@@ -2,7 +2,6 @@
 title: "Harmony_models_and_patients"
 output: html_notebook
 ---
-#asdfas
 from :https://colab.research.google.com/drive/1GJ6ZhZq1B2TIalPz2izhhF8fcOJmLrbR?usp=sharing
 ```{r}
 xeno = readRDS("./Data/10x_xeno_1000.Rds")
