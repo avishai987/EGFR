@@ -1,0 +1,95 @@
+---
+title: "R Notebook"
+output: 
+  html_notebook: 
+    code_folding: hide
+---
+
+```{python}
+suffix ="2Kvargenes_100_iter"
+import pickle
+f = open('./Data/cnmf/patients_' + suffix '_cnmf_obj.pckl', 'rb')
+cnmf_obj = pickle.load(f)
+f.close()
+```
+
+```{python}
+selected_k = 4
+density_threshold = 0.1
+cnmf_obj.consensus(k=selected_k, density_threshold=density_threshold)
+usage_norm, gep_scores, gep_tpm, topgenes = cnmf_obj.load_results(K=selected_k, density_threshold=density_threshold)
+```
+
+
+
+```{r fig.height=10, fig.width=10}
+#Add to seurat metadata:
+
+library(reticulate)
+all_metagenes= py$usage_norm
+#Make metagene names
+for (i in 1:ncol(all_metagenes)) {
+  colnames(all_metagenes)[i] = "metagene." %>% paste0(i)
+}
+
+#add each metagene to metadata
+for (i in 1:ncol(all_metagenes)) {
+  metage_metadata = all_metagenes %>% select(i)
+  lung = AddMetaData(object = lung,metadata = metage_metadata)
+}
+```
+
+
+```{r fig.height=10, fig.width=10}
+FeaturePlot(object = lung,features = colnames(all_metagenes))
+```
+
+## Enrichment analysis by top 200 genes of each program
+```{r fig.height=8, fig.width=8, results='hide'}
+gep_scores = py$gep_scores
+plt_list = list()
+for (i in 1:ncol(gep_scores)) {
+  top_genes = gep_scores  %>%  arrange(desc(gep_scores[i])) #sort by score a
+  top = head(rownames(top_genes),200) #take top top_genes_num
+  res = genes_vec_enrichment(genes = top,background = rownames(gep_scores),gene_sets = "homer_hallmark",title = 
+                    i,convert_background = T,add_msigdb_to_set = T,add_bg = F,silent = T,return_all = T)
+   
+  plt_list[[i]] = res$plt
+}
+gridExtra::grid.arrange(grobs = plt_list)
+```
+
+## Enrichment analysis by selecting genes using "max" method
+```{r fig.height=7, fig.width=7, results='hide'}
+gep_scores = py$gep_scores
+plt_list = list()
+
+library(NMF)
+top_features = extractFeatures(object = gep_scores %>% data.matrix(),method ="max")
+for (i in 1:length(top_features)) {
+  top_features[[i]]= rownames(gep_scores)[top_features[[i]]]
+}
+
+for (i in 1:ncol(gep_scores)) {
+top = top_features[i] %>% unlist()
+  try({ 
+      res = genes_vec_enrichment(genes = top,background = rownames(gep_scores),gene_sets = "homer_hallmark",title = 
+                      i,convert_background = T,add_msigdb_to_set = T,add_bg = F,silent = T,return_all = T)
+      plt_list[[i]] = res$plt
+    }, silent=TRUE)
+}
+plt_list = Filter(Negate(is.null), plt_list) #remove null plots
+
+
+gridExtra::grid.arrange(grobs = plt_list)
+
+```
+
+
+```{r eval=FALSE, include=FALSE}
+rstudioapi::documentSave() #save doc
+this_notebooke_path = rstudioapi::getSourceEditorContext()$path
+previewed_notebook = gsub(pattern = ".Rmd",replacement = ".nb.html",x = this_notebooke_path)
+final_notebook  = basename(this_notebooke_path) %>% gsub(pattern = ".Rmd",replacement = "")
+file.copy(from = previewed_notebook, to = dirname(this_notebooke_path) %>% paste(final_notebook,sep = "/") %>% paste(suffix,sep = "_") %>% paste0(".html"))
+```

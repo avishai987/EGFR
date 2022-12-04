@@ -1,0 +1,12 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+Data/
+.Rprofile
+.cahce/
+.conda/
+.config/
+.local/
+.cache/
+EGFR.Rproj

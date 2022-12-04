@@ -1,0 +1,83 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+```{r}
+suffix = "2K_test"
+```
+
+```{python}
+f = open('./Data/cnmf/xeno_2Kvargenes_cnmf_obj.pckl', 'rb')
+cnmf_obj = pickle.load(f)
+f.close()
+```
+
+## K selection plot
+![Caption for the picture.](/sci/labs/yotamd/lab_share/avishai.wizel/R_projects/EGFR/Data/cnmf/cNMF_patients_Varnorm_Harmony_2Kvargenes/cNMF_patients_Varnorm_Harmony_2Kvargenes.k_selection.png)
+
+
+```{python}
+selected_k = 5
+cnmf_obj.consensus(k=selected_k, density_threshold=0.1)
+usage_norm, gep_scores, gep_tpm, topgenes = cnmf_obj.load_results(K=selected_k, density_threshold=0.1)
+
+```
+
+```{r fig.height=10, fig.width=10}
+library(reticulate)
+xeno = readRDS("./Data/10x_xeno_1000.Rds")
+
+all_metagenes= py$usage_norm
+
+
+#Make metagene names
+for (i in 1:ncol(all_metagenes)) {
+  colnames(all_metagenes)[i] = "metagene." %>% paste0(i)
+}
+
+#add each metagene to metadata
+for (i in 1:ncol(all_metagenes)) {
+  metage_metadata = all_metagenes %>% select(i)
+  xeno = AddMetaData(object = xeno,metadata = metage_metadata)
+}
+```
+
+## Programs on UMAP
+```{r fig.height=10, fig.width=10}
+FeaturePlot(object = xeno,features = colnames(all_metagenes))
+```
+
+
+## Enrichment analysis by top 200 genes of each program
+
+```{r results='hide'}
+gep_scores = py$gep_scores
+for (i in 1:ncol(gep_scores)) {
+  top_genes = gep_scores  %>%  arrange(gep_scores[i]) #sort by score a
+   top = head(rownames(top_genes),100) #take top top_genes_num
+   genes_vec_enrichment(genes = top,background = rownames(gep_scores),gene_sets = "homer_hallmark",title = i,convert_background = T,add_msigdb_to_set = T)
+}
+```
+## Enrichment analysis by selecting genes using "max" method
+
+```{r results='hide'}
+library(NMF)
+top_features = extractFeatures(object = gep_scores %>% data.matrix(),method ="max")
+for (i in 1:length(top_features)) {
+  top_features[[i]]= rownames(gep_scores)[top_features[[i]]]
+}
+
+for (i in 1:ncol(gep_scores)) {
+top = top_features[i] %>% unlist()
+   genes_vec_enrichment(genes = top,background = rownames(gep_scores),gene_sets = "homer_hallmark",title = i,convert_background = T,add_msigdb_to_set = T)
+}
+```
+
+
+```{r eval=FALSE, include=FALSE}
+this_notebooke_path = rstudioapi::getSourceEditorContext()$path
+previewed_notebook = gsub(pattern = ".Rmd",replacement = ".nb.html",x = this_notebooke_path)
+final_notebook  = basename(this_notebooke_path) %>% gsub(pattern = ".Rmd",replacement = "")
+file.copy(from =previewed_notebook, to = "." %>% paste0(final_notebook) %>% paste(suffix,sep = "_") %>% paste0(".html"))
+```
+
