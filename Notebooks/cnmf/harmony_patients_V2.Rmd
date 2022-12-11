@@ -1,0 +1,224 @@
+---
+title: "Harmony_patients_V2"
+output: 
+  html_notebook: 
+    code_folding: hide
+---
+
+
+## Data
+```{r}
+lung = readRDS("./Data/lung_cancercells_withTP_onlyPatients.rds")
+```
+
+```{r}
+library(reticulate)
+```
+
+## Parameters
+```{r}
+#define parametes
+nfeatures = 2000 #default: 2000
+n_iter = 10 #default: 10
+densify = T #default: T
+convert_to_tpm = F #default: T
+provideTPM = F  #default: T
+theta = 2.7 #default: 2
+suffix ="2Kvargenes_logTPM_2-7theta"
+
+```
+
+```{python}
+#import parameters to python
+nfeatures = r.nfeatures
+n_iter = int(r.n_iter)
+densify = r.densify
+suffix = r.suffix
+provideTPM = r.provideTPM
+theta = r.theta
+```
+
+```{r}
+lung = FindVariableFeatures(object = lung,nfeatures = nfeatures)
+```
+
+## Convert seurat to scanpy
+```{r}
+sc <- import('scanpy', convert = FALSE)
+gene_expression = t(as.matrix(GetAssayData(lung,slot='data')))
+
+if(convert_to_tpm == T){
+gene_expression = 2**gene_expression #convert log2(TPM+1) to TPM+1
+gene_expression = gene_expression-1 #convert TPM+1 to TPM
+}
+
+adata <- sc$AnnData(
+  X   = gene_expression, 
+  obs = lung[[]],
+  var = GetAssay(lung)[[]]
+)
+rm(gene_expression)
+```
+
+```{python}
+# %matplotlib inline
+# %load_ext autoreload
+# %autoreload 2
+import scipy
+import scanpy as sc
+import matplotlib.pyplot as plt
+import harmonypy
+from harmonypy import run_harmony
+import sys
+from cnmf import cNMF
+
+import numpy as np
+import pandas as pd
+from sklearn.decomposition import NMF
+import seaborn as sns
+import yaml
+## copied from harmonypy.py
+def moe_correct_ridge(Z_orig, Z_cos, Z_corr, R, W, K, Phi_Rk, Phi_moe, lamb):
+    Z_corr = Z_orig.copy()
+    for i in range(K):
+        Phi_Rk = np.multiply(Phi_moe, R[i,:])
+        x = np.dot(Phi_Rk, Phi_moe.T) + lamb
+        W = np.dot(np.dot(np.linalg.inv(x), Phi_Rk), Z_orig.T)
+        W[0,:] = 0 # do not remove the intercept
+        Z_corr -= np.dot(W.T, Phi_Rk)
+    Z_cos = Z_corr / np.linalg.norm(Z_corr, ord=2, axis=0)
+    return Z_cos, Z_corr, W, Phi_Rk
+
+```
+
+## Scale high var genes+ PCA
+```{python}
+adata = r.adata
+
+# sc.pp.normalize_per_cell(adata)
+adata.var['highly_variable'] = adata.var['vst.variable']
+adata = adata[:,adata.var['highly_variable']].copy()
+sc.pp.scale(adata, zero_center=False, max_value=50)
+sc.tl.pca(adata, use_highly_variable=True)
+sc.pl.pca_variance_ratio(adata, log=True)
+# plt.savefig("./Data/cnmf/PCA_patients_"+suffix)
+```
+#Run harmony
+```{python}
+harmony_res = harmonypy.run_harmony(adata.obsm['X_pca'], adata.obs, 'patient.ident', max_iter_harmony = 15,theta = theta)
+```
+## Adujst correction
+```{python}
+X = np.array(adata[:,adata.var['highly_variable']].X)
+
+_, X_corr, _, _ = moe_correct_ridge(X.T, None, None, harmony_res.R, None, harmony_res.K,
+                                            None, harmony_res.Phi_moe, harmony_res.lamb)
+X_corr = X_corr.T
+```
+
+## non negative correction
+```{python}
+adata_corr = adata[:,adata.var['highly_variable']].copy()
+X_corr_nonneg = X_corr.copy()
+X_corr_nonneg[X_corr_nonneg<0]= 0
+adata_corr_nonneg = adata_corr.copy()
+adata_corr_nonneg.X = X_corr_nonneg
+```
+## import to seurat for plotting UMAP
+```{r}
+exprs <- t(py$adata_corr_nonneg$X)
+colnames(exprs) <- py$adata$obs_names$to_list()
+rownames(exprs) <- py$adata$var_names$to_list()
+# Create the Seurat object
+lung_corr_nonneg <- CreateSeuratObject(counts = exprs)
+lung_corr_nonneg$patient.ident <- py$adata$obs["patient.ident"]
+lung_corr_nonneg$time.point <- py$adata$obs["time.point"]
+
+```
+
+## PCA after correction
+```{r}
+lung_corr_nonneg@assays$RNA@scale.data = exprs
+lung_corr_nonneg <- RunPCA(lung_corr_nonneg, features = rownames(lung_corr_nonneg))
+
+ElbowPlot(lung_corr_nonneg)
+```
+## Run dim reduction
+```{r results='hide'}
+pc2use = 1:5
+lung_corr_nonneg <- FindNeighbors(lung_corr_nonneg, dims = pc2use)
+lung_corr_nonneg <- FindClusters(lung_corr_nonneg, resolution = 0.5)
+lung_corr_nonneg <- RunUMAP(lung_corr_nonneg, dims = pc2use)
+
+```
+
+## UMAP after correction
+```{r}
+DimPlot(lung_corr_nonneg, reduction = "umap",group.by = "patient.ident")
+```
+```{r}
+DimPlot(lung_corr_nonneg, reduction = "umap",group.by = "time.point")
+```
+```{python}
+suffix
+```
+
+```{python}
+sc.write('./Data/cnmf/lung_Harmony_NoNeg_' + suffix +'.h5ad', adata_corr_nonneg)
+```
+
+cNMF:
+
+```{python}
+name = 'cNMF_patients_Varnorm_Harmony_' + suffix
+outdir = './Data/cnmf'
+K_range = np.arange(3,10)
+cnmf_obj = cNMF(output_dir=outdir, name=name)
+counts_fn='./Data/cnmf/lung_Harmony_NoNeg_' + suffix +'.h5ad'
+if (provideTPM == True):
+  tpm_fn = counts_fn
+else:
+  tpm_fn = None
+
+cnmf_obj.prepare(counts_fn=counts_fn, components=K_range, n_iter=n_iter, seed=14,tpm_fn=tpm_fn,densify=densify)
+```
+
+```{python}
+cnmf_obj.factorize(worker_i=0, total_workers=1)
+```
+
+```{python}
+cnmf_obj.combine()
+cnmf_obj.k_selection_plot()
+```
+
+```{python}
+import pickle
+f = open('./Data/cnmf/cnmf_objects/patients_' + suffix +'_cnmf_obj.pckl', 'wb')
+pickle.dump(cnmf_obj, f)
+f.close()
+```
+
+
+```{r results='hide'}
+## calibrate harmony parameters with seurat
+library(harmony)
+lung = RunHarmony(object = lung,group.by.vars = c("patient.ident"),plot_convergence = T,max.iter.harmony = 15,dims.use = pc2use,theta = 2.5,sigma = 0.3,nclust = 3)
+```
+
+```{r results='hide'}
+ DimPlot(object = lung, reduction = "harmony", pt.size = .1, group.by = "patient.ident")
+```
+
+```{r eval=FALSE, include=FALSE, results='hide'}
+lung <- lung %>% 
+    RunUMAP(reduction = "harmony", dims = 1:20) 
+```
+
+```{r results='hide'}
+DimPlot(lung, reduction = "umap", group.by = "patient.ident")
+```
+
+```{r results='hide'}
+DimPlot(lung, reduction = "umap", group.by = "time.point")
+```

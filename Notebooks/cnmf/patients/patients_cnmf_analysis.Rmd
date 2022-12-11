@@ -5,22 +5,42 @@ output:
     code_folding: hide
 ---
 
+## Data
+```{r}
+lung = readRDS("./Data/lung_cancercells_withTP_onlyPatients.rds")
+```
+
+
 ```{python}
-suffix ="2Kvargenes_100_iter"
+suffix ="2Kvargenes_logTPM"
 import pickle
-f = open('./Data/cnmf/patients_' + suffix '_cnmf_obj.pckl', 'rb')
+f = open('./Data/cnmf/cnmf_objects/patients_' + suffix + '_cnmf_obj.pckl', 'rb')
 cnmf_obj = pickle.load(f)
 f.close()
 ```
+## Functions
+
+```{r}
+source_from_github(repositoy = "DEG_functions",version = "0.2.1")
+```
+
 
 ```{python}
-selected_k = 4
+selected_k = 3
 density_threshold = 0.1
 cnmf_obj.consensus(k=selected_k, density_threshold=density_threshold)
 usage_norm, gep_scores, gep_tpm, topgenes = cnmf_obj.load_results(K=selected_k, density_threshold=density_threshold)
 ```
 
 
+```{r}
+gep_scores= py$gep_scores %>% t() %>%  as.matrix()
+expression = lung@assays$RNA@data %>% as.matrix()
+expression = expression[rownames(expression) %in% VariableFeatures(lung),]
+
+my_usage = gep_scores%*%expression
+all_metagenes = my_usage %>% t() %>% as.data.frame()
+```
 
 ```{r fig.height=10, fig.width=10}
 #Add to seurat metadata:
@@ -40,6 +60,7 @@ for (i in 1:ncol(all_metagenes)) {
 ```
 
 
+
 ```{r fig.height=10, fig.width=10}
 FeaturePlot(object = lung,features = colnames(all_metagenes))
 ```
@@ -51,8 +72,8 @@ plt_list = list()
 for (i in 1:ncol(gep_scores)) {
   top_genes = gep_scores  %>%  arrange(desc(gep_scores[i])) #sort by score a
   top = head(rownames(top_genes),200) #take top top_genes_num
-  res = genes_vec_enrichment(genes = top,background = rownames(gep_scores),gene_sets = "homer_hallmark",title = 
-                    i,convert_background = T,add_msigdb_to_set = T,add_bg = F,silent = T,return_all = T)
+  res = genes_vec_enrichment(genes = top,background = rownames(gep_scores),homer = T,title = 
+                    i,silent = T,return_all = T)
    
   plt_list[[i]] = res$plt
 }
@@ -73,8 +94,8 @@ for (i in 1:length(top_features)) {
 for (i in 1:ncol(gep_scores)) {
 top = top_features[i] %>% unlist()
   try({ 
-      res = genes_vec_enrichment(genes = top,background = rownames(gep_scores),gene_sets = "homer_hallmark",title = 
-                      i,convert_background = T,add_msigdb_to_set = T,add_bg = F,silent = T,return_all = T)
+ res = genes_vec_enrichment(genes = top,background = rownames(gep_scores),homer = T,title = 
+                    i,silent = T,return_all = T)
       plt_list[[i]] = res$plt
     }, silent=TRUE)
 }
@@ -84,7 +105,16 @@ plt_list = Filter(Negate(is.null), plt_list) #remove null plots
 gridExtra::grid.arrange(grobs = plt_list)
 
 ```
-
+## Enriched in patient
+```{r fig.height=5, fig.width=7}
+lung = SetIdent(object = lung,value = "patient.ident")
+VlnPlot(object = lung,features = colnames(all_metagenes))
+```
+## Enriched in time point
+```{r fig.height=6, fig.width=7}
+lung = SetIdent(object = lung,value = "time.point")
+VlnPlot(object = lung,features = colnames(all_metagenes))
+```
 
 ```{r eval=FALSE, include=FALSE}
 rstudioapi::documentSave() #save doc
@@ -93,3 +123,5 @@ previewed_notebook = gsub(pattern = ".Rmd",replacement = ".nb.html",x = this_not
 final_notebook  = basename(this_notebooke_path) %>% gsub(pattern = ".Rmd",replacement = "")
 file.copy(from = previewed_notebook, to = dirname(this_notebooke_path) %>% paste(final_notebook,sep = "/") %>% paste(suffix,sep = "_") %>% paste0(".html"))
 ```
+
+
