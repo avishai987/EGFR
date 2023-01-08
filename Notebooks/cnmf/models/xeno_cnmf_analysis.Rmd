@@ -1,35 +1,71 @@
 ---
-title: "R Notebook"
-output: html_notebook
+title: "Xeno_cnmf_analysis"
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+output: 
+  html_notebook: 
+    code_folding: hide
 ---
+## Data
 ```{r}
-suffix = "2K_test"
+xeno = readRDS("./Data/10x_xeno_1000.Rds")
+```
+
+```{r}
+library(reticulate)
+```
+
+
+```{r}
+by_expression = T #calculate metagenes by multiplie expression in genes coef, or by cnmf usage
+suffix = "2Kvargenes"
 ```
 
 ```{python}
-f = open('./Data/cnmf/xeno_2Kvargenes_cnmf_obj.pckl', 'rb')
+suffix = r.suffix
+import pickle
+f = open('./Data/cnmf/cnmf_objects/models_' + suffix + '_cnmf_obj.pckl', 'rb')
 cnmf_obj = pickle.load(f)
 f.close()
 ```
+## Functionres
 
-## K selection plot
-![Caption for the picture.](/sci/labs/yotamd/lab_share/avishai.wizel/R_projects/EGFR/Data/cnmf/cNMF_patients_Varnorm_Harmony_2Kvargenes/cNMF_patients_Varnorm_Harmony_2Kvargenes.k_selection.png)
+```{r}
+library(stringi)
+source_from_github(repositoy = "DEG_functions",version = "0.2.1")
+source_from_github(repositoy = "cNMF_functions",version = "0.3.21",script_name = "cnmf_function_Harmony.R")
+```
+<!-- ## K selection plot -->
+<!-- ![Caption for the picture.](/sci/labs/yotamd/lab_share/avishai.wizel/R_projects/EGFR/Data/cnmf/cNMF_patients_Varnorm_Harmony_2Kvargenes/cNMF_patients_Varnorm_Harmony_2Kvargenes.k_selection.png) -->
+
+
+```{r}
+selected_k = 4
+suffix = paste(suffix,paste0(selected_k,"nmfK"),sep="_")
+print(suffix)
+```
 
 
 ```{python}
-selected_k = 5
-cnmf_obj.consensus(k=selected_k, density_threshold=0.1)
-usage_norm, gep_scores, gep_tpm, topgenes = cnmf_obj.load_results(K=selected_k, density_threshold=0.1)
-
+selected_k = int(r.selected_k)
+density_threshold = 0.1
+cnmf_obj.consensus(k=selected_k, density_threshold=density_threshold)
+usage_norm, gep_scores, gep_tpm, topgenes = cnmf_obj.load_results(K=selected_k, density_threshold=density_threshold)
 ```
 
+```{r}
+gep_scores= py$gep_scores 
+```
+
+```{r}
+if (by_expression){
+  all_metagenes = expression_mult(gep_scores = gep_scores,dataset = xeno)
+
+}else{all_metagenes= py$usage_norm}
+```
+
+
 ```{r fig.height=10, fig.width=10}
-library(reticulate)
-xeno = readRDS("./Data/10x_xeno_1000.Rds")
-
-all_metagenes= py$usage_norm
-
-
 #Make metagene names
 for (i in 1:ncol(all_metagenes)) {
   colnames(all_metagenes)[i] = "metagene." %>% paste0(i)
@@ -50,17 +86,24 @@ FeaturePlot(object = xeno,features = colnames(all_metagenes))
 
 ## Enrichment analysis by top 200 genes of each program
 
-```{r results='hide'}
-gep_scores = py$gep_scores
+```{r fig.height=8, fig.width=8, results='hide'}
+# gep_scores = py$gep_scores
+plt_list = list()
 for (i in 1:ncol(gep_scores)) {
-  top_genes = gep_scores  %>%  arrange(gep_scores[i]) #sort by score a
-   top = head(rownames(top_genes),100) #take top top_genes_num
-   genes_vec_enrichment(genes = top,background = rownames(gep_scores),gene_sets = "homer_hallmark",title = i,convert_background = T,add_msigdb_to_set = T)
+  top_genes = gep_scores  %>%  arrange(desc(gep_scores[i])) #sort by score a
+  top = head(rownames(top_genes),200) #take top top_genes_num
+  res = genes_vec_enrichment(genes = top,background = rownames(gep_scores),homer = T,title = 
+                    i,silent = T,return_all = T)
+   
+  plt_list[[i]] = res$plt
 }
+gridExtra::grid.arrange(grobs = plt_list)
 ```
 ## Enrichment analysis by selecting genes using "max" method
+```{r fig.height=7, fig.width=7, results='hide'}
+# gep_scores = py$gep_scores
+plt_list = list()
 
-```{r results='hide'}
 library(NMF)
 top_features = extractFeatures(object = gep_scores %>% data.matrix(),method ="max")
 for (i in 1:length(top_features)) {
@@ -69,15 +112,32 @@ for (i in 1:length(top_features)) {
 
 for (i in 1:ncol(gep_scores)) {
 top = top_features[i] %>% unlist()
-   genes_vec_enrichment(genes = top,background = rownames(gep_scores),gene_sets = "homer_hallmark",title = i,convert_background = T,add_msigdb_to_set = T)
+  try({ 
+ res = genes_vec_enrichment(genes = top,background = rownames(gep_scores),homer = T,title = 
+                    i,silent = T,return_all = T)
+      plt_list[[i]] = res$plt
+    }, silent=TRUE)
 }
+plt_list = Filter(Negate(is.null), plt_list) #remove null plots
+
+
+gridExtra::grid.arrange(grobs = plt_list)
+
 ```
 
+## Enriched in time point
+larger_by = `r larger_by`
+```{r}
+larger_by = 2
+xeno = program_assignment(dataset = xeno,larger_by = larger_by,program_names = colnames(all_metagenes))
+```   
 
-```{r eval=FALSE, include=FALSE}
-this_notebooke_path = rstudioapi::getSourceEditorContext()$path
-previewed_notebook = gsub(pattern = ".Rmd",replacement = ".nb.html",x = this_notebooke_path)
-final_notebook  = basename(this_notebooke_path) %>% gsub(pattern = ".Rmd",replacement = "")
-file.copy(from =previewed_notebook, to = "." %>% paste0(final_notebook) %>% paste(suffix,sep = "_") %>% paste0(".html"))
+```{r}
+cell_percentage(dataset = xeno,time.point_var = "treatment")
+```
+
+```{r}
+DimPlot(xeno,group.by = "program.assignment")
+# DimPlot(xeno,group.by = "program.assignment",cols = c("red","darkgreen","blue","yellow","black","grey"))
 ```
 

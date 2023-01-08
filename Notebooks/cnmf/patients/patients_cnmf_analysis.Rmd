@@ -10,43 +10,63 @@ output:
 lung = readRDS("./Data/lung_cancercells_withTP_onlyPatients.rds")
 ```
 
+```{r}
+suffix ="2Kvargenes_normalized_2-7theta"
+```
 
 ```{python}
-suffix ="2Kvargenes_logTPM"
+suffix = r.suffix
 import pickle
 f = open('./Data/cnmf/cnmf_objects/patients_' + suffix + '_cnmf_obj.pckl', 'rb')
 cnmf_obj = pickle.load(f)
 f.close()
 ```
-## Functions
+## Functionres
 
 ```{r}
+library(stringi)
 source_from_github(repositoy = "DEG_functions",version = "0.2.1")
+source_from_github(repositoy = "cNMF_functions",version = "0.3.21",script_name = "cnmf_function_Harmony.R")
 ```
 
+```{r}
+selected_k = 5
+suffix = paste(suffix,paste0(selected_k,"nmfK"),sep="_")
+print(suffix)
+```
 
 ```{python}
-selected_k = 3
+selected_k = int(r.selected_k)
 density_threshold = 0.1
-cnmf_obj.consensus(k=selected_k, density_threshold=density_threshold)
+cnmf_obj.consensus(k=selected_k, density_threshold=density_threshold,show_clustering=True)
 usage_norm, gep_scores, gep_tpm, topgenes = cnmf_obj.load_results(K=selected_k, density_threshold=density_threshold)
 ```
 
-
+## gep scores by expression
 ```{r}
 gep_scores= py$gep_scores %>% t() %>%  as.matrix()
 expression = lung@assays$RNA@data %>% as.matrix()
-expression = expression[rownames(expression) %in% VariableFeatures(lung),]
+expression = expression[rownames(expression) %in% colnames(gep_scores),]
 
 my_usage = gep_scores%*%expression
 all_metagenes = my_usage %>% t() %>% as.data.frame()
+   
+ # for (col_num in 1:ncol(all_metagenes)){
+ #      program_sum = sum(all_metagenes[,col_num])
+ #      norm_program = all_metagenes[,col_num]/program_sum 
+ #      all_metagenes[,col_num] = norm_program
+ #    }
 ```
 
-```{r fig.height=10, fig.width=10}
+```{r}
 #Add to seurat metadata:
 
 library(reticulate)
 all_metagenes= py$usage_norm
+```
+
+```{r fig.height=10, fig.width=10}
+
 #Make metagene names
 for (i in 1:ncol(all_metagenes)) {
   colnames(all_metagenes)[i] = "metagene." %>% paste0(i)
@@ -111,17 +131,31 @@ lung = SetIdent(object = lung,value = "patient.ident")
 VlnPlot(object = lung,features = colnames(all_metagenes))
 ```
 ## Enriched in time point
-```{r fig.height=6, fig.width=7}
-lung = SetIdent(object = lung,value = "time.point")
-VlnPlot(object = lung,features = colnames(all_metagenes))
+```{r}
+lung = program_assignment(dataset = lung,larger_by = 2,program_names = colnames(all_metagenes))
+```   
+
+```{r}
+data =FetchData(object = lung,vars = c("program.assignment","time.point"))
+data = data %>% dplyr::count(program.assignment, time.point) %>%  dplyr::add_count(time.point, wt = n, name = "overall")%>% 
+mutate(proportion = n / overall)   
+
+plt_list = list()
+for (program_name in unique(data$program.assignment)) {
+  program_data = data[data$program.assignment == program_name,]
+  p = ggplot(data=program_data, aes(x=time.point, y=proportion)) +geom_bar(stat="identity")+ylab("precentage") +ggtitle("program" %>% paste(program_data$program.assignment %>% unique() %>% as.character())) +
+    scale_y_continuous(limits = c(0,1))  
+    plt_list[[program_name]] = p
+}
+gridExtra::grid.arrange(grobs = plt_list)
+
 ```
 
-```{r eval=FALSE, include=FALSE}
-rstudioapi::documentSave() #save doc
-this_notebooke_path = rstudioapi::getSourceEditorContext()$path
-previewed_notebook = gsub(pattern = ".Rmd",replacement = ".nb.html",x = this_notebooke_path)
-final_notebook  = basename(this_notebooke_path) %>% gsub(pattern = ".Rmd",replacement = "")
-file.copy(from = previewed_notebook, to = dirname(this_notebooke_path) %>% paste(final_notebook,sep = "/") %>% paste(suffix,sep = "_") %>% paste0(".html"))
+```{r}
+DimPlot(lung,group.by = "program.assignment")
+
+# DimPlot(lung,group.by = "program.assignment",cols = c("red","darkgreen","blue","grey"))
 ```
+
 
 

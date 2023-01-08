@@ -1,0 +1,171 @@
+---
+title: "Title"
+author: "Avishai Wizel"
+date: '`r Sys.Date()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+---
+
+## Parameters
+
+```{r warning=FALSE}
+lung_suffix = "2Kvargenes_normalized_2-7theta"
+xeno_suffix = "2Kvargenes"
+```
+```{r}
+library(reticulate)
+```
+
+
+## functions
+
+```{r warning=FALSE}
+library(stringi)
+source_from_github(repositoy = "DEG_functions",version = "0.2.1")
+source_from_github(repositoy = "cNMF_functions",version = "0.3.21",script_name = "cnmf_function_Harmony.R")
+```
+
+## Data
+
+```{python}
+lung_suffix = r.lung_suffix
+xeno_suffix = r.xeno_suffix
+
+import pickle
+f = open('./Data/cnmf/cnmf_objects/patients_' + lung_suffix + '_cnmf_obj.pckl', 'rb')
+lung_cnmf_obj = pickle.load(f)
+f.close()
+
+f = open('./Data/cnmf/cnmf_objects/models_' + xeno_suffix + '_cnmf_obj.pckl', 'rb')
+xeno_cnmf_obj = pickle.load(f)
+f.close()
+```
+
+```{python}
+selected_k = 4
+density_threshold = 0.1
+# cnmf_obj.consensus(k=selected_k, density_threshold=density_threshold) #if not already  computed 
+usage_norm, lung_gep_scores, lung_gep_tpm, topgenes = lung_cnmf_obj.load_results(K=selected_k, density_threshold=density_threshold)
+```
+
+```{python}
+selected_k = 4
+density_threshold = 0.1
+# cnmf_obj.consensus(k=selected_k, density_threshold=density_threshold) #if not already  computed
+usage_norm, xeno_gep_scores, xeno_gep_tpm, topgenes = xeno_cnmf_obj.load_results(K=selected_k, density_threshold=density_threshold)
+```
+
+```{r}
+xeno_gep_scores= py$xeno_gep_scores
+lung_gep_scores = py$lung_gep_scores
+
+for (score in list(lung_gep_scores, xeno_gep_scores)) {
+    plt_list = list()
+    for (i in 1:ncol(score)) {
+      top_genes = score  %>%  arrange(desc(score[i])) #sort by score a
+      top = head(rownames(top_genes),200) #take top top_genes_num
+      res = genes_vec_enrichment(genes = top,background = rownames(score),homer = T,title = 
+                        names(score)[i],silent = T,return_all = T)
+       
+      plt_list[[i]] = res$plt
+    }
+    gridExtra::grid.arrange(grobs = plt_list)
+}
+```
+
+```{r}
+common_genes = intersect(rownames(xeno_gep_scores), rownames(lung_gep_scores))
+
+xeno_gep_scores = xeno_gep_scores[rownames(xeno_gep_scores) %in% common_genes,]
+lung_gep_scores = lung_gep_scores[rownames(lung_gep_scores) %in% common_genes,]
+sum2one <- function(df) {
+   for (col_num in 1:ncol(df)){
+      program_sum = sum(df[,col_num])
+      norm_program = df[,col_num]/program_sum
+      df[,col_num] = norm_program
+      return(df)
+    }
+}
+xeno_gep_scores = scale(xeno_gep_scores)
+lung_gep_scores = scale(lung_gep_scores)
+# xeno_gep_scores = sum2one(xeno_gep_scores)
+# lung_gep_scores = sum2one(lung_gep_scores)
+lung_gep_scores = lung_gep_scores[match(rownames(xeno_gep_scores), rownames(lung_gep_scores)),] #order lung rows like xeno
+
+```
+
+```{r fig.height=6, fig.width=6, results='hide'}
+for (score in list(lung_gep_scores %>% as.data.frame(), xeno_gep_scores %>% as.data.frame())) {
+    plt_list = list()
+    for (i in 1:ncol(score)) {
+      top_genes = score  %>%  arrange(desc(score[i])) #sort by score a
+      top = head(rownames(top_genes),200) #take top top_genes_num
+      res = genes_vec_enrichment(genes = top,background = rownames(score),homer = T,title = 
+                        names(score)[i],silent = T,return_all = T)
+       
+      plt_list[[i]] = res$plt
+    }
+    gridExtra::grid.arrange(grobs = plt_list)
+}
+
+```
+
+
+```{r}
+cor_res = cor(x = xeno_gep_scores,y = lung_gep_scores)
+```
+
+```{r}
+pheatmap(cor_res,breaks=seq(-1, 1, length.out=100),display_numbers = T,color = colorRampPalette(c("blue", "white", "red"))(100))
+```
+
+```{r}
+cell_cycle = xeno_gep_scores[,3] %>% cbind(lung_gep_scores[,3]) %>% rowMeans()
+on_treatment = xeno_gep_scores[,2] %>% cbind(lung_gep_scores[,2]) %>% rowMeans()
+hypoxia = xeno_gep_scores[,1] %>% cbind(lung_gep_scores[,1]) %>% rowMeans()
+gep_scores = cbind(hypoxia,on_treatment,cell_cycle) %>% as.data.frame() %>% setNames(c("cell_cycle","on_treatment","hypoxia"))
+```
+
+```{r fig.height=6, fig.width=6, results='hide'}
+# gep_scores = py$gep_scores
+plt_list = list()
+for (i in 1:ncol(gep_scores)) {
+  top_genes = gep_scores  %>%  arrange(desc(gep_scores[i])) #sort by score a
+  top = head(rownames(top_genes),200) #take top top_genes_num
+  res = genes_vec_enrichment(genes = top,background = rownames(gep_scores),homer = T,title = 
+                    names(gep_scores)[i],silent = T,return_all = T)
+   
+  plt_list[[i]] = res$plt
+}
+gridExtra::grid.arrange(grobs = plt_list)
+```
+
+```{r}
+lung@project.name = "patients_ss2"
+all_metagenes_lst = list()
+for (dataset in list(xeno,lung)) {
+  all_metagenes = expression_mult(gep_scores = gep_scores,dataset = dataset)
+  all_metagenes_lst[[dataset@project.name]] = all_metagenes
+}
+
+```
+
+
+```{r fig.height=10, fig.width=10}
+#Make metagene names
+
+for (dataset in list(xeno,lung)) {
+  all_metagenes = all_metagenes_lst[[dataset@project.name]]
+  #add each metagene to metadata
+  for (i in 1:ncol(all_metagenes)) {
+    metage_metadata = all_metagenes %>% select(i)
+    dataset = AddMetaData(object = dataset,metadata = metage_metadata)
+  }
+ print(FeaturePlot(object = dataset,features = colnames(all_metagenes)))
+}
+
+```
+
+
+

@@ -1,0 +1,192 @@
+---
+title: "Title"
+author: "Avishai Wizel"
+date: '`r Sys.Date()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+---
+
+
+
+## Data
+```{r}
+xeno = readRDS("./Data/10x_xeno_1000.Rds")
+```
+
+```{r}
+library(reticulate)
+```
+
+## Parameters
+```{r}
+#define parametes
+nfeatures = 2000 #default: 2000
+n_iter = 10 #default: 10
+densify = T #default: T
+theta = 2 #default: 2
+suffix ="2Kvargenes"
+print(suffix)
+```
+
+```{python}
+#import parameters to python
+nfeatures = r.nfeatures
+n_iter = int(r.n_iter)
+densify = r.densify
+suffix = r.suffix
+theta = r.theta
+```
+
+```{r}
+xeno = FindVariableFeatures(object = xeno,nfeatures = nfeatures)
+```
+
+## Convert seurat to scanpy
+```{r}
+sc <- import('scanpy', convert = FALSE)
+gene_expression = t(as.matrix(GetAssayData(xeno,slot='counts'))) #cnmf expect 10x counts
+
+
+adata <- sc$AnnData(
+  X   = gene_expression, 
+  obs = xeno[[]],
+  var = GetAssay(xeno)[[]]
+)
+rm(gene_expression)
+```
+
+```{python}
+# %matplotlib inline
+# %load_ext autoreload
+# %autoreload 2
+import scipy
+import scanpy as sc
+import matplotlib.pyplot as plt
+import harmonypy
+from harmonypy import run_harmony
+import sys
+from cnmf import cNMF
+
+import numpy as np
+import pandas as pd
+from sklearn.decomposition import NMF
+import seaborn as sns
+import yaml
+## copied from harmonypy.py
+def moe_correct_ridge(Z_orig, Z_cos, Z_corr, R, W, K, Phi_Rk, Phi_moe, lamb):
+    Z_corr = Z_orig.copy()
+    for i in range(K):
+        Phi_Rk = np.multiply(Phi_moe, R[i,:])
+        x = np.dot(Phi_Rk, Phi_moe.T) + lamb
+        W = np.dot(np.dot(np.linalg.inv(x), Phi_Rk), Z_orig.T)
+        W[0,:] = 0 # do not remove the intercept
+        Z_corr -= np.dot(W.T, Phi_Rk)
+    Z_cos = Z_corr / np.linalg.norm(Z_corr, ord=2, axis=0)
+    return Z_cos, Z_corr, W, Phi_Rk
+
+```
+
+## Scale high var genes+ PCA
+```{python}
+adata = r.adata
+
+sc.pp.normalize_per_cell(adata) 
+adata.var['highly_variable'] = adata.var['vst.variable']
+adata = adata[:,adata.var['highly_variable']].copy()
+sc.pp.scale(adata, zero_center=False, max_value=50)
+sc.tl.pca(adata, use_highly_variable=True)
+sc.pl.pca_variance_ratio(adata, log=True)
+# plt.savefig("./Data/cnmf/PCA_patients_"+suffix)
+```
+#Run harmony
+```{python}
+harmony_res = harmonypy.run_harmony(adata.obsm['X_pca'], adata.obs, 'orig.ident', max_iter_harmony = 15,theta = theta,random_state = 1)
+```
+## Adujst correction
+```{python}
+X = np.array(adata[:,adata.var['highly_variable']].X)
+
+_, X_corr, _, _ = moe_correct_ridge(X.T, None, None, harmony_res.R, None, harmony_res.K,
+                                            None, harmony_res.Phi_moe, harmony_res.lamb)
+X_corr = X_corr.T
+```
+
+## non negative correction
+```{python}
+adata_corr = adata[:,adata.var['highly_variable']].copy()
+X_corr_nonneg = X_corr.copy()
+X_corr_nonneg[X_corr_nonneg<0]= 0
+adata_corr_nonneg = adata_corr.copy()
+adata_corr_nonneg.X = X_corr_nonneg
+```
+## import to seurat for plotting UMAP
+```{r}
+exprs <- t(py$adata_corr_nonneg$X)
+colnames(exprs) <- py$adata$obs_names$to_list()
+rownames(exprs) <- py$adata$var_names$to_list()
+# Create the Seurat object
+xeno_corr_nonneg <- CreateSeuratObject(counts = exprs)
+xeno_corr_nonneg$orig.ident <- py$adata$obs["orig.ident"]
+xeno_corr_nonneg$treatment <- py$adata$obs["treatment"]
+
+```
+
+## PCA after correction
+```{r}
+xeno_corr_nonneg@assays$RNA@scale.data = exprs
+xeno_corr_nonneg <- RunPCA(xeno_corr_nonneg, features = rownames(xeno_corr_nonneg))
+
+ElbowPlot(xeno_corr_nonneg)
+```
+## Run dim reduction
+```{r results='hide',include=FALSE}
+pc2use = 1:5
+xeno_corr_nonneg <- FindNeighbors(xeno_corr_nonneg, dims = pc2use)
+xeno_corr_nonneg <- FindClusters(xeno_corr_nonneg, resolution = 0.5)
+xeno_corr_nonneg <- RunUMAP(xeno_corr_nonneg, dims = pc2use)
+
+```
+
+## UMAP after correction
+```{r}
+DimPlot(xeno_corr_nonneg, reduction = "umap",group.by = "orig.ident")
+DimPlot(xeno_corr_nonneg, reduction = "umap",group.by = "treatment")
+```
+
+```{python}
+suffix
+```
+
+```{python}
+sc.write('./Data/cnmf/xeno_Harmony_NoNeg_' + suffix +'.h5ad', adata_corr_nonneg)
+```
+
+cNMF:
+
+```{python}
+name = 'cNMF_models_Varnorm_Harmony_' + suffix
+outdir = './Data/cnmf'
+K_range = np.arange(3,6)
+cnmf_obj = cNMF(output_dir=outdir, name=name)
+counts_fn='./Data/cnmf/xeno_Harmony_NoNeg_' + suffix +'.h5ad'
+
+
+cnmf_obj.prepare(counts_fn=counts_fn, components=K_range, n_iter=n_iter, seed=14,densify=densify)
+```
+
+```{python}
+cnmf_obj.factorize(worker_i=0, total_workers=1)
+```
+
+```{python}
+cnmf_obj.combine()
+cnmf_obj.k_selection_plot()
+```
+
+```{python}
+import pickle
+f = open('./Data/cnmf/cnmf_objects/models_' + suffix +'_cnmf_obj.pckl', 'wb')
+pickle.dump(cnmf_obj, f)
+f.close()
+```

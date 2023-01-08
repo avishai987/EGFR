@@ -1852,36 +1852,13 @@ adata &lt;- sc$AnnData(
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgcHl0aG9uXG4jICVtYXRwbG90bGliIGlubGluZVxuIyAlbG9hZF9leHQgYXV0b3JlbG9hZFxuIyAlYXV0b3JlbG9hZCAyXG5cbmltcG9ydCBzY2FucHkgYXMgc2NcbmltcG9ydCBtYXRwbG90bGliLnB5cGxvdCBhcyBwbHRcbmltcG9ydCBoYXJtb255cHlcbmZyb20gaGFybW9ueXB5IGltcG9ydCBydW5faGFybW9ueVxuaW1wb3J0IHN5c1xuZnJvbSBjbm1mIGltcG9ydCBjTk1GXG5cbmltcG9ydCBudW1weSBhcyBucFxuaW1wb3J0IHBhbmRhcyBhcyBwZFxuZnJvbSBza2xlYXJuLmRlY29tcG9zaXRpb24gaW1wb3J0IE5NRlxuaW1wb3J0IHNlYWJvcm4gYXMgc25zXG5pbXBvcnQgeWFtbFxuIyMgY29waWVkIGZyb20gaGFybW9ueXB5LnB5XG5kZWYgbW9lX2NvcnJlY3RfcmlkZ2UoWl9vcmlnLCBaX2NvcywgWl9jb3JyLCBSLCBXLCBLLCBQaGlfUmssIFBoaV9tb2UsIGxhbWIpOlxuICAgIFpfY29yciA9IFpfb3JpZy5jb3B5KClcbiAgICBmb3IgaSBpbiByYW5nZShLKTpcbiAgICAgICAgUGhpX1JrID0gbnAubXVsdGlwbHkoUGhpX21vZSwgUltpLDpdKVxuICAgICAgICB4ID0gbnAuZG90KFBoaV9SaywgUGhpX21vZS5UKSArIGxhbWJcbiAgICAgICAgVyA9IG5wLmRvdChucC5kb3QobnAubGluYWxnLmludih4KSwgUGhpX1JrKSwgWl9vcmlnLlQpXG4gICAgICAgIFdbMCw6XSA9IDAgIyBkbyBub3QgcmVtb3ZlIHRoZSBpbnRlcmNlcHRcbiAgICAgICAgWl9jb3JyIC09IG5wLmRvdChXLlQsIFBoaV9SaylcbiAgICBaX2NvcyA9IFpfY29yciAvIG5wLmxpbmFsZy5ub3JtKFpfY29yciwgb3JkPTIsIGF4aXM9MClcbiAgICByZXR1cm4gWl9jb3MsIFpfY29yciwgVywgUGhpX1JrXG5cbmBgYCJ9 -->
-<pre class="python"><code># %matplotlib inline
-# %load_ext autoreload
-# %autoreload 2
-
-import scanpy as sc
-import matplotlib.pyplot as plt
-import harmonypy
-from harmonypy import run_harmony
-import sys
-from cnmf import cNMF
-
-import numpy as np
-import pandas as pd
-from sklearn.decomposition import NMF
-import seaborn as sns
-import yaml
-## copied from harmonypy.py
-def moe_correct_ridge(Z_orig, Z_cos, Z_corr, R, W, K, Phi_Rk, Phi_moe, lamb):
-    Z_corr = Z_orig.copy()
-    for i in range(K):
-        Phi_Rk = np.multiply(Phi_moe, R[i,:])
-        x = np.dot(Phi_Rk, Phi_moe.T) + lamb
-        W = np.dot(np.dot(np.linalg.inv(x), Phi_Rk), Z_orig.T)
-        W[0,:] = 0 # do not remove the intercept
-        Z_corr -= np.dot(W.T, Phi_Rk)
-    Z_cos = Z_corr / np.linalg.norm(Z_corr, ord=2, axis=0)
-    return Z_cos, Z_corr, W, Phi_Rk
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgcHl0aG9uXG5mcm9tIGNubWYgaW1wb3J0IGNOTUZcblxuYGBgIn0= -->
+<pre class="python"><code>from cnmf import cNMF
 </code></pre>
 <!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiTW9kdWxlTm90Rm91bmRFcnJvcjogTm8gbW9kdWxlIG5hbWVkICdjbm1mJ1xuIn0= -->
+<pre><code>ModuleNotFoundError: No module named &#39;cnmf&#39;</code></pre>
+<!-- rnb-output-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
