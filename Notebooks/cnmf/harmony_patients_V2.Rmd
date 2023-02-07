@@ -4,26 +4,20 @@ output:
   html_notebook: 
     code_folding: hide
 ---
-```{r}
-genes_lst = c()
-for (row in 1:nrow(lung@assays[["RNA"]]@scale.data)) {
-  vector = lung@assays[["RNA"]]@scale.data[row,]
-  if (sum(vector>0,na.rm = T)>=400){
-    genes_lst = c(genes_lst,rownames(lung@assays[["RNA"]]@scale.data)[row])
-  }
-}
-```
-
-
-
 ## Data
 ```{r}
 lung = readRDS("./Data/lung_cancercells_withTP_onlyPatients.rds")
+lung_patients = lung$patient.ident %>% unique() %>% as.character()
+lung_patients_filtered = lung_patients[!(lung_patients %in% c("X1055new","X1099"))]
+lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
 ```
 
-```{r}
+```{r include=FALSE}
+library(stringi)
 library(reticulate)
+source_from_github(repositoy = "cNMF_functions",version = "0.3.55",script_name = "cnmf_function_Harmony.R")
 ```
+
 
 ## Parameters
 ```{r}
@@ -36,14 +30,44 @@ provideTPM = F  #default: T
 theta = 2.7 #default: 2
 normalize = T #default: F
 lamb = 1 #default: 1
-sigma = 0.5
-
+sigma = 0.5  #default: 0.1
+options_for_genes = c("var_genes","combined","positive","xeno","dana")
+genes_from = options_for_genes[4] 
 ```
 
 ```{r}
-suffix ="2Kvargenes_normalized_0-5sigma_2-7theta"
+suffix ="xeno_genes_normalized_0-5sigma_2-7theta"
 print(suffix)
 ```
+
+```{r}
+library(VennDiagram)
+genes_from_list = F
+message(paste("selecting genes by:",genes_from))
+if (genes_from == "var_genes"){
+  lung = FindVariableFeatures(object = lung,nfeatures = nfeatures)
+
+}else if(genes_from == "combined"){
+  genes_lst = combine_var_genes(dataset_1 = xeno,dataset_2 = lung,all_var_genes_num = 15000,most_var_genes_num_1 = 4000,most_var_genes_num_2 = 2000)  
+
+  genes_from_list = T
+
+}else if(genes_from == "positive"){
+  genes_lst = positive_genes(dataset = lung,num_of_cells = 700)
+    genes_from_list = T
+}else if(genes_from == "xeno"){
+  xeno = FindVariableFeatures(object = xeno,nfeatures = 2000)
+  genes_lst = intersect(VariableFeatures(xeno),rownames(lung))
+      genes_from_list = T
+}else if(genes_from == "dana"){
+genes_lst = scan(file = "./nmf_dana_genes.txt",sep = "\n",what = "character")
+
+      genes_from_list = T
+}
+```
+
+
+
 
 ```{python}
 #import parameters to python
@@ -57,13 +81,10 @@ normalize = r.normalize
 lamb = r.lamb
 sigma = r.sigma
 genes_lst = r.genes_lst
+genes_from_list = r.genes_from_list
 ```
 
-```{r}
-# lung = FindVariableFeatures(object = lung,nfeatures = nfeatures)
-# lung@assays[["RNA"]]@var.features = genes_lst
-VariableFeatures(lung) = rownames(lung)
-```
+
 
 ## Convert seurat to scanpy
 ```{r}
@@ -71,10 +92,11 @@ sc <- import('scanpy', convert = FALSE)
 gene_expression = t(as.matrix(GetAssayData(lung,slot='data')))
 
 if(convert_to_tpm == T){
+  message("converting from log2(TPM) to TPM")
 gene_expression = 2**gene_expression #convert log2(TPM+1) to TPM+1
 gene_expression = gene_expression-1 #convert TPM+1 to TPM
 }
-
+# gene_expression = read.table(file = "/sci/labs/yotamd/lab_share/avishai.wizel/R_projects/EGFR/Data/scvi_normalized.txt") %>%  as.matrix()
 adata <- sc$AnnData(
   X   = gene_expression, 
   obs = lung[[]],
@@ -121,22 +143,24 @@ adata = r.adata
 if (normalize == True):
   sc.pp.normalize_per_cell(adata) #Data is already normlized
 adata.var['highly_variable'] = adata.var['vst.variable']
-# adata = adata[:,adata.var['highly_variable']].copy()
-adata = adata[:,genes_lst].copy()
+if (not genes_from_list):
+  adata = adata[:,adata.var['highly_variable']].copy()
+else:
+  adata = adata[:,genes_lst].copy()
 sc.pp.scale(adata, zero_center=False, max_value=50)
 sc.tl.pca(adata, use_highly_variable=True)
 sc.pl.pca_variance_ratio(adata, log=True)
-# plt.savefig("./Data/cnmf/PCA_patients_"+suffix)
 ```
 #Run harmony
 ```{python}
-harmony_res = harmonypy.run_harmony(adata.obsm['X_pca'], adata.obs, 'patient.ident', max_iter_harmony = 20,theta = 2.7,random_state = 1,lamb = 1)
+harmony_res = harmonypy.run_harmony(adata.obsm['X_pca'], adata.obs, 'patient.ident', max_iter_harmony = 25,theta = theta,random_state = 1,lamb = lamb,sigma = sigma,plot_convergence = True)
 ```
 ## Adujst correction
 ```{python}
-# X = np.array(adata[:,adata.var['highly_variable']].X)
-X = np.array(adata[:,genes_lst].X)
-
+if (not genes_from_list):
+  X = np.array(adata[:,adata.var['highly_variable']].X)
+else:
+  X = np.array(adata[:,genes_lst].X)
 
 _, X_corr, _, _ = moe_correct_ridge(X.T, None, None, harmony_res.R, None, harmony_res.K,
                                             None, harmony_res.Phi_moe, harmony_res.lamb)
@@ -145,8 +169,11 @@ X_corr = X_corr.T
 
 ## non negative correction
 ```{python}
-# adata_corr = adata[:,adata.var['highly_variable']].copy()
-adata_corr = adata[:,genes_lst].copy()
+if (not genes_from_list):
+   adata_corr = adata[:,adata.var['highly_variable']].copy()
+else:
+  adata_corr = adata[:,genes_lst].copy()
+  
 X_corr_nonneg = X_corr.copy()
 X_corr_nonneg[X_corr_nonneg<0]= 0
 adata_corr_nonneg = adata_corr.copy()
@@ -157,6 +184,7 @@ adata_corr_nonneg.X = X_corr_nonneg
 exprs <- t(py$adata_corr_nonneg$X)
 colnames(exprs) <- py$adata$obs_names$to_list()
 rownames(exprs) <- py$adata$var_names$to_list()
+
 # Create the Seurat object
 lung_corr_nonneg <- CreateSeuratObject(counts = exprs)
 lung_corr_nonneg$patient.ident <- py$adata$obs["patient.ident"]
@@ -194,6 +222,7 @@ suffix
 sc.write('./Data/cnmf/lung_Harmony_NoNeg_' + suffix +'.h5ad', adata_corr_nonneg)
 ```
 
+
 cNMF:
 
 ```{python}
@@ -218,7 +247,7 @@ cnmf_obj.factorize(worker_i=0, total_workers=1)
 cnmf_obj.combine()
 cnmf_obj.k_selection_plot()
 ```
-
+## Save object
 ```{python}
 import pickle
 f = open('./Data/cnmf/cnmf_objects/patients_' + suffix +'_cnmf_obj.pckl', 'wb')
@@ -226,9 +255,9 @@ pickle.dump(cnmf_obj, f)
 f.close()
 ```
 
+## calibrate harmony parameters with seurat
 
 ```{r results='hide'}
-## calibrate harmony parameters with seurat
 library(harmony)
 # lung = RunHarmony(object = lung,group.by.vars = c("patient.ident"),plot_convergence = T,max.iter.harmony = 15,dims.use = pc2use,theta = 2.5,sigma = 0.3,nclust = 3)
 set.seed(10)
@@ -249,6 +278,7 @@ DimPlot(lung, reduction = "umap", group.by = "patient.ident",pt.size = 0.4)
 DimPlot(lung, reduction = "umap", group.by = "time.point",pt.size = 0.4)
 
 ```
+
 
 
 

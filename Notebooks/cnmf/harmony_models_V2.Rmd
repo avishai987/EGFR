@@ -15,6 +15,16 @@ xeno = readRDS("./Data/10x_xeno_1000.Rds")
 ```
 
 ```{r}
+xeno = DietSeurat(object = xeno)
+```
+
+```{r}
+library(stringi)
+library(reticulate)
+source_from_github(repositoy = "cNMF_functions",version = "0.3.48",script_name = "cnmf_function_Harmony.R")
+```
+
+```{r}
 library(reticulate)
 ```
 
@@ -25,8 +35,34 @@ nfeatures = 2000 #default: 2000
 n_iter = 10 #default: 10
 densify = T #default: T
 theta = 2 #default: 2
-suffix ="2Kvargenes"
+options_for_genes = c("var_genes","combined","positive")
+genes_from = options_for_genes[2] 
+```
+
+```{r}
+suffix ="4Kcombined_genes"
 print(suffix)
+print(genes_from)
+```
+```{r}
+grid.newpage()
+draw.pairwise.venn(area1=20, area2=45,cross.area=10,
+                   category=c("Mango","Banana"),fill=c("Red","Yellow"))
+```
+
+```{r}
+genes_from_list = F
+if (genes_from == "var_genes"){
+  xeno = FindVariableFeatures(object = xeno,nfeatures = nfeatures)
+
+}else if(genes_from == "combined"){
+  genes_lst = combine_var_genes(dataset_1 = xeno,dataset_2 = xeno,all_var_genes_num = 15000,most_var_genes_num = 4000,plot = T)
+  genes_from_list = T
+
+}else if(genes_from == "positive"){
+  genes_lst = positive_genes(dataset = xeno,num_of_cells = 400)
+    genes_from_list = T
+}
 ```
 
 ```{python}
@@ -36,11 +72,10 @@ n_iter = int(r.n_iter)
 densify = r.densify
 suffix = r.suffix
 theta = r.theta
+genes_lst = r.genes_lst
+genes_from_list = r.genes_from_list
 ```
 
-```{r}
-xeno = FindVariableFeatures(object = xeno,nfeatures = nfeatures)
-```
 
 ## Convert seurat to scanpy
 ```{r}
@@ -93,11 +128,14 @@ adata = r.adata
 
 sc.pp.normalize_per_cell(adata) 
 adata.var['highly_variable'] = adata.var['vst.variable']
-adata = adata[:,adata.var['highly_variable']].copy()
+if (not genes_from_list):
+  adata = adata[:,adata.var['highly_variable']].copy()
+else:
+  adata = adata[:,genes_lst].copy()
+
 sc.pp.scale(adata, zero_center=False, max_value=50)
 sc.tl.pca(adata, use_highly_variable=True)
 sc.pl.pca_variance_ratio(adata, log=True)
-# plt.savefig("./Data/cnmf/PCA_patients_"+suffix)
 ```
 #Run harmony
 ```{python}
@@ -105,8 +143,11 @@ harmony_res = harmonypy.run_harmony(adata.obsm['X_pca'], adata.obs, 'orig.ident'
 ```
 ## Adujst correction
 ```{python}
-X = np.array(adata[:,adata.var['highly_variable']].X)
-
+if (not genes_from_list):
+  X = np.array(adata[:,adata.var['highly_variable']].X)
+else:
+  X = np.array(adata[:,genes_lst].X)
+  
 _, X_corr, _, _ = moe_correct_ridge(X.T, None, None, harmony_res.R, None, harmony_res.K,
                                             None, harmony_res.Phi_moe, harmony_res.lamb)
 X_corr = X_corr.T
@@ -114,7 +155,11 @@ X_corr = X_corr.T
 
 ## non negative correction
 ```{python}
-adata_corr = adata[:,adata.var['highly_variable']].copy()
+if (not genes_from_list):
+   adata_corr = adata[:,adata.var['highly_variable']].copy()
+else:
+  adata_corr = adata[:,genes_lst].copy()
+
 X_corr_nonneg = X_corr.copy()
 X_corr_nonneg[X_corr_nonneg<0]= 0
 adata_corr_nonneg = adata_corr.copy()
@@ -125,6 +170,7 @@ adata_corr_nonneg.X = X_corr_nonneg
 exprs <- t(py$adata_corr_nonneg$X)
 colnames(exprs) <- py$adata$obs_names$to_list()
 rownames(exprs) <- py$adata$var_names$to_list()
+
 # Create the Seurat object
 xeno_corr_nonneg <- CreateSeuratObject(counts = exprs)
 xeno_corr_nonneg$orig.ident <- py$adata$obs["orig.ident"]

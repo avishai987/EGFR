@@ -11,9 +11,6 @@ output:
 xeno = readRDS("./Data/10x_xeno_1000.Rds")
 ```
 
-```{r}
-library(reticulate)
-```
 
 
 ```{r}
@@ -24,23 +21,25 @@ suffix = "2Kvargenes"
 ```{python}
 suffix = r.suffix
 import pickle
+from cnmf import cNMF
 f = open('./Data/cnmf/cnmf_objects/models_' + suffix + '_cnmf_obj.pckl', 'rb')
 cnmf_obj = pickle.load(f)
 f.close()
 ```
-## Functionres
+## Functions
 
 ```{r}
 library(stringi)
-source_from_github(repositoy = "DEG_functions",version = "0.2.1")
-source_from_github(repositoy = "cNMF_functions",version = "0.3.21",script_name = "cnmf_function_Harmony.R")
+library(reticulate)
+source_from_github(repositoy = "DEG_functions",version = "0.2.24")
+source_from_github(repositoy = "cNMF_functions",version = "0.3.56",script_name = "cnmf_function_Harmony.R")
 ```
 <!-- ## K selection plot -->
 <!-- ![Caption for the picture.](/sci/labs/yotamd/lab_share/avishai.wizel/R_projects/EGFR/Data/cnmf/cNMF_patients_Varnorm_Harmony_2Kvargenes/cNMF_patients_Varnorm_Harmony_2Kvargenes.k_selection.png) -->
 
 
 ```{r}
-selected_k = 4
+selected_k = 3
 suffix = paste(suffix,paste0(selected_k,"nmfK"),sep="_")
 print(suffix)
 ```
@@ -49,17 +48,19 @@ print(suffix)
 ```{python}
 selected_k = int(r.selected_k)
 density_threshold = 0.1
-cnmf_obj.consensus(k=selected_k, density_threshold=density_threshold)
+# cnmf_obj.consensus(k=selected_k, density_threshold=density_threshold)
 usage_norm, gep_scores, gep_tpm, topgenes = cnmf_obj.load_results(K=selected_k, density_threshold=density_threshold)
 ```
 
 ```{r}
-gep_scores= py$gep_scores 
+gep_scores= py$gep_scores
 ```
 
 ```{r}
 if (by_expression){
-  all_metagenes = expression_mult(gep_scores = gep_scores,dataset = xeno)
+    gep_scores = apply(gep_scores, MARGIN = 2, FUN = min_max_normalize)%>% as.data.frame()
+  gep_scores = sum2one(gep_scores)
+  all_metagenes = expression_mult(gep_scores = gep_scores,dataset = xeno,top_genes = T,max_genes = F,min_max  = F )
 
 }else{all_metagenes= py$usage_norm}
 ```
@@ -73,21 +74,21 @@ for (i in 1:ncol(all_metagenes)) {
 
 #add each metagene to metadata
 for (i in 1:ncol(all_metagenes)) {
-  metage_metadata = all_metagenes %>% select(i)
+  metage_metadata = all_metagenes %>% dplyr::select(i)
   xeno = AddMetaData(object = xeno,metadata = metage_metadata)
 }
+
+FeaturePlot(object = xeno,features = colnames(all_metagenes))
+
 ```
 
-## Programs on UMAP
-```{r fig.height=10, fig.width=10}
-FeaturePlot(object = xeno,features = colnames(all_metagenes))
-```
+
 
 
 ## Enrichment analysis by top 200 genes of each program
 
 ```{r fig.height=8, fig.width=8, results='hide'}
-# gep_scores = py$gep_scores
+gep_scores = py$gep_scores
 plt_list = list()
 for (i in 1:ncol(gep_scores)) {
   top_genes = gep_scores  %>%  arrange(desc(gep_scores[i])) #sort by score a
@@ -125,19 +126,40 @@ gridExtra::grid.arrange(grobs = plt_list)
 
 ```
 
+
+
+
+
 ## Enriched in time point
 larger_by = `r larger_by`
 ```{r}
-larger_by = 2
+larger_by = 1.5
 xeno = program_assignment(dataset = xeno,larger_by = larger_by,program_names = colnames(all_metagenes))
 ```   
 
 ```{r}
+undebug(cell_percentage)
 cell_percentage(dataset = xeno,time.point_var = "treatment")
 ```
 
 ```{r}
-DimPlot(xeno,group.by = "program.assignment")
+DimPlot(xeno,group.by = "program.assignment",cols = c("red","green","blue","grey"))
 # DimPlot(xeno,group.by = "program.assignment",cols = c("red","darkgreen","blue","yellow","black","grey"))
 ```
+```{r warning=FALSE}
+hallmark_name = "GO_MITOTIC_CELL_CYCLE"
+genesets  =GSEABase::getGmt("./Data/h.all.v7.0.symbols.pluscc.gmt")
+var_features=xeno@assays$RNA@var.features
+geneIds= genesets[[hallmark_name]]@geneIds
+score <- apply(xeno@assays$RNA@data[intersect(geneIds,var_features),],2,mean)
+xeno=AddMetaData(xeno,score,hallmark_name)
+```
+
+
+```{r warning=FALSE}
+FeaturePlot(object = xeno,features = "metagene.3")
+
+FeaturePlot(object = xeno,features = hallmark_name)
+```
+
 

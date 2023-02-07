@@ -4,16 +4,37 @@ output: html_notebook
 editor_options: 
   chunk_output_type: inline
 ---
+```{r}
+lung = FindVariableFeatures(object = lung,nfeatures = 4000)
+lung_most_vargenes = lung@assays$RNA@var.features
+lung = FindVariableFeatures(object = lung,nfeatures = 15000)
+lung_all_vargenes = lung@assays$RNA@var.features
+
+xeno = FindVariableFeatures(object = xeno,nfeatures = 4000)
+xeno_most_vargenes = xeno@assays$RNA@var.features
+
+xeno = FindVariableFeatures(object = xeno,nfeatures = 15000)
+xeno_all_vargenes = xeno@assays$RNA@var.features
+
+lung_vargenes = lung_most_vargenes[lung_most_vargenes %in% xeno_all_vargenes]
+xeno_vargenes = xeno_most_vargenes[xeno_most_vargenes %in% lung_all_vargenes]
+genes_lst = c(lung_vargenes,xeno_vargenes)
+genes_lst = genes_lst[!duplicated(genes_lst)] #remove dups
+```
+
 
 
 ```{r}
-suffix ="_2Kvargenes"
+suffix ="4Kcombined_genes"
 xeno = readRDS("./Data/10x_xeno_1000.Rds")
 xeno = FindVariableFeatures(object = xeno,nfeatures = 2000)
 var_features = VariableFeatures(xeno) %>% as.character()
 ```
 
-
+```{r}
+#if no memory
+xeno = DietSeurat(object = xeno)
+```
 
 ```{r}
 library(reticulate)
@@ -30,6 +51,7 @@ rm(xeno) #delete to save ram
 ```{python}
 adata = r.adata
 ```
+
 
 
 ```{python}

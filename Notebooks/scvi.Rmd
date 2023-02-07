@@ -1,0 +1,72 @@
+---
+title: "Title"
+author: "Avishai Wizel"
+date: '`r Sys.Date()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+---
+
+## Parameters
+
+```{r warning=FALSE}
+suffix = ""
+data_to_read = ""
+```
+
+-   suffix = `r suffix`
+-   data_to_read = `r data_to_read`
+
+## functions
+
+```{r warning=FALSE}
+library(reticulate)
+library(SeuratData)
+sc <- import("scanpy", convert = FALSE)
+scvi <- import("scvi", convert = FALSE)
+scvi <- import("numpy", convert = FALSE)
+
+```
+
+## Data
+
+```{r}
+
+```
+
+```{python}
+import scvi
+```
+
+
+```{r}
+
+lung = readRDS("./Data/lung_cancercells_withTP_onlyPatients.rds")
+lung_patients = lung$patient.ident %>% unique() %>% as.character()
+lung_patients_filtered = lung_patients[!(lung_patients %in% c("X1055new","X1099"))]
+lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
+
+top2000 <- head(VariableFeatures(lung), 2000)
+lung <- lung[top2000]
+a = 3
+adata <- sceasy::convertFormat(lung, from="seurat", to="anndata", main_layer="counts", drop_single_values=FALSE)
+print(adata)
+scvi$model$SCVI$setup_anndata(adata, batch_key = 'patient.ident')
+model = scvi$model$SCVI(adata)
+model$train()
+```
+
+```{r}
+# get the latent represenation
+latent = model$get_latent_representation()
+
+# put it back in our original Seurat object
+latent <- as.matrix(latent)
+rownames(latent) = colnames(lung)
+lung[["scvi"]] <- CreateDimReducObject(embeddings = latent, key = "scvi_", assay = DefaultAssay(lung))
+```
+
+```{r}
+normalized_expression = model$get_normalized_expression() 
+```
+

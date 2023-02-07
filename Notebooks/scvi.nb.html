@@ -9,9 +9,11 @@
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
+<meta name="author" content="Avishai Wizel" />
 
+<meta name="date" content="2023-01-29" />
 
-<title>R Notebook</title>
+<title>Title</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -1762,461 +1764,96 @@ pre code {
 
 
 
-<h1 class="title toc-ignore">R Notebook</h1>
+<h1 class="title toc-ignore">Title</h1>
+<h4 class="author">Avishai Wizel</h4>
+<h4 class="date">2023-01-29</h4>
 
 </div>
 
 
 <!-- rnb-text-begin -->
+<div id="parameters" class="section level2">
+<h2>Parameters</h2>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuYGBgclxuc3VmZml4ID1cXF8yS3ZhcmdlbmVzXFxcbnhlbm8gPSByZWFkUkRTKFxcLi4vRGF0YS8xMHhfeGVub18xMDAwLlJkc1xcKVxueGVubyA9IEZpbmRWYXJpYWJsZUZlYXR1cmVzKG9iamVjdCA9IHhlbm8sbmZlYXR1cmVzID0gMjAwMClcbmBgYFxuYGBgIn0= -->
-<pre class="r"><code>```r
-suffix =\_2Kvargenes\
-xeno = readRDS(\../Data/10x_xeno_1000.Rds\)
-xeno = FindVariableFeatures(object = xeno,nfeatures = 2000)</code></pre>
-<pre><code>
-&lt;!-- rnb-source-end --&gt;
-
-&lt;!-- rnb-output-begin eyJkYXRhIjoiQ2FsY3VsYXRpbmcgZ2VuZSB2YXJpYW5jZXNcbjAlICAgMTAgICAyMCAgIDMwICAgNDAgICA1MCAgIDYwICAgNzAgICA4MCAgIDkwICAgMTAwJVxuWy0tLS18LS0tLXwtLS0tfC0tLS18LS0tLXwtLS0tfC0tLS18LS0tLXwtLS0tfC0tLS18XG4qKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKnxcbkNhbGN1bGF0aW5nIGZlYXR1cmUgdmFyaWFuY2VzIG9mIHN0YW5kYXJkaXplZCBhbmQgY2xpcHBlZCB2YWx1ZXNcbjAlICAgMTAgICAyMCAgIDMwICAgNDAgICA1MCAgIDYwICAgNzAgICA4MCAgIDkwICAgMTAwJVxuWy0tLS18LS0tLXwtLS0tfC0tLS18LS0tLXwtLS0tfC0tLS18LS0tLXwtLS0tfC0tLS18XG4qKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKnxcbiJ9 --&gt;
-</code></pre>
-<p>Calculating gene variances 0% 10 20 30 40 50 60 70 80 90 100%
-[—-|—-|—-|—-|—-|—-|—-|—-|—-|—-|
-**************************************************| Calculating feature
-variances of standardized and clipped values 0% 10 20 30 40 50 60 70 80
-90 100% [—-|—-|—-|—-|—-|—-|—-|—-|—-|—-|
-**************************************************|</p>
-<pre><code>
-
-
-&lt;!-- rnb-output-end --&gt;
-
-&lt;!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuYGBgclxudmFyX2ZlYXR1cmVzID0gVmFyaWFibGVGZWF0dXJlcyh4ZW5vKSAlPiUgYXMuY2hhcmFjdGVyKClcbmBgYFxuYGBgIn0= --&gt;
-
-```r
-```r
-var_features = VariableFeatures(xeno) %&gt;% as.character()</code></pre>
-<pre><code>
-&lt;!-- rnb-source-end --&gt;
-
-&lt;!-- rnb-chunk-end --&gt;
-
-
-&lt;!-- rnb-text-begin --&gt;
-
-
-
-
-
-&lt;!-- rnb-text-end --&gt;
-
-
-&lt;!-- rnb-chunk-begin --&gt;
-
-
-&lt;!-- rnb-source-begin eyJkYXRhIjoiYGBgclxubGlicmFyeShyZXRpY3VsYXRlKVxuXG5zYyA8LSBpbXBvcnQoJ3NjYW5weScsIGNvbnZlcnQgPSBGQUxTRSlcbmFkYXRhIDwtIHNjJEFubkRhdGEoXG4gIFggICA9IHQoYXMubWF0cml4KEdldEFzc2F5RGF0YSh4ZW5vLHNsb3Q9J2NvdW50cycpKSksICNjbm1mIGV4cGVjdCAxMHggY291bnRzXG4gIG9icyA9IHhlbm9bW11dLFxuICB2YXIgPSBHZXRBc3NheSh4ZW5vKVtbXV1cbilcbmBgYCJ9 --&gt;
-
-```r
-library(reticulate)
-
-sc &lt;- import(&#39;scanpy&#39;, convert = FALSE)
-adata &lt;- sc$AnnData(
-  X   = t(as.matrix(GetAssayData(xeno,slot=&#39;counts&#39;))), #cnmf expect 10x counts
-  obs = xeno[[]],
-  var = GetAssay(xeno)[[]]
-)</code></pre>
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuc3VmZml4ID0gXCJcIlxuZGF0YV90b19yZWFkID0gXCJcIlxuYGBgIn0= -->
+<pre class="r"><code>suffix = &quot;&quot;
+data_to_read = &quot;&quot;</code></pre>
 <!-- rnb-source-end -->
-<!-- rnb-output-begin eyJkYXRhIjoic3lzOjE6IEZ1dHVyZVdhcm5pbmc6IFguZHR5cGUgYmVpbmcgY29udmVydGVkIHRvIG5wLmZsb2F0MzIgZnJvbSBmbG9hdDY0LiBJbiB0aGUgbmV4dCB2ZXJzaW9uIG9mIGFubmRhdGEgKDAuOSkgY29udmVyc2lvbiB3aWxsIG5vdCBiZSBhdXRvbWF0aWMuIFBhc3MgZHR5cGUgZXhwbGljaXRseSB0byBhdm9pZCB0aGlzIHdhcm5pbmcuIFBhc3MgYEFubkRhdGEoWCwgZHR5cGU9WC5kdHlwZSwgLi4uKWAgdG8gZ2V0IHRoZSBmdXR1cmUgYmVoYXZvdXIuXG4ifQ== -->
-<pre><code>sys:1: FutureWarning: X.dtype being converted to np.float32 from float64. In the next version of anndata (0.9) conversion will not be automatic. Pass dtype explicitly to avoid this warning. Pass `AnnData(X, dtype=X.dtype, ...)` to get the future behavour.</code></pre>
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<ul>
+<li>suffix = 2Kvargenes</li>
+<li>data_to_read =</li>
+</ul>
+</div>
+<div id="functions" class="section level2">
+<h2>functions</h2>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxubGlicmFyeShyZXRpY3VsYXRlKVxubGlicmFyeShTZXVyYXREYXRhKVxuc2MgPC0gaW1wb3J0KFwic2NhbnB5XCIsIGNvbnZlcnQgPSBGQUxTRSlcbmBgYCJ9 -->
+<pre class="r"><code>library(reticulate)
+library(SeuratData)
+sc &lt;- import(&quot;scanpy&quot;, convert = FALSE)</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiRXJyb3IgaW4gcHlfbW9kdWxlX2ltcG9ydChtb2R1bGUsIGNvbnZlcnQgPSBjb252ZXJ0KSA6IFxuICBNb2R1bGVOb3RGb3VuZEVycm9yOiBObyBtb2R1bGUgbmFtZWQgJ3NjYW5weSdcbiJ9 -->
+<pre><code>Error in py_module_import(module, convert = convert) : 
+  ModuleNotFoundError: No module named &#39;scanpy&#39;</code></pre>
 <!-- rnb-output-end -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxucm0oeGVubykgI2RlbGV0ZSB0byBzYXZlIHJhbVxuYGBgIn0= -->
-<pre class="r"><code>rm(xeno) #delete to save ram</code></pre>
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+</div>
+<div id="data" class="section level2">
+<h2>Data</h2>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgcHl0aG9uXG5pbXBvcnQgc2N2aVxuYGBgIn0= -->
+<pre class="python"><code>import scvi</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiSW1wb3J0RXJyb3I6IC91c3IvbGliL3g4Nl82NC1saW51eC1nbnUvbGlic3RkYysrLnNvLjY6IHZlcnNpb24gYEdMSUJDWFhfMy40LjMwJyBub3QgZm91bmQgKHJlcXVpcmVkIGJ5IC9zY2kvbGFicy95b3RhbWQvbGFiX3NoYXJlL2F2aXNoYWkud2l6ZWwvcHl0aG9uX2VudnMvbWluaWNvbmRhL2VudnMvc2N2aS1lbnYzL2xpYi9weXRob24zLjcvc2l0ZS1wYWNrYWdlcy90b3JjaC9saWIvbGlidG9yY2hfcHl0aG9uLnNvKVxuIn0= -->
+<pre><code>ImportError: /usr/lib/x86_64-linux-gnu/libstdc++.so.6: version `GLIBCXX_3.4.30&#39; not found (required by /sci/labs/yotamd/lab_share/avishai.wizel/python_envs/miniconda/envs/scvi-env3/lib/python3.7/site-packages/torch/lib/libtorch_python.so)</code></pre>
+<!-- rnb-output-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuc2N2aSRtb2RlbCRTQ1ZJJHNldHVwX2FubmRhdGEoYWRhdGEsIGJhdGNoX2tleSA9ICdwYXRpZW50LmlkZW50JylcblxuYGBgIn0= -->
+<pre class="r"><code>scvi$model$SCVI$setup_anndata(adata, batch_key = &#39;patient.ident&#39;)
+</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiRXJyb3I6IGF0dGVtcHQgdG8gYXBwbHkgbm9uLWZ1bmN0aW9uXG4ifQ== -->
+<pre><code>Error: attempt to apply non-function</code></pre>
+<!-- rnb-output-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuIyBnZXQgdGhlIGxhdGVudCByZXByZXNlbmF0aW9uXG5sYXRlbnQgPSBtb2RlbCRnZXRfbGF0ZW50X3JlcHJlc2VudGF0aW9uKClcblxuIyBwdXQgaXQgYmFjayBpbiBvdXIgb3JpZ2luYWwgU2V1cmF0IG9iamVjdFxubGF0ZW50IDwtIGFzLm1hdHJpeChsYXRlbnQpXG5yb3duYW1lcyhsYXRlbnQpID0gY29sbmFtZXMobHVuZylcbmx1bmdbW1wic2N2aVwiXV0gPC0gQ3JlYXRlRGltUmVkdWNPYmplY3QoZW1iZWRkaW5ncyA9IGxhdGVudCwga2V5ID0gXCJzY3ZpX1wiLCBhc3NheSA9IERlZmF1bHRBc3NheShsdW5nKSlcbmBgYCJ9 -->
+<pre class="r"><code># get the latent represenation
+latent = model$get_latent_representation()
+
+# put it back in our original Seurat object
+latent &lt;- as.matrix(latent)
+rownames(latent) = colnames(lung)
+lung[[&quot;scvi&quot;]] &lt;- CreateDimReducObject(embeddings = latent, key = &quot;scvi_&quot;, assay = DefaultAssay(lung))</code></pre>
 <!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuYWRhdGEgPSByLmFkYXRhXG5gYGAifQ== -->
-<pre class="r"><code>adata = r.adata</code></pre>
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxubm9ybWFsaXplZF9leHByZXNzaW9uID0gbW9kZWwkZ2V0X25vcm1hbGl6ZWRfZXhwcmVzc2lvbigpIFxuYGBgIn0= -->
+<pre class="r"><code>normalized_expression = model$get_normalized_expression() </code></pre>
 <!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
-<!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuIyAlbWF0cGxvdGxpYiBpbmxpbmVcbiMgJWxvYWRfZXh0IGF1dG9yZWxvYWRcbiMgJWF1dG9yZWxvYWQgMlxuXG5pbXBvcnQgc2NhbnB5IGFzIHNjXG5pbXBvcnQgbWF0cGxvdGxpYi5weXBsb3QgYXMgcGx0XG5pbXBvcnQgaGFybW9ueXB5XG5mcm9tIGhhcm1vbnlweSBpbXBvcnQgcnVuX2hhcm1vbnlcbmltcG9ydCBzeXNcbmZyb20gY25tZiBpbXBvcnQgY05NRlxuXG5pbXBvcnQgbnVtcHkgYXMgbnBcbmltcG9ydCBwYW5kYXMgYXMgcGRcbmZyb20gc2tsZWFybi5kZWNvbXBvc2l0aW9uIGltcG9ydCBOTUZcbmltcG9ydCBzZWFib3JuIGFzIHNuc1xuaW1wb3J0IHlhbWxcbiMjIGNvcGllZCBmcm9tIGhhcm1vbnlweS5weVxuZGVmIG1vZV9jb3JyZWN0X3JpZGdlKFpfb3JpZywgWl9jb3MsIFpfY29yciwgUiwgVywgSywgUGhpX1JrLCBQaGlfbW9lLCBsYW1iKTpcbiAgICBaX2NvcnIgPSBaX29yaWcuY29weSgpXG4gICAgZm9yIGkgaW4gcmFuZ2UoSyk6XG4gICAgICAgIFBoaV9SayA9IG5wLm11bHRpcGx5KFBoaV9tb2UsIFJbaSw6XSlcbiAgICAgICAgeCA9IG5wLmRvdChQaGlfUmssIFBoaV9tb2UuVCkgKyBsYW1iXG4gICAgICAgIFcgPSBucC5kb3QobnAuZG90KG5wLmxpbmFsZy5pbnYoeCksIFBoaV9SayksIFpfb3JpZy5UKVxuICAgICAgICBXWzAsOl0gPSAwICMgZG8gbm90IHJlbW92ZSB0aGUgaW50ZXJjZXB0XG4gICAgICAgIFpfY29yciAtPSBucC5kb3QoVy5ULCBQaGlfUmspXG4gICAgWl9jb3MgPSBaX2NvcnIgLyBucC5saW5hbGcubm9ybShaX2NvcnIsIG9yZD0yLCBheGlzPTApXG4gICAgcmV0dXJuIFpfY29zLCBaX2NvcnIsIFcsIFBoaV9Sa1xuXG5gYGAifQ== -->
-<pre class="r"><code># %matplotlib inline
-# %load_ext autoreload
-# %autoreload 2
+</div>
 
-import scanpy as sc
-import matplotlib.pyplot as plt
-import harmonypy
-from harmonypy import run_harmony
-import sys
-from cnmf import cNMF
-
-import numpy as np
-import pandas as pd
-from sklearn.decomposition import NMF
-import seaborn as sns
-import yaml
-## copied from harmonypy.py
-def moe_correct_ridge(Z_orig, Z_cos, Z_corr, R, W, K, Phi_Rk, Phi_moe, lamb):
-    Z_corr = Z_orig.copy()
-    for i in range(K):
-        Phi_Rk = np.multiply(Phi_moe, R[i,:])
-        x = np.dot(Phi_Rk, Phi_moe.T) + lamb
-        W = np.dot(np.dot(np.linalg.inv(x), Phi_Rk), Z_orig.T)
-        W[0,:] = 0 # do not remove the intercept
-        Z_corr -= np.dot(W.T, Phi_Rk)
-    Z_cos = Z_corr / np.linalg.norm(Z_corr, ord=2, axis=0)
-    return Z_cos, Z_corr, W, Phi_Rk
-</code></pre>
-<!-- rnb-source-end -->
-<!-- rnb-chunk-end -->
-<!-- rnb-text-begin -->
-<!-- rnb-text-end -->
-<!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgcHl0aG9uXG5gYGBweXRob25cbnZhcl9mZWF0dXJlcyA9IHIudmFyX2ZlYXR1cmVzXG5cbnZhcl9mZWF0dXJlc19kZiA9IHBkLlNlcmllcyhkYXRhPW5wLmZ1bGwobGVuKGFkYXRhLnZhcl9uYW1lcyksIEZhbHNlKSwgaW5kZXggPSBhZGF0YS52YXJfbmFtZXMpXG5cblxuZm9yIGksZ2VuZV9uYW1lIGluIGVudW1lcmF0ZSh2YXJfZmVhdHVyZXNfZGYuaW5kZXgpOlxuICBpZiBnZW5lX25hbWUgaW4gdmFyX2ZlYXR1cmVzOlxuICAgIHZhcl9mZWF0dXJlc19kZltpXSA9IFRydWVcbiAgZWxzZTpcbiAgICB2YXJfZmVhdHVyZXNfZGZbaV0gPSBGYWxzZVxuXG5cbmFkYXRhLnZhclsnaGlnaGx5X3ZhcmlhYmxlJ10gPSB2YXJfZmVhdHVyZXNfZGZcbnNjLnBwLm5vcm1hbGl6ZV9wZXJfY2VsbChhZGF0YSlcbmFkYXRhID0gYWRhdGFbOixhZGF0YS52YXJbJ2hpZ2hseV92YXJpYWJsZSddXS5jb3B5KClcbnNjLnBwLnNjYWxlKGFkYXRhLCB6ZXJvX2NlbnRlcj1GYWxzZSwgbWF4X3ZhbHVlPTUwKVxuc2MudGwucGNhKGFkYXRhLCB1c2VfaGlnaGx5X3ZhcmlhYmxlPUZhbHNlKVxuYGBgXG5gYGAifQ== -->
-<pre class="python"><code>```python
-var_features = r.var_features
-
-var_features_df = pd.Series(data=np.full(len(adata.var_names), False), index = adata.var_names)
-
-
-for i,gene_name in enumerate(var_features_df.index):
-  if gene_name in var_features:
-    var_features_df[i] = True
-  else:
-    var_features_df[i] = False
-
-
-adata.var[&#39;highly_variable&#39;] = var_features_df
-sc.pp.normalize_per_cell(adata)
-adata = adata[:,adata.var[&#39;highly_variable&#39;]].copy()
-sc.pp.scale(adata, zero_center=False, max_value=50)
-sc.tl.pca(adata, use_highly_variable=False)</code></pre>
-<pre><code>
-&lt;!-- rnb-source-end --&gt;
-
-&lt;!-- rnb-chunk-end --&gt;
-
-
-&lt;!-- rnb-text-begin --&gt;
-
-
-
-
-
-&lt;!-- rnb-text-end --&gt;
-
-
-&lt;!-- rnb-chunk-begin --&gt;
-
-
-&lt;!-- rnb-source-begin eyJkYXRhIjoiYGBgcHl0aG9uXG5gYGBweXRob25cbnNjLnBsLnBjYV92YXJpYW5jZV9yYXRpbyhhZGF0YSwgbG9nPVRydWUpXG5wbHQuc2F2ZWZpZyhcXC4vRGF0YS9QQ0EucG5nXFwpXG5gYGBcbmBgYCJ9 --&gt;
-
-```python
-```python
-sc.pl.pca_variance_ratio(adata, log=True)
-plt.savefig(\./Data/PCA.png\)</code></pre>
-<pre><code>
-&lt;!-- rnb-source-end --&gt;
-
-&lt;!-- rnb-chunk-end --&gt;
-
-
-&lt;!-- rnb-text-begin --&gt;
-
-
-
-&lt;!-- rnb-text-end --&gt;
-
-
-&lt;!-- rnb-chunk-begin --&gt;
-
-
-&lt;!-- rnb-source-begin eyJkYXRhIjoiYGBgcHl0aG9uXG5gYGBweXRob25cbmhhcm1vbnlfcmVzID0gcnVuX2hhcm1vbnkoYWRhdGEub2JzbVsnWF9wY2EnXSwgYWRhdGEub2JzLCAnb3JpZy5pZGVudCcpXG5cbmBgYFxuYGBgIn0= --&gt;
-
-```python
-```python
-harmony_res = run_harmony(adata.obsm[&#39;X_pca&#39;], adata.obs, &#39;orig.ident&#39;)
-</code></pre>
-<pre><code>
-&lt;!-- rnb-source-end --&gt;
-
-&lt;!-- rnb-output-begin eyJkYXRhIjoiMjAyMi0xMS0yMyAxNzo0Mzo1NCwxNzQgLSBoYXJtb255cHkgLSBJTkZPIC0gSXRlcmF0aW9uIDEgb2YgMTBcbjIwMjItMTEtMjMgMTc6NDQ6MTAsNTgyIC0gaGFybW9ueXB5IC0gSU5GTyAtIEl0ZXJhdGlvbiAyIG9mIDEwXG4yMDIyLTExLTIzIDE3OjQ0OjI3LDAzMiAtIGhhcm1vbnlweSAtIElORk8gLSBJdGVyYXRpb24gMyBvZiAxMFxuMjAyMi0xMS0yMyAxNzo0NDo0MSw3ODkgLSBoYXJtb255cHkgLSBJTkZPIC0gQ29udmVyZ2VkIGFmdGVyIDMgaXRlcmF0aW9uc1xuIn0= --&gt;
-</code></pre>
-<p>2022-11-23 17:43:54,174 - harmonypy - INFO - Iteration 1 of 10
-2022-11-23 17:44:10,582 - harmonypy - INFO - Iteration 2 of 10
-2022-11-23 17:44:27,032 - harmonypy - INFO - Iteration 3 of 10
-2022-11-23 17:44:41,789 - harmonypy - INFO - Converged after 3
-iterations</p>
-<pre><code>
-
-
-&lt;!-- rnb-output-end --&gt;
-
-&lt;!-- rnb-chunk-end --&gt;
-
-
-&lt;!-- rnb-text-begin --&gt;
-
-
-
-&lt;!-- rnb-text-end --&gt;
-
-
-&lt;!-- rnb-chunk-begin --&gt;
-
-
-&lt;!-- rnb-source-begin eyJkYXRhIjoiYGBgcHl0aG9uXG5gYGBweXRob25cblggPSBucC5hcnJheShhZGF0YVs6LGFkYXRhLnZhclsnaGlnaGx5X3ZhcmlhYmxlJ11dLlgpXG5fLCBYX2NvcnIsIF8sIF8gPSBtb2VfY29ycmVjdF9yaWRnZShYLlQsIE5vbmUsIE5vbmUsIGhhcm1vbnlfcmVzLlIsIE5vbmUsIGhhcm1vbnlfcmVzLkssIE5vbmUsIGhhcm1vbnlfcmVzLlBoaV9tb2UsIGhhcm1vbnlfcmVzLmxhbWIpXG5gYGBcbmBgYCJ9 --&gt;
-
-```python
-```python
-X = np.array(adata[:,adata.var[&#39;highly_variable&#39;]].X)
-_, X_corr, _, _ = moe_correct_ridge(X.T, None, None, harmony_res.R, None, harmony_res.K, None, harmony_res.Phi_moe, harmony_res.lamb)</code></pre>
-<pre><code>
-&lt;!-- rnb-source-end --&gt;
-
-&lt;!-- rnb-chunk-end --&gt;
-
-
-&lt;!-- rnb-text-begin --&gt;
-
-
-
-&lt;!-- rnb-text-end --&gt;
-
-
-&lt;!-- rnb-chunk-begin --&gt;
-
-
-&lt;!-- rnb-source-begin eyJkYXRhIjoiYGBgcHl0aG9uXG5gYGBweXRob25cbnNjLnBsLnVtYXAoYWRhdGEsIGNvbG9yPVsnb3JpZy5pZGVudCddKVxucGx0LnNhdmVmaWcoJy4vRGF0YS9vcmlnX3VtYXAucG5nJywgZHBpPTE5OSlcbmBgYFxuYGBgIn0= --&gt;
-
-```python
-```python
-sc.pl.umap(adata, color=[&#39;orig.ident&#39;])
-plt.savefig(&#39;./Data/orig_umap.png&#39;, dpi=199)</code></pre>
-<pre><code>
-&lt;!-- rnb-source-end --&gt;
-
-&lt;!-- rnb-chunk-end --&gt;
-
-
-&lt;!-- rnb-text-begin --&gt;
-
-
-
-&lt;!-- rnb-text-end --&gt;
-
-
-&lt;!-- rnb-chunk-begin --&gt;
-
-
-&lt;!-- rnb-source-begin eyJkYXRhIjoiYGBgcHl0aG9uXG5gYGBweXRob25cbnNjLnBwLm5laWdoYm9ycyhhZGF0YSwgbl9wY3M9MjAsIHVzZV9yZXA9J1hfcGNhX2hhcm1vbnknKVxuc2MudGwudW1hcChhZGF0YSkgI2Vycm9yIHdoZW4gcnVubmluZyBvbiBzZXJ2ZXJcbnBsdC5zYXZlZmlnKCcuL0RhdGEvY29ycmVjdGVkX3VtYXAucG5nJylcblxuYGBgXG5gYGAifQ== --&gt;
-
-```python
-```python
-sc.pp.neighbors(adata, n_pcs=20, use_rep=&#39;X_pca_harmony&#39;)
-sc.tl.umap(adata) #error when running on server
-plt.savefig(&#39;./Data/corrected_umap.png&#39;)
-</code></pre>
-<pre><code>
-&lt;!-- rnb-source-end --&gt;
-
-&lt;!-- rnb-chunk-end --&gt;
-
-
-&lt;!-- rnb-text-begin --&gt;
-
-
-
-&lt;!-- rnb-text-end --&gt;
-
-
-&lt;!-- rnb-chunk-begin --&gt;
-
-
-&lt;!-- rnb-source-begin eyJkYXRhIjoiYGBgcHl0aG9uXG5gYGBweXRob25cbmFkYXRhX2NvcnIgPSBhZGF0YVs6LGFkYXRhLnZhclsnaGlnaGx5X3ZhcmlhYmxlJ11dLmNvcHkoKVxuYWRhdGFfY29yci5YID0gWF9jb3JyXG5gYGBcbmBgYCJ9 --&gt;
-
-```python
-```python
-adata_corr = adata[:,adata.var[&#39;highly_variable&#39;]].copy()
-adata_corr.X = X_corr</code></pre>
-<pre><code>
-&lt;!-- rnb-source-end --&gt;
-
-&lt;!-- rnb-chunk-end --&gt;
-
-
-&lt;!-- rnb-text-begin --&gt;
-
-
-
-&lt;!-- rnb-text-end --&gt;
-
-
-&lt;!-- rnb-chunk-begin --&gt;
-
-
-&lt;!-- rnb-source-begin eyJkYXRhIjoiYGBgcHl0aG9uXG5gYGBweXRob25cbnN1ZmZpeCA9IHIuc3VmZml4XG5YX2NvcnJfbm9ubmVnID0gWF9jb3JyLmNvcHkoKVxuWF9jb3JyX25vbm5lZ1tYX2NvcnJfbm9ubmVnPDBdPSAwXG5hZGF0YV9jb3JyX25vbm5lZyA9IGFkYXRhX2NvcnIuY29weSgpXG5hZGF0YV9jb3JyX25vbm5lZy5YID0gWF9jb3JyX25vbm5lZ1xuc2Mud3JpdGUoJy4uL0RhdGEvY25tZi94ZW5vX0hhcm1vbnlfTm9OZWcnICsgc3VmZml4ICsnLmg1YWQnLCBhZGF0YV9jb3JyX25vbm5lZylcbmBgYFxuYGBgIn0= --&gt;
-
-```python
-```python
-suffix = r.suffix
-X_corr_nonneg = X_corr.copy()
-X_corr_nonneg[X_corr_nonneg&lt;0]= 0
-adata_corr_nonneg = adata_corr.copy()
-adata_corr_nonneg.X = X_corr_nonneg
-sc.write(&#39;../Data/cnmf/xeno_Harmony_NoNeg&#39; + suffix +&#39;.h5ad&#39;, adata_corr_nonneg)</code></pre>
-<pre><code>
-&lt;!-- rnb-source-end --&gt;
-
-&lt;!-- rnb-chunk-end --&gt;
-
-
-&lt;!-- rnb-text-begin --&gt;
-
-
-
-
-&lt;!-- rnb-text-end --&gt;
-
-
-&lt;!-- rnb-chunk-begin --&gt;
-
-
-&lt;!-- rnb-source-begin eyJkYXRhIjoiYGBgcHl0aG9uXG5gYGBweXRob25cbm5hbWUgPSAnY05NRl9wYXRpZW50c19WYXJub3JtX0hhcm1vbnknICsgc3VmZml4XG5vdXRkaXIgPSAnLi4vRGF0YS9jbm1mJ1xuS19yYW5nZSA9IG5wLmFyYW5nZSgzLDkpXG5jbm1mX29iaiA9IGNOTUYob3V0cHV0X2Rpcj1vdXRkaXIsIG5hbWU9bmFtZSlcbmNubWZfb2JqLnByZXBhcmUoY291bnRzX2ZuPScuLi9EYXRhL2NubWYveGVub19IYXJtb255X05vTmVnJysgc3VmZml4ICsnLmg1YWQnLCBjb21wb25lbnRzPUtfcmFuZ2UsIG5faXRlcj0xMCwgc2VlZD0xNCwgZGVuc2lmeT1UcnVlKVxuYGBgXG5gYGAifQ== --&gt;
-
-```python
-```python
-name = &#39;cNMF_patients_Varnorm_Harmony&#39; + suffix
-outdir = &#39;../Data/cnmf&#39;
-K_range = np.arange(3,9)
-cnmf_obj = cNMF(output_dir=outdir, name=name)
-cnmf_obj.prepare(counts_fn=&#39;../Data/cnmf/xeno_Harmony_NoNeg&#39;+ suffix +&#39;.h5ad&#39;, components=K_range, n_iter=10, seed=14, densify=True)</code></pre>
-<pre><code>
-&lt;!-- rnb-source-end --&gt;
-
-&lt;!-- rnb-chunk-end --&gt;
-
-
-&lt;!-- rnb-text-begin --&gt;
-
-
-
-&lt;!-- rnb-text-end --&gt;
-
-
-&lt;!-- rnb-chunk-begin --&gt;
-
-
-&lt;!-- rnb-source-begin eyJkYXRhIjoiYGBgcHl0aG9uXG5gYGBweXRob25cbmNubWZfb2JqLmZhY3Rvcml6ZSh3b3JrZXJfaT0wLCB0b3RhbF93b3JrZXJzPTEpXG5gYGBcbmBgYCJ9 --&gt;
-
-```python
-```python
-cnmf_obj.factorize(worker_i=0, total_workers=1)</code></pre>
-<pre><code>
-&lt;!-- rnb-source-end --&gt;
-
-&lt;!-- rnb-chunk-end --&gt;
-
-
-&lt;!-- rnb-text-begin --&gt;
-
-
-cNMF:
-
-
-&lt;!-- rnb-text-end --&gt;
-
-
-&lt;!-- rnb-chunk-begin --&gt;
-
-
-&lt;!-- rnb-source-begin eyJkYXRhIjoiYGBgcHl0aG9uXG5gYGBweXRob25cbmNubWZfb2JqLmNvbWJpbmUoKVxuYGBgXG5gYGAifQ== --&gt;
-
-```python
-```python
-cnmf_obj.combine()</code></pre>
-<pre><code>
-&lt;!-- rnb-source-end --&gt;
-
-&lt;!-- rnb-output-begin eyJkYXRhIjoiQ29tYmluaW5nIGZhY3Rvcml6YXRpb25zIGZvciBrPTMuXG5Db21iaW5pbmcgZmFjdG9yaXphdGlvbnMgZm9yIGs9NC5cbkNvbWJpbmluZyBmYWN0b3JpemF0aW9ucyBmb3Igaz01LlxuQ29tYmluaW5nIGZhY3Rvcml6YXRpb25zIGZvciBrPTYuXG5Db21iaW5pbmcgZmFjdG9yaXphdGlvbnMgZm9yIGs9Ny5cbkNvbWJpbmluZyBmYWN0b3JpemF0aW9ucyBmb3Igaz04LlxuIn0= --&gt;
-</code></pre>
-<p>Combining factorizations for k=3. Combining factorizations for k=4.
-Combining factorizations for k=5. Combining factorizations for k=6.
-Combining factorizations for k=7. Combining factorizations for k=8.</p>
-<pre><code>
-
-
-&lt;!-- rnb-output-end --&gt;
-
-&lt;!-- rnb-source-begin eyJkYXRhIjoiYGBgcHl0aG9uXG5gYGBweXRob25cbmNubWZfb2JqLmtfc2VsZWN0aW9uX3Bsb3QoKVxuYGBgXG5gYGAifQ== --&gt;
-
-```python
-```python
-cnmf_obj.k_selection_plot()</code></pre>
-<pre><code>
-&lt;!-- rnb-source-end --&gt;
-
-&lt;!-- rnb-chunk-end --&gt;
-
-
-&lt;!-- rnb-text-begin --&gt;
-
-
-
-&lt;!-- rnb-text-end --&gt;
-
-
-&lt;!-- rnb-chunk-begin --&gt;
-
-
-&lt;!-- rnb-source-begin eyJkYXRhIjoiYGBgcHl0aG9uXG5gYGBweXRob25cbmltcG9ydCBwaWNrbGVcbmYgPSBvcGVuKCcuLi9EYXRhL2NubWYveGVubycgKyBzdWZmaXggKydfY25tZl9vYmoucGNrbCcsICd3YicpXG5waWNrbGUuZHVtcChjbm1mX29iaiwgZilcbmYuY2xvc2UoKVxuYGBgXG5gYGAifQ== --&gt;
-
-```python
-```python
-import pickle
-f = open(&#39;../Data/cnmf/xeno&#39; + suffix +&#39;_cnmf_obj.pckl&#39;, &#39;wb&#39;)
-pickle.dump(cnmf_obj, f)
-f.close()</code></pre>
-<pre><code>
-&lt;!-- rnb-source-end --&gt;
-
-&lt;!-- rnb-chunk-end --&gt;
-
-
-&lt;!-- rnb-text-begin --&gt;
-
-
-
-&lt;!-- rnb-text-end --&gt;
-
-
-&lt;!-- rnb-chunk-begin --&gt;
-
-
-&lt;!-- rnb-source-begin eyJkYXRhIjoiYGBgcHl0aG9uXG5jbm1mX29iai5jb21iaW5lKClcbmNubWZfb2JqLmtfc2VsZWN0aW9uX3Bsb3QoKVxuYGBgIn0= --&gt;
-
-```python
-cnmf_obj.combine()
-cnmf_obj.k_selection_plot()</code></pre>
-<!-- rnb-source-end -->
-<!-- rnb-chunk-end -->
-<!-- rnb-text-begin -->
-<!-- rnb-text-end -->
-<!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgcHl0aG9uXG5pbXBvcnQgcGlja2xlXG5mID0gb3BlbignLi9EYXRhL2NubWYveGVubycgKyBzdWZmaXggKydfY25tZl9vYmoucGNrbCcsICd3YicpXG5waWNrbGUuZHVtcChjbm1mX29iaiwgZilcbmYuY2xvc2UoKVxuYGBgIn0= -->
-<pre class="python"><code>import pickle
-f = open(&#39;./Data/cnmf/xeno&#39; + suffix +&#39;_cnmf_obj.pckl&#39;, &#39;wb&#39;)
-pickle.dump(cnmf_obj, f)
-f.close()</code></pre>
-<!-- rnb-source-end -->
-<!-- rnb-chunk-end -->
-
-<div id="rmd-source-code">LS0tCnRpdGxlOiAiUiBOb3RlYm9vayIKb3V0cHV0OiBodG1sX25vdGVib29rCmVkaXRvcl9vcHRpb25zOiAKICBjaHVua19vdXRwdXRfdHlwZTogaW5saW5lCi0tLQpgYGB7cn0KbHVuZyA9IEZpbmRWYXJpYWJsZUZlYXR1cmVzKG9iamVjdCA9IGx1bmcsbmZlYXR1cmVzID0gNDAwMCkKbHVuZ19tb3N0X3ZhcmdlbmVzID0gbHVuZ0Bhc3NheXMkUk5BQHZhci5mZWF0dXJlcwpsdW5nID0gRmluZFZhcmlhYmxlRmVhdHVyZXMob2JqZWN0ID0gbHVuZyxuZmVhdHVyZXMgPSAxNTAwMCkKbHVuZ19hbGxfdmFyZ2VuZXMgPSBsdW5nQGFzc2F5cyRSTkFAdmFyLmZlYXR1cmVzCgp4ZW5vID0gRmluZFZhcmlhYmxlRmVhdHVyZXMob2JqZWN0ID0geGVubyxuZmVhdHVyZXMgPSA0MDAwKQp4ZW5vX21vc3RfdmFyZ2VuZXMgPSB4ZW5vQGFzc2F5cyRSTkFAdmFyLmZlYXR1cmVzCgp4ZW5vID0gRmluZFZhcmlhYmxlRmVhdHVyZXMob2JqZWN0ID0geGVubyxuZmVhdHVyZXMgPSAxNTAwMCkKeGVub19hbGxfdmFyZ2VuZXMgPSB4ZW5vQGFzc2F5cyRSTkFAdmFyLmZlYXR1cmVzCgpsdW5nX3ZhcmdlbmVzID0gbHVuZ19tb3N0X3ZhcmdlbmVzW2x1bmdfbW9zdF92YXJnZW5lcyAlaW4lIHhlbm9fYWxsX3ZhcmdlbmVzXQp4ZW5vX3ZhcmdlbmVzID0geGVub19tb3N0X3ZhcmdlbmVzW3hlbm9fbW9zdF92YXJnZW5lcyAlaW4lIGx1bmdfYWxsX3ZhcmdlbmVzXQpnZW5lc19sc3QgPSBjKGx1bmdfdmFyZ2VuZXMseGVub192YXJnZW5lcykKZ2VuZXNfbHN0ID0gZ2VuZXNfbHN0WyFkdXBsaWNhdGVkKGdlbmVzX2xzdCldICNyZW1vdmUgZHVwcwpgYGAKCgoKYGBge3J9CnN1ZmZpeCA9IjRLY29tYmluZWRfZ2VuZXMiCnhlbm8gPSByZWFkUkRTKCIuL0RhdGEvMTB4X3hlbm9fMTAwMC5SZHMiKQp4ZW5vID0gRmluZFZhcmlhYmxlRmVhdHVyZXMob2JqZWN0ID0geGVubyxuZmVhdHVyZXMgPSAyMDAwKQp2YXJfZmVhdHVyZXMgPSBWYXJpYWJsZUZlYXR1cmVzKHhlbm8pICU+JSBhcy5jaGFyYWN0ZXIoKQpgYGAKCmBgYHtyfQojaWYgbm8gbWVtb3J5Cnhlbm8gPSBEaWV0U2V1cmF0KG9iamVjdCA9IHhlbm8pCmBgYAoKYGBge3J9CmxpYnJhcnkocmV0aWN1bGF0ZSkKCnNjIDwtIGltcG9ydCgnc2NhbnB5JywgY29udmVydCA9IEZBTFNFKQphZGF0YSA8LSBzYyRBbm5EYXRhKAogIFggICA9IHQoYXMubWF0cml4KEdldEFzc2F5RGF0YSh4ZW5vLHNsb3Q9J2NvdW50cycpKSksICNjbm1mIGV4cGVjdCAxMHggY291bnRzCiAgb2JzID0geGVub1tbXV0sCiAgdmFyID0gR2V0QXNzYXkoeGVubylbW11dCikKcm0oeGVubykgI2RlbGV0ZSB0byBzYXZlIHJhbQpgYGAKCmBgYHtweXRob259CmFkYXRhID0gci5hZGF0YQpgYGAKCgoKYGBge3B5dGhvbn0KIyAlbWF0cGxvdGxpYiBpbmxpbmUKIyAlbG9hZF9leHQgYXV0b3JlbG9hZAojICVhdXRvcmVsb2FkIDIKCmltcG9ydCBzY2FucHkgYXMgc2MKaW1wb3J0IG1hdHBsb3RsaWIucHlwbG90IGFzIHBsdAppbXBvcnQgaGFybW9ueXB5CmZyb20gaGFybW9ueXB5IGltcG9ydCBydW5faGFybW9ueQppbXBvcnQgc3lzCmZyb20gY25tZiBpbXBvcnQgY05NRgoKaW1wb3J0IG51bXB5IGFzIG5wCmltcG9ydCBwYW5kYXMgYXMgcGQKZnJvbSBza2xlYXJuLmRlY29tcG9zaXRpb24gaW1wb3J0IE5NRgppbXBvcnQgc2VhYm9ybiBhcyBzbnMKaW1wb3J0IHlhbWwKIyMgY29waWVkIGZyb20gaGFybW9ueXB5LnB5CmRlZiBtb2VfY29ycmVjdF9yaWRnZShaX29yaWcsIFpfY29zLCBaX2NvcnIsIFIsIFcsIEssIFBoaV9SaywgUGhpX21vZSwgbGFtYik6CiAgICBaX2NvcnIgPSBaX29yaWcuY29weSgpCiAgICBmb3IgaSBpbiByYW5nZShLKToKICAgICAgICBQaGlfUmsgPSBucC5tdWx0aXBseShQaGlfbW9lLCBSW2ksOl0pCiAgICAgICAgeCA9IG5wLmRvdChQaGlfUmssIFBoaV9tb2UuVCkgKyBsYW1iCiAgICAgICAgVyA9IG5wLmRvdChucC5kb3QobnAubGluYWxnLmludih4KSwgUGhpX1JrKSwgWl9vcmlnLlQpCiAgICAgICAgV1swLDpdID0gMCAjIGRvIG5vdCByZW1vdmUgdGhlIGludGVyY2VwdAogICAgICAgIFpfY29yciAtPSBucC5kb3QoVy5ULCBQaGlfUmspCiAgICBaX2NvcyA9IFpfY29yciAvIG5wLmxpbmFsZy5ub3JtKFpfY29yciwgb3JkPTIsIGF4aXM9MCkKICAgIHJldHVybiBaX2NvcywgWl9jb3JyLCBXLCBQaGlfUmsKCmBgYAoKYGBge3B5dGhvbn0KdmFyX2ZlYXR1cmVzID0gci52YXJfZmVhdHVyZXMKCnZhcl9mZWF0dXJlc19kZiA9IHBkLlNlcmllcyhkYXRhPW5wLmZ1bGwobGVuKGFkYXRhLnZhcl9uYW1lcyksIEZhbHNlKSwgaW5kZXggPSBhZGF0YS52YXJfbmFtZXMpCgoKZm9yIGksZ2VuZV9uYW1lIGluIGVudW1lcmF0ZSh2YXJfZmVhdHVyZXNfZGYuaW5kZXgpOgogIGlmIGdlbmVfbmFtZSBpbiB2YXJfZmVhdHVyZXM6CiAgICB2YXJfZmVhdHVyZXNfZGZbaV0gPSBUcnVlCiAgZWxzZToKICAgIHZhcl9mZWF0dXJlc19kZltpXSA9IEZhbHNlCgoKYWRhdGEudmFyWydoaWdobHlfdmFyaWFibGUnXSA9IHZhcl9mZWF0dXJlc19kZgpzYy5wcC5ub3JtYWxpemVfcGVyX2NlbGwoYWRhdGEpCmFkYXRhID0gYWRhdGFbOixhZGF0YS52YXJbJ2hpZ2hseV92YXJpYWJsZSddXS5jb3B5KCkKc2MucHAuc2NhbGUoYWRhdGEsIHplcm9fY2VudGVyPUZhbHNlLCBtYXhfdmFsdWU9NTApCnNjLnRsLnBjYShhZGF0YSwgdXNlX2hpZ2hseV92YXJpYWJsZT1GYWxzZSkKYGBgCgpgYGB7cHl0aG9ufQpzYy5wbC5wY2FfdmFyaWFuY2VfcmF0aW8oYWRhdGEsIGxvZz1UcnVlKQpwbHQuc2F2ZWZpZygiLi9EYXRhL1BDQS5wbmciKQpgYGAKCmBgYHtweXRob259Cmhhcm1vbnlfcmVzID0gcnVuX2hhcm1vbnkoYWRhdGEub2JzbVsnWF9wY2EnXSwgYWRhdGEub2JzLCAnb3JpZy5pZGVudCcpCmBgYAoKYGBge3B5dGhvbn0KWCA9IG5wLmFycmF5KGFkYXRhWzosYWRhdGEudmFyWydoaWdobHlfdmFyaWFibGUnXV0uWCkKXywgWF9jb3JyLCBfLCBfID0gbW9lX2NvcnJlY3RfcmlkZ2UoWC5ULCBOb25lLCBOb25lLCBoYXJtb255X3Jlcy5SLCBOb25lLCBoYXJtb255X3Jlcy5LLCBOb25lLCBoYXJtb255X3Jlcy5QaGlfbW9lLCBoYXJtb255X3Jlcy5sYW1iKQpYX2NvcnIgPSBYX2NvcnIuVAphZGF0YS5vYnNtWydYX3BjYV9oYXJtb255J10gPSBoYXJtb255X3Jlcy5aX2NvcnIuVApgYGAKCmBgYHtweXRob259CnNjLnBsLnVtYXAoYWRhdGEsIGNvbG9yPVsnb3JpZy5pZGVudCddKQpwbHQuc2F2ZWZpZygnLi9EYXRhL29yaWdfdW1hcC5wbmcnLCBkcGk9MTk5KQpgYGAKCmBgYHtweXRob259CnNjLnBwLm5laWdoYm9ycyhhZGF0YSwgbl9wY3M9MjAsIHVzZV9yZXA9J1hfcGNhX2hhcm1vbnknKQpzYy50bC51bWFwKGFkYXRhKSAjZXJyb3Igd2hlbiBydW5uaW5nIG9uIHNlcnZlcgpwbHQuc2F2ZWZpZygnLi9EYXRhL2NvcnJlY3RlZF91bWFwLnBuZycpCgpgYGAKCgpgYGB7cHl0aG9ufQphZGF0YV9jb3JyID0gYWRhdGFbOixhZGF0YS52YXJbJ2hpZ2hseV92YXJpYWJsZSddXS5jb3B5KCkKYWRhdGFfY29yci5YID0gWF9jb3JyCmBgYAoKYGBge3B5dGhvbn0Kc3VmZml4ID0gci5zdWZmaXgKWF9jb3JyX25vbm5lZyA9IFhfY29yci5jb3B5KCkKWF9jb3JyX25vbm5lZ1tYX2NvcnJfbm9ubmVnPDBdPSAwCmFkYXRhX2NvcnJfbm9ubmVnID0gYWRhdGFfY29yci5jb3B5KCkKYWRhdGFfY29ycl9ub25uZWcuWCA9IFhfY29ycl9ub25uZWcKc2Mud3JpdGUoJy4vRGF0YS9jbm1mL3hlbm9fSGFybW9ueV9Ob05lZycgKyBzdWZmaXggKycuaDVhZCcsIGFkYXRhX2NvcnJfbm9ubmVnKQpgYGAKCmNOTUY6CgpgYGB7cHl0aG9ufQpuYW1lID0gJ2NOTUZfcGF0aWVudHNfVmFybm9ybV9IYXJtb255JyArIHN1ZmZpeApvdXRkaXIgPSAnLi9EYXRhL2NubWYnCktfcmFuZ2UgPSBucC5hcmFuZ2UoMyw5KQpjbm1mX29iaiA9IGNOTUYob3V0cHV0X2Rpcj1vdXRkaXIsIG5hbWU9bmFtZSkKY25tZl9vYmoucHJlcGFyZShjb3VudHNfZm49Jy4vRGF0YS9jbm1mL3hlbm9fSGFybW9ueV9Ob05lZycrIHN1ZmZpeCArJy5oNWFkJywgY29tcG9uZW50cz1LX3JhbmdlLCBuX2l0ZXI9MTAsIHNlZWQ9MTQsIGRlbnNpZnk9VHJ1ZSkKYGBgCgpgYGB7cHl0aG9ufQpjbm1mX29iai5mYWN0b3JpemUod29ya2VyX2k9MCwgdG90YWxfd29ya2Vycz0xKQpgYGAKCmBgYHtweXRob259CmNubWZfb2JqLmNvbWJpbmUoKQpjbm1mX29iai5rX3NlbGVjdGlvbl9wbG90KCkKYGBgCgoKYGBge3B5dGhvbn0KaW1wb3J0IHBpY2tsZQpmID0gb3BlbignLi9EYXRhL2NubWYveGVubycgKyBzdWZmaXggKydfY25tZl9vYmoucGNrbCcsICd3YicpCnBpY2tsZS5kdW1wKGNubWZfb2JqLCBmKQpmLmNsb3NlKCkKYGBg</div>
+<div id="rmd-source-code">LS0tCnRpdGxlOiAiVGl0bGUiCmF1dGhvcjogIkF2aXNoYWkgV2l6ZWwiCmRhdGU6ICdgciBTeXMuRGF0ZSgpYCcKb3V0cHV0OiAKICBodG1sX25vdGVib29rOiAKICAgIGNvZGVfZm9sZGluZzogaGlkZQotLS0KCiMjIFBhcmFtZXRlcnMKCmBgYHtyIHdhcm5pbmc9RkFMU0V9CnN1ZmZpeCA9ICIiCmRhdGFfdG9fcmVhZCA9ICIiCmBgYAoKLSAgIHN1ZmZpeCA9IGByIHN1ZmZpeGAKLSAgIGRhdGFfdG9fcmVhZCA9IGByIGRhdGFfdG9fcmVhZGAKCiMjIGZ1bmN0aW9ucwoKYGBge3Igd2FybmluZz1GQUxTRX0KbGlicmFyeShyZXRpY3VsYXRlKQpsaWJyYXJ5KFNldXJhdERhdGEpCnNjIDwtIGltcG9ydCgic2NhbnB5IiwgY29udmVydCA9IEZBTFNFKQpzY3ZpIDwtIGltcG9ydCgic2N2aSIsIGNvbnZlcnQgPSBGQUxTRSkKc2N2aSA8LSBpbXBvcnQoIm51bXB5IiwgY29udmVydCA9IEZBTFNFKQoKYGBgCgojIyBEYXRhCgpgYGB7cn0KCmBgYAoKYGBge3B5dGhvbn0KaW1wb3J0IHNjdmkKYGBgCgoKYGBge3J9CgpsdW5nID0gcmVhZFJEUygiLi9EYXRhL2x1bmdfY2FuY2VyY2VsbHNfd2l0aFRQX29ubHlQYXRpZW50cy5yZHMiKQpsdW5nX3BhdGllbnRzID0gbHVuZyRwYXRpZW50LmlkZW50ICU+JSB1bmlxdWUoKSAlPiUgYXMuY2hhcmFjdGVyKCkKbHVuZ19wYXRpZW50c19maWx0ZXJlZCA9IGx1bmdfcGF0aWVudHNbIShsdW5nX3BhdGllbnRzICVpbiUgYygiWDEwNTVuZXciLCJYMTA5OSIpKV0KbHVuZyA9IHN1YnNldCh4ID0gbHVuZyxzdWJzZXQgPSBwYXRpZW50LmlkZW50ICVpbiUgbHVuZ19wYXRpZW50c19maWx0ZXJlZCkKCnRvcDIwMDAgPC0gaGVhZChWYXJpYWJsZUZlYXR1cmVzKGx1bmcpLCAyMDAwKQpsdW5nIDwtIGx1bmdbdG9wMjAwMF0KYSA9IDMKYWRhdGEgPC0gc2NlYXN5Ojpjb252ZXJ0Rm9ybWF0KGx1bmcsIGZyb209InNldXJhdCIsIHRvPSJhbm5kYXRhIiwgbWFpbl9sYXllcj0iY291bnRzIiwgZHJvcF9zaW5nbGVfdmFsdWVzPUZBTFNFKQpwcmludChhZGF0YSkKc2N2aSRtb2RlbCRTQ1ZJJHNldHVwX2FubmRhdGEoYWRhdGEsIGJhdGNoX2tleSA9ICdwYXRpZW50LmlkZW50JykKbW9kZWwgPSBzY3ZpJG1vZGVsJFNDVkkoYWRhdGEpCm1vZGVsJHRyYWluKCkKYGBgCgpgYGB7cn0KIyBnZXQgdGhlIGxhdGVudCByZXByZXNlbmF0aW9uCmxhdGVudCA9IG1vZGVsJGdldF9sYXRlbnRfcmVwcmVzZW50YXRpb24oKQoKIyBwdXQgaXQgYmFjayBpbiBvdXIgb3JpZ2luYWwgU2V1cmF0IG9iamVjdApsYXRlbnQgPC0gYXMubWF0cml4KGxhdGVudCkKcm93bmFtZXMobGF0ZW50KSA9IGNvbG5hbWVzKGx1bmcpCmx1bmdbWyJzY3ZpIl1dIDwtIENyZWF0ZURpbVJlZHVjT2JqZWN0KGVtYmVkZGluZ3MgPSBsYXRlbnQsIGtleSA9ICJzY3ZpXyIsIGFzc2F5ID0gRGVmYXVsdEFzc2F5KGx1bmcpKQpgYGAKCmBgYHtyfQpub3JtYWxpemVkX2V4cHJlc3Npb24gPSBtb2RlbCRnZXRfbm9ybWFsaXplZF9leHByZXNzaW9uKCkgCmBgYAoK</div>
 
 
 
@@ -2263,8 +1900,8 @@ $(document).ready(function () {
 <!-- code folding -->
 <script>
 $(document).ready(function () {
-  window.initializeSourceEmbed("models_cnmf_harmony.Rmd");
-  window.initializeCodeFolding("show" === "show");
+  window.initializeSourceEmbed("scvi.Rmd");
+  window.initializeCodeFolding("hide" === "show");
 });
 </script>
 

@@ -1,0 +1,145 @@
+---
+title: "Title"
+author: "Avishai Wizel"
+date: '`r Sys.Date()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+---
+
+## Parameters
+
+```{r warning=FALSE}
+suffix = "X1155"
+data_to_read = ""
+```
+
+
+## functions
+
+```{r warning=FALSE}
+```
+
+## Data
+
+```{r}
+lung = readRDS("./Data/lung_cancercells_withTP_onlyPatients.rds")
+```
+
+```{r}
+x1155 = base::subset(lung,subset = patient.ident == "X1155")
+#write expression
+x1155 = FindVariableFeatures(object = x1155,nfeatures = 2000)
+vargenes = VariableFeatures(object = x1155)
+x1155_expression = t(as.matrix(GetAssayData(x1155,slot='data')))
+x1155_expression = 2**x1155_expression #convert from log2(tpm+1) to tpm
+x1155_expression = x1155_expression-1
+# hmsc_expression = hmsc_expression[,!colSums(hmsc_expression==0, na.rm=TRUE)==nrow(hmsc_expression)] #delete rows that have all 0
+x1155_expression = x1155_expression[,vargenes]
+write.table(x = x1155_expression ,file = './Data/cnmf/x1155_expressionData_2Kvargenes.txt',sep = "\t")
+```
+cNMF:
+```{python eval=F}
+from cnmf import cNMF
+import numpy as np
+name = 'X1155_cNMF_2Kvargenes'
+outdir = './Data/cNMF'
+K_range = np.arange(3,10)
+cnmf_obj = cNMF(output_dir=outdir, name=name)
+counts_fn='./Data/cnmf/x1155_expressionData_2Kvargenes.txt'
+tpm_fn = counts_fn ## This is a weird case where because this dataset is not 3' end umi sequencing, we opted to use the TPM matrix as the input matrix rather than the count matrix
+
+cnmf_obj.prepare(counts_fn=counts_fn, components=K_range, seed=14,tpm_fn=tpm_fn)
+```
+```{python eval=F}
+from cnmf import cNMF
+import numpy as np
+name = 'patients_scvi_xenoGenes'
+outdir = './Data/cNMF'
+K_range = np.arange(3,6)
+cnmf_obj = cNMF(output_dir=outdir, name=name)
+counts_fn='./Data/cNMF/scVI_normCounts/patients_scvi_normalized_xenoGenes.txt'
+
+
+cnmf_obj.prepare(counts_fn=counts_fn, components=K_range, seed=14,densify=True,tpm_fn=counts_fn)
+```
+
+```{python}
+cnmf_obj.factorize(worker_i=0, total_workers=1)
+```
+
+```{python}
+cnmf_obj.combine()
+cnmf_obj.k_selection_plot()
+```
+## Save object
+```{python}
+import pickle
+f = open('./Data/cnmf/cnmf_objects/patients_SCVI_xenoGenes_cnmf_obj.pckl', 'wb')
+pickle.dump(cnmf_obj, f)
+f.clo
+se()
+```
+```{python}
+suffix = r.suffix
+import pickle
+from cnmf import cNMF
+f = open('./Data/cnmf/cnmf_objects/patients_SCVI_xenoGenes_cnmf_obj.pckl', 'rb')
+cnmf_obj = pickle.load(f)
+f.close()
+```
+
+```{r}
+selected_k = 6
+suffix = paste(suffix,paste0(selected_k,"nmfK"),sep="_")
+print(suffix)
+```
+
+```{python}
+selected_k = int(r.selected_k)
+density_threshold = 0.1
+# cnmf_obj.consensus(k=selected_k, density_threshold=density_threshold,show_clustering=True)
+usage_norm, gep_scores, gep_tpm, topgenes = cnmf_obj.load_results(K=selected_k, density_threshold=density_threshold)
+```
+## Enrichment analysis by top 200 genes of each program
+```{r fig.height=8, fig.width=8, results='hide'}
+gep_scores = py$gep_scores
+top_genes_num = 200
+plt_list = list()
+for (i in 1:ncol(gep_scores)) {
+  top_genes = gep_scores  %>%  arrange(desc(gep_scores[i])) #sort by score a
+  top = head(rownames(top_genes),top_genes_num) #take top top_genes_num
+  res = genes_vec_enrichment(genes = top,background = rownames(gep_scores),homer = T,title = 
+                    names(gep_scores)[i],silent = T,return_all = T)
+   
+  plt_list[[i]] = res$plt
+}
+gridExtra::grid.arrange(grobs = plt_list)
+```
+```{r}
+  res = genes_vec_enrichment(genes = top,background = rownames(gep_scores),homer = T,title = 
+                    names(gep_scores)[i],silent = F,return_all = T)
+```
+
+```{r}
+  message("calculating from cNMF usage")
+  all_metagenes= py$usage_norm
+```
+
+```{r}
+  # Make metagene names
+  for (i in 1:ncol(all_metagenes)) {
+    colnames(all_metagenes)[i] = "metagene." %>% paste0(i)
+  }
+```
+
+
+```{r fig.height=12, fig.width=12}
+#add each metagene to metadata
+for (i in 1:ncol(all_metagenes)) {
+  metage_metadata = all_metagenes %>% select(i)
+  x1155 = AddMetaData(object = x1155,metadata = metage_metadata)
+}
+FeaturePlot(object = x1155,features = colnames(all_metagenes))
+
+```
