@@ -10,3 +10,6 @@ Data/
 .local/
 .cache/
 EGFR.Rproj
+pythonProject/
+history.Rhistory
+.Rhistory

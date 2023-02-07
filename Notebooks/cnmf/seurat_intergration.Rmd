@@ -1,0 +1,82 @@
+---
+title: "Title"
+author: "Avishai Wizel"
+date: '`r Sys.Date()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+---
+
+## Parameters
+
+```{r warning=FALSE}
+suffix = ""
+data_to_read = ""
+```
+
+
+## functions
+
+```{r warning=FALSE}
+```
+
+## Data
+
+```{r}
+
+```
+
+```{r}
+lung.list <- SplitObject(lung, split.by = "patient.ident")
+```
+```{r}
+lung.list <- lapply(X = lung.list, FUN = function(x) {
+    # x <- NormalizeData(x)
+print(ncol(x))})
+```
+
+```{r}
+lung.list <- lapply(X = lung.list, FUN = function(x) {
+    # x <- NormalizeData(x)
+    x <- FindVariableFeatures(x, selection.method = "vst", nfeatures = 2000)
+})
+```
+
+```{r}
+features <- SelectIntegrationFeatures(object.list = lung.list)
+
+```
+```{r}
+immune.anchors <- FindIntegrationAnchors(object.list = lung.list, anchor.features = features,k.filter = 50)
+
+```
+
+```{r}
+# this command creates an 'integrated' data assay
+immune.combined <- IntegrateData(anchorset = immune.anchors,k.weight = 42)
+```
+
+```{r}
+DefaultAssay(immune.combined) <- "integrated"
+
+# Run the standard workflow for visualization and clustering
+immune.combined <- ScaleData(immune.combined)
+immune.combined <- RunPCA(immune.combined)
+ElbowPlot(object = immune.combined)
+```
+
+```{r}
+immune.combined <- RunUMAP(immune.combined, reduction = "pca", dims = 1:5)
+immune.combined <- FindNeighbors(immune.combined, reduction = "pca", dims = 1:5)
+immune.combined <- FindClusters(immune.combined, resolution = 0.5)
+```
+
+```{r}
+DimPlot(immune.combined, reduction = "umap", group.by = "patient.ident")
+DimPlot(immune.combined, reduction = "umap", group.by = "time.point")
+```
+```{r}
+  data_matrix <- data.frame(immune.combined@assays$RNA@counts) %>% t() %>% as.data.frame()
+  fwrite(x = data_matrix, file = paste0("./",model,"_counts.txt"),sep = '\t',row.names=T)
+```
+
