@@ -1,0 +1,50 @@
+---
+title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+author: "Avishai Wizel"
+date: '`r Sys.Date()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: FALSE
+---
+
+## Parameters
+
+```{r warning=FALSE}
+suffix = ""
+data_to_read = ""
+```
+
+
+## functions
+
+```{r warning=FALSE}
+library(stringi)
+source_from_github(repositoy = "DEG_functions",version = "0.2.24")
+```
+
+## Data
+
+```{r}
+xeno = readRDS("./Data/10x_xeno_1000.Rds")
+lung = readRDS("./Data/lung_cancercells_withTP_onlyPatients.rds")
+lung_patients = lung$patient.ident %>% unique() %>% as.character()
+lung_patients_filtered = lung_patients[!(lung_patients %in% c("X1055new","X1099"))] #remove patients with less then 100 cells
+lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
+```
+
+```{r}
+patients_list = lung$patient.ident %>% unique()
+lung = SetIdent(object = lung,value = "time.point")
+
+all_up = list()
+for (patient in patients_list) {
+  patient_data = subset(x = lung,subset = patient.ident == patient)
+  deg = FindMarkers(object = patient_data,ident.1 = "pre-treatment",ident.2 = "on-treatment")
+  all_up[[patient]] =  deg %>% mutate(fdr = p.adjust(p_val,method = "fdr")) %>% filter()
+}
+```
+

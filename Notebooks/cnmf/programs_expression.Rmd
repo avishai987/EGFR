@@ -1,0 +1,123 @@
+---
+title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+
+author: "Avishai Wizel"
+date: '`r Sys.Date()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: FALSE
+---
+
+## Parameters
+
+```{r warning=FALSE}
+suffix = "nmf_intersected"
+data_to_read = ""
+```
+
+
+
+## functions
+
+```{r warning=FALSE}
+```
+
+## Data
+
+```{r}
+xeno = readRDS("./Data/10x_xeno_1000.Rds")
+lung = readRDS("./Data/lung_cancercells_withTP_onlyPatients.rds")
+lung_patients = lung$patient.ident %>% unique() %>% as.character()
+lung_patients_filtered = lung_patients[!(lung_patients %in% c("X1055new","X1099"))]
+lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
+```
+
+
+
+```{python}
+suffix = r.suffix
+import pickle
+from cnmf import cNMF
+f = open('./Data/cnmf/cnmf_objects/models_2Kvargenes_cnmf_obj.pckl', 'rb')
+cnmf_obj = pickle.load(f)
+f.close()
+```
+
+
+
+
+```{python}
+selected_k = 3
+density_threshold = 0.1
+# cnmf_obj.consensus(k=selected_k, density_threshold=density_threshold)
+usage_norm, gep_scores, gep_tpm, topgenes = cnmf_obj.load_results(K=selected_k, density_threshold=density_threshold)
+```
+
+```{r}
+gep_scores = py$gep_scores
+```
+
+```{r}
+pathways_list = c("HALLMARK_HYPOXIA","HALLMARK_TNFA_SIGNALING_VIA_NFKB","HALLMARK_G2M_CHECKPOINT")
+for (pathway in pathways_list) {
+  genesets  =GSEABase::getGmt("./Data/h.all.v7.0.symbols.pluscc.gmt")
+  geneIds= genesets[[pathway]]@geneIds
+  geneIds = intersect(geneIds, rownames(gep_scores))
+    geneIds = intersect(geneIds, rownames(lung))
+  score <- apply(lung@assays$RNA@data[geneIds,],2,mean)
+  lung=AddMetaData(lung,score,pathway)
+}
+
+```
+
+
+
+## lung pathways {.tabset}
+
+
+```{r results='asis',echo=TRUE}
+programs = c("HALLMARK_TNFA_SIGNALING_VIA_NFKB","HALLMARK_HYPOXIA","HALLMARK_G2M_CHECKPOINT")
+for (i in programs) {
+  cat("### ",i," \n")
+  print(FeaturePlot(object = lung,features = i))
+  cat(' \n\n')
+  plot.new()
+  dev.off()
+}
+
+```
+
+
+
+```{r}
+pathways_list = c("HALLMARK_HYPOXIA","HALLMARK_TNFA_SIGNALING_VIA_NFKB","HALLMARK_G2M_CHECKPOINT")
+for (pathway in pathways_list) {
+  genesets  =GSEABase::getGmt("./Data/h.all.v7.0.symbols.pluscc.gmt")
+  geneIds= genesets[[pathway]]@geneIds
+  geneIds = intersect(geneIds, rownames(gep_scores))
+    geneIds = intersect(geneIds, rownames(xeno))
+  score <- apply(xeno@assays$RNA@data[geneIds,],2,mean)
+  xeno=AddMetaData(xeno,score,pathway)
+}
+
+```
+
+## xeno pathways {.tabset}
+
+```{r results='asis',echo=TRUE}
+programs = c("HALLMARK_TNFA_SIGNALING_VIA_NFKB","HALLMARK_HYPOXIA","HALLMARK_G2M_CHECKPOINT")
+for (i in programs) {
+  cat("### ",i," \n")
+  print(FeaturePlot(object = xeno,features = i))
+  cat(' \n\n')
+  plot.new()
+  dev.off()
+}
+
+```
+
+

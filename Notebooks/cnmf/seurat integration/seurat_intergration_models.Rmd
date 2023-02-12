@@ -1,0 +1,160 @@
+---
+title: "Title"
+author: "Avishai Wizel"
+date: '`r Sys.Date()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+---
+
+## Parameters
+
+```{r warning=FALSE}
+suffix = "2Kvargenes"
+```
+
+
+## functions
+
+```{r warning=FALSE}
+library(stringi)
+library(reticulate)
+source_from_github(repositoy = "DEG_functions",version = "0.2.24")
+source_from_github(repositoy = "cNMF_functions",version = "0.3.56",script_name = "cnmf_function_Harmony.R")
+```
+
+## Data
+
+```{r}
+xeno = readRDS("./Data/10x_xeno_1000.Rds")
+xeno = DietSeurat(object = xeno)
+```
+
+```{r}
+xeno.list <- SplitObject(xeno, split.by = "orig.ident")
+```
+
+```{r}
+lapply(X = xeno.list, FUN = function(x) {
+    print(ncol(x))})
+```
+
+```{r}
+ xeno.list <- lapply(X = xeno.list, FUN = function(x) {
+    x <- NormalizeData(x)
+    x <- FindVariableFeatures(x, selection.method = "vst", nfeatures = 2000)
+}) 
+```
+
+```{r}
+features <- SelectIntegrationFeatures(object.list = xeno.list)
+```
+
+```{r}
+immune.anchors <- FindIntegrationAnchors(object.list = xeno.list, anchor.features = features,k.filter = 50)
+
+```
+
+```{r}
+# this command creates an 'integrated' data assay
+immune.combined <- IntegrateData(anchorset = immune.anchors,k.weight = 42)
+```
+
+```{r}
+DefaultAssay(immune.combined) <- "integrated"
+
+# Run the standard workflow for visualization and clustering
+immune.combined <- ScaleData(immune.combined)
+immune.combined <- RunPCA(immune.combined)
+ElbowPlot(object = immune.combined)
+```
+
+```{r}
+immune.combined <- RunUMAP(immune.combined, reduction = "pca", dims = 1:7)
+immune.combined <- FindNeighbors(immune.combined, reduction = "pca", dims = 1:7)
+immune.combined <- FindClusters(immune.combined, resolution = 0.5)
+```
+
+```{r}
+DimPlot(immune.combined, reduction = "umap", group.by = "orig.ident")
+DimPlot(immune.combined, reduction = "umap", group.by = "treatment")
+```
+```{r}
+metadata = FetchData(object = immune.combined,vars = c("seurat_clusters","treatment"))
+ metadata2 =  group_by(metadata,seurat_clusters,treatment)%>% summarise(count = n())
+```
+```{r}
+DimPlot(immune.combined, reduction = "umap")
+```
+
+
+```{r}
+ggplot(metadata2, aes(seurat_clusters, count, fill = treatment)) +
+  geom_bar(stat = 'identity')
+```
+
+
+
+```{r}
+  data_matrix <- data.frame(immune.combined@assays$integrated@data) %>% t() %>% as.data.frame()
+  data_matrix = apply(data_matrix, MARGIN = 2, FUN = min_max_normalize)%>% as.data.frame() #min max to remove negative values
+
+  fwrite(x = data_matrix, file = "./Data/cNMF/models_SeuratIntegration_data" %>% paste(suffix,sep = "_") %>% paste0(".txt"),sep = '\t',row.names=T)
+```
+
+```{r}
+zero_low_values <- function(x) {
+  q2 = quantile(x)[3] %>% unname()
+x[x<=(q2)] = 0
+x
+}
+data_matrix2 = apply(data_matrix, 2, FUN = zero_low_values) %>% as.data.frame()
+  fwrite(x = data_matrix2, file = "./Data/cNMF/models_SeuratIntegration_data_sparse" %>% paste(suffix,sep = "_") %>% paste0(".txt"),sep = '\t',row.names=T)
+```
+```{r}
+data_matrix <- data.frame(immune.combined@assays$integrated@data) %>% t() %>% as.data.frame()
+zero_negative_values <- function(x) {
+  x[x<0] = 0
+  x
+}
+data_matrix3 = apply(data_matrix, 2, FUN = zero_negative_values) %>% as.data.frame()
+  fwrite(x = data_matrix3, file = "./Data/cNMF/models_SeuratIntegration_data_noNeg" %>% paste(suffix,sep = "_") %>% paste0(".txt"),sep = '\t',row.names=T)
+```
+
+
+
+cNMF:
+
+
+```{python}
+suffix = r.suffix
+```
+
+```{python}
+from cnmf import cNMF
+import numpy as np
+name = 'cNMF_models_SeuratIntegration_' + suffix
+outdir = './Data/cNMF'
+K_range = np.arange(3,4)
+cnmf_obj = cNMF(output_dir=outdir, name=name)
+counts_fn='./Data/cNMF/models_SeuratIntegration_data_noNeg_' + suffix +'.txt'
+
+
+cnmf_obj.prepare(counts_fn=counts_fn, components=K_range, seed=14,densify=True)
+```
+
+```{python}
+cnmf_obj.factorize(worker_i=0, total_workers=1)
+```
+
+```{python}
+cnmf_obj.combine()
+cnmf_obj.k_selection_plot()
+```
+
+```{python}
+import pickle
+f = open('./Data/cnmf/cnmf_objects/models_' + suffix +'_cnmf_obj.pckl', 'wb')
+pickle.dump(cnmf_obj, f)
+f.close()
+```

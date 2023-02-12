@@ -34,7 +34,7 @@ f.close()
 library(stringi)
 library(reticulate)
 source_from_github(repositoy = "DEG_functions",version = "0.2.24")
-source_from_github(repositoy = "cNMF_functions",version = "0.3.56",script_name = "cnmf_function_Harmony.R") 
+source_from_github(repositoy = "cNMF_functions",version = "0.3.58",script_name = "cnmf_function_Harmony.R") 
 ```
 
 ## K selection plot
@@ -46,7 +46,7 @@ plot_path = paste0("/sci/labs/yotamd/lab_share/avishai.wizel/R_projects/EGFR/Dat
 
 
 ```{r}
-selected_k = 9
+selected_k = 3
 suffix = paste(suffix,paste0(selected_k,"nmfK"),sep="_")
 print(suffix)
 ```
@@ -54,7 +54,7 @@ print(suffix)
 ```{python}
 selected_k = int(r.selected_k)
 density_threshold = 0.1
-# cnmf_obj.consensus(k=selected_k, density_threshold=density_threshold,show_clustering=True)
+cnmf_obj.consensus(k=selected_k, density_threshold=density_threshold,show_clustering=True)
 usage_norm, gep_scores, gep_tpm, topgenes = cnmf_obj.load_results(K=selected_k, density_threshold=density_threshold)
 ```
 
@@ -126,7 +126,8 @@ if (by_expression){
   gep_scores_norm = gep_scores
     gep_scores_norm = apply(gep_scores_norm, MARGIN = 2, FUN = min_max_normalize)%>% as.data.frame()
 gep_scores_norm = sum2one(gep_scores_norm)
-  all_metagenes = expression_mult(gep_scores = gep_scores_norm,dataset = lung,top_genes = T,min_max = F,max_genes = F,z_score = F)
+  # gep_scores_norm = scale(gep_scores_norm) %>% as.data.frame()
+  all_metagenes = expression_mult(gep_scores = gep_scores_norm,dataset = lung,top_genes = F,min_max = F,max_genes = T,z_score = F)
 
 }else{
   message("calculating from cNMF usage")
@@ -199,7 +200,7 @@ VlnPlot(object = lung,features = colnames(all_metagenes))
 ```
 ## Enriched in time point
 ```{r}
-larger_by = 1.25
+larger_by = 1.1
 lung = program_assignment(dataset = lung,larger_by = larger_by,program_names = colnames(all_metagenes))
 ```   
 
