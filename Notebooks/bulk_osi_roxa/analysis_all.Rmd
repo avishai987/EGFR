@@ -1,0 +1,113 @@
+---
+title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: FALSE
+    number_sections: true
+    toc_depth: 1
+---
+
+
+
+# Functions
+
+```{r warning=FALSE}
+```
+
+# Data
+
+```{r}
+
+
+
+
+osiRoxaJun23 = read.table(
+  file = "./Data/osiRoxa_bulk/Jun23/gene_fpkm.xls",
+  sep = "\t",
+  header = TRUE
+)
+rownames(osiRoxaJun23) = make.unique(osiRoxaJun23[,"gene_name",drop=T])
+osiRoxaJun23 = osiRoxaJun23[,2:31]
+names (osiRoxaJun23) = gsub(x = names(osiRoxaJun23),pattern = "op",replacement = "osiPersistors")%>% gsub(pattern = "cp",replacement = "_osiRoxaPersistors") 
+
+osiRoxaOct23 <-
+  read.table(file = "./Data/osiRoxa_bulk/Oct23/gene_fpkm.xls",
+             sep = "\t", header = TRUE)
+rownames(osiRoxaOct23) = make.unique(osiRoxaOct23[,38,drop=T])
+osiRoxaOct23 = osiRoxaOct23[,2:37]
+
+names (osiRoxaOct23) = gsub(x = names(osiRoxaOct23),pattern = "_C",replacement = "_ctrl")%>% gsub(pattern = "p_OR",replacement = "_osiRoxaPersistors") %>% gsub(pattern = "p_O",replacement = "_osiPersistors") %>% gsub(pattern = "_R",replacement = "_roxa")%>% gsub(,pattern = "_O",replacement = "_osi")
+
+osiRoxaOct23 = osiRoxaOct23[,1:24] #take only cell lines
+```
+
+```{r}
+#combine datasets:
+
+common_genes = intersect(rownames(osiRoxaOct23),rownames(osiRoxaJun23))
+osiRoxaOct23 = osiRoxaOct23[common_genes,]
+colnames(osiRoxaOct23) = colnames(osiRoxaOct23) %>% paste0("_Oct23")
+osiRoxaJun23 = osiRoxaJun23[common_genes,]
+colnames(osiRoxaJun23) = colnames(osiRoxaJun23) %>% paste0("_Jun23")
+
+osiRoxa_all = cbind(osiRoxaJun23,osiRoxaOct23)
+experiment = c(rep(x = "Jun23",length(osiRoxaJun23)),rep(x = "Oct23",length(osiRoxaOct23)))
+```
+
+```{r}
+cell.labels = names(osiRoxa_all)
+cell_type = str_extract(cell.labels, "^[A-Z]{1,3}[0-9]{3,4}") 
+condition = str_extract(cell.labels, "osiPersistors|osiRoxaPersistor|osi|ctrl|roxa")
+# condition = paste(cell_type,condition,sep = "_")
+replicate = str_extract(cell.labels, "osiPersistors[0-9]|osiRoxaPersistors[0-9]|osi[0-9]|ctrl[0-9]|roxa[0-9]") 
+replicate = replicate %>% substr(nchar(replicate), nchar(replicate))
+metadata = data.frame(cell_type = cell_type, condition = condition, replicate = replicate, row.names = colnames(osiRoxa_all),experiment = experiment)
+```
+
+```{r}
+library(DESeq2)
+dds <- DESeqDataSetFromMatrix(countData = round(osiRoxa_all),
+                              colData = metadata,
+                              design = ~condition)
+```
+
+```{r}
+nrow(dds)
+dds1 <- dds[ rowSums(counts(dds)) >= 3, ]
+nrow(dds1)
+```
+```{r}
+vst = vst(dds1, blind=FALSE)
+```
+
+```{r}
+library("ggfortify")
+PCAdata <- prcomp(t(assay(vst)))
+autoplot(PCAdata, data = metadata,colour = "condition",label = FALSE, main="PCA") # Show dots
+autoplot(PCAdata, data = metadata,colour = "cell_type",label = FALSE, main="PCA") # Show dots
+autoplot(PCAdata, data = metadata,colour = "experiment",label = FALSE, main="PCA") # Show dots
+
+```
+
+```{r fig.height=10, fig.width=12}
+
+annotation = data.frame( vst$cell_type,vst$condition,vst$experiment,row.names = colnames(vst))
+sampleDists <- dist( t( assay(vst) ) )
+sampleDistMatrix <- as.matrix( sampleDists )
+rownames(sampleDistMatrix) <- colnames(osiRoxa_all)
+colnames(sampleDistMatrix) <- colnames(osiRoxa_all)
+colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows=sampleDists,
+         clustering_distance_cols=sampleDists,
+         col=colors, main = "Sample Distance Matrix ",show_colnames = T,annotation_row  = annotation)+
+    theme(axis.text.x = element_text(angle=30, hjust=1)) 
+```
+<script src="https://hypothes.is/embed.js" async></script>
+

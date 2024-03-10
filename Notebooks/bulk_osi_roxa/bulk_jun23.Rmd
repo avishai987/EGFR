@@ -1,0 +1,232 @@
+---
+title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: FALSE
+    number_sections: true
+    toc_depth: 1
+---
+
+## Parameters
+
+```{r warning=FALSE}
+suffix = ""
+data_to_read = ""
+```
+
+
+
+## functions
+
+```{r warning=FALSE}
+```
+
+## Data
+
+
+
+```{r}
+counts <- read.delim("/sci/labs/yotamd/lab_share/lung_sc/bulk/RoxaOsi/02.Bam/all_noMTGLKI",skip=1,header=T,sep="\t",stringsAsFactors=F,row.names=1,check.names = F)
+
+# tpm <- read.delim("/sci/labs/yotamd/lab_share/lung_sc/bulk/RoxaOsi/02.Bam/RoxaOsi_noMTGLKI_tpm.txt",skip=1,header=T,sep="\t",stringsAsFactors=F,row.names=1,check.names = F)
+```
+
+# Pre-process
+```{r}
+#save before omitting
+genes_names = counts$gene_name
+genes_lengths = counts[,5]
+
+#omit non relevant cols
+counts=counts[,7:ncol(counts)]
+
+
+#create genes names
+genes_names=make.unique(genes_names) %>% replace_na('NA')
+rownames(counts) = genes_names
+
+#omit non relevant genes
+omitgenes= startsWith(rownames(counts),"NA")
+counts=counts[!omitgenes,]
+genes_lengths = genes_lengths[!omitgenes] #update genes_lengths
+
+#calcualte gene length and MT genes
+mt_genes = startsWith(rownames(counts),"MT-")| startsWith(rownames(counts),"ERCC-")
+
+#get colnames
+cell.labels <- gsub(pattern = ".bam",replacement = "",colnames(counts))
+
+#change colnames
+colnames(counts) <- cell.labels
+
+
+counts_seurat <- CreateSeuratObject(counts = counts, project = "egfr_counts", min.cells = 0, min.features = 1000)
+```
+
+```{r}
+cell_type = str_extract(cell.labels, "^[A-Z]{1,3}[0-9]{3}")
+condition = str_extract(cell.labels, "cp|osi|ctrl|roxa|op")
+condition = paste(cell_type,condition,sep = "_")
+replicate = str_extract(cell.labels, ".$")
+metadata = data.frame(cell_type = cell_type, condition = condition, replicate = replicate, row.names = colnames(counts))
+```
+
+```{r}
+library(DESeq2)
+dds <- DESeqDataSetFromMatrix(countData = round(counts),
+                              colData = metadata,
+                              design = ~condition)
+```
+
+```{r}
+nrow(dds)
+dds1 <- dds[ rowSums(counts(dds)) >= 3, ]
+nrow(dds1)
+```
+```{r}
+vst = vst(dds1, blind=FALSE)
+```
+
+```{r}
+library("ggfortify")
+PCAdata <- prcomp(t(assay(vst)))
+autoplot(PCAdata, data = metadata,colour = "condition",label = FALSE, main="PCA") # Show dots
+
+
+```
+
+
+```{r fig.width=8}
+counts_seurat = AddMetaData(object = counts_seurat,metadata = metadata)
+counts_seurat$orig.ident = colnames(counts_seurat)
+VlnPlot(counts_seurat, features = c("nCount_RNA"),group.by = "orig.ident",pt.size = 3)+theme(text = element_text(size=10),
+        axis.text.x = element_text(size = 8)) 
+```
+
+```{r}
+# counts_filtered = counts[, colnames(counts) != "HCC827cp3"]
+# metadata_filtered = metadata[ rownames(metadata) != "HCC827cp3",]
+# dds <- DESeqDataSetFromMatrix(countData = round(counts_filtered),
+#                               colData = metadata_filtered,
+#                               design = ~condition)
+# nrow(dds)
+# dds1 <- dds[ rowSums(counts(dds)) >= 3, ]
+# nrow(dds1)
+```
+
+```{r}
+vst = vst(dds1, blind=FALSE)
+```
+
+```{r}
+PCAdata <- prcomp(t(assay(vst)))
+autoplot(PCAdata, data = metadata,colour = "condition",label = FALSE, main="PCA")
+autoplot(PCAdata, data = metadata,colour = "cell_type",label = FALSE, main="PCA")
+
+```
+```{r fig.height=8}
+sampleDists <- dist( t( assay(vst) ) )
+sampleDistMatrix <- as.matrix( sampleDists )
+rownames(sampleDistMatrix) <- colnames(counts)
+colnames(sampleDistMatrix) <- colnames(counts)
+colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows=sampleDists,
+         clustering_distance_cols=sampleDists,
+         col=colors, main = "Sample Distance Matrix ",show_colnames = T)+
+    theme(axis.text.x = element_text(angle=30, hjust=1)) 
+```
+
+```{r}
+# H1975_cpVSop_up <- read.table(file = "/sci/labs/yotamd/lab_share/lung_sc/bulk/RoxaOsi/03.Result_X202SC23034502-Z01-F001_Homo_sapiens/Result_X202SC23034502-Z01-F001/4.Differential/1.deglist/H1975cpvsH1975op/H1975cpvsH1975op_deg_up.xls",
+#                       sep = "\t", header=T, quote = "")
+# 
+# H1975_cpVSop_up = H1975_cpVSop_up[,c("gene_name","H1975cp", "H1975op", "log2FoldChange","padj","gene_description")]
+# 
+# 
+# H1975_roxaVSctrl <- read.table(file = "/sci/labs/yotamd/lab_share/lung_sc/bulk/RoxaOsi/03.Result_X202SC23034502-Z01-F001_Homo_sapiens/Result_X202SC23034502-Z01-F001/4.Differential/1.deglist/H1975roxavsH1975ctrl/H1975roxavsH1975ctrl_deg.xls",
+#                       sep = "\t", header=TRUE, quote = "")
+# H1975_roxaVSctrl = H1975_roxaVSctrl[,c("gene_name","H1975roxa", "H1975ctrl", "log2FoldChange")]
+
+```
+
+
+#Look for genes that DE between cp Vs op but not in roxa Vs control
+```{r}
+dds <- DESeq(dds)
+```
+
+```{r}
+H1975_cpVSop <- results(dds,contrast = c("condition","H197_cp","H197_op"))  %>% as.data.frame()
+H1975_roxaVSctrl <- results(dds,contrast = c("condition","H197_roxa","H197_ctrl"))  %>% as.data.frame()
+diff_genes = data.frame(row.names = rownames(H1975_cpVSop), cpVSop_FC = 2**H1975_cpVSop$log2FoldChange,roxaVSctrl_FC = 2**H1975_roxaVSctrl$log2FoldChange,  H1975_cpVSop_padj = H1975_cpVSop$padj)
+
+```
+
+
+
+
+```{r}
+up_genes_df =  diff_genes %>% filter(cpVSop_FC > 2 & roxaVSctrl_FC<1.2 & H1975_cpVSop_padj<0.05) 
+down_genes_df = diff_genes %>% filter(cpVSop_FC < 0.5 & roxaVSctrl_FC>0.8 & H1975_cpVSop_padj<0.05)
+up_genes = diff_genes %>% filter(cpVSop_FC > 2 & roxaVSctrl_FC<1.2 & H1975_cpVSop_padj<0.05) %>% rownames()
+down_genes = diff_genes %>% filter(cpVSop_FC < 0.5 & roxaVSctrl_FC>0.8 & H1975_cpVSop_padj<0.05)%>% rownames()
+
+up_genes_df
+down_genes_df
+```
+
+```{r}
+genes_vec_enrichment(genes = up_genes,background = rownames(H1975_cpVSop),homer = T,title = "up genes")
+genes_vec_enrichment(genes = down_genes,background = rownames(H1975_cpVSop),homer = T,title = "down genes")
+
+```
+```{r}
+library(biomaRt)
+ensembl = useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl")
+```
+
+```{r}
+#add averga expression and gene discription
+
+mid_norm<-counts(dds, normalized=TRUE) %>% as.data.frame() #get expr
+dds_counts <- sapply(split.default(mid_norm, metadata$condition[match(names(mid_norm), rownames(metadata))]),
+                     rowMeans, na.rm = FALSE) %>% as.data.frame() #mean over rep
+dds_counts = dds_counts[,c("H197_cp","H197_op", "H197_roxa","H197_ctrl")] #take relevant cols
+
+genedesc <- getBM(attributes=c('external_gene_name','description'), filters = 'external_gene_name', values = up_genes, mart =ensembl)  
+up_with_counts= dds_counts[up_genes,] %>% cbind(up_genes_df)
+all_up_genes = merge(up_with_counts,genedesc,by.x="row.names",by.y = "external_gene_name") %>% column_to_rownames("Row.names")
+all_up_genes
+```
+
+
+```{r}
+#add averga expression and gene discription
+
+mid_norm<-counts(dds, normalized=TRUE) %>% as.data.frame() #get expr
+dds_counts <- sapply(split.default(mid_norm, metadata$condition[match(names(mid_norm), rownames(metadata))]),
+                     rowMeans, na.rm = FALSE) %>% as.data.frame() #mean over rep
+dds_counts = dds_counts[,c("H197_cp","H197_op", "H197_roxa","H197_ctrl")] #take relevant cols
+
+genedesc <- getBM(attributes=c('external_gene_name','description'), filters = 'external_gene_name', values = down_genes, mart =ensembl)  
+down_with_counts= dds_counts[down_genes,] %>% cbind(down_genes_df)
+all_down_genes = merge(down_with_counts,genedesc,by.x="row.names",by.y = "external_gene_name") %>% column_to_rownames("Row.names")
+all_down_genes
+```
+
+```{r}
+library(openxlsx)
+write.xlsx(all_up_genes, "../Data/X202_comboVSroxa_upgenes.xlsx",rowNames = T)
+write.xlsx(all_down_genes, "../Data/X202_comboVSroxa_downgenes.xlsx",rowNames = T)
+
+```
+
+
+

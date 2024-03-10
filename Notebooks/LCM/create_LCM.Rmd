@@ -1,0 +1,324 @@
+---
+title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+author: "Avishai Wizel"
+date: '`r Sys.Date()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: FALSE
+---
+
+
+```{r}
+tpm <- function(counts, lengths) {
+	rpk <- counts / lengths
+	coef <- sum(rpk) / 1e6
+	rpk/coef
+}
+```
+
+```{r warning=FALSE}
+library(stringi)
+library(reticulate)
+source_from_github(repositoy = "DEG_functions",version = "0.2.24")
+source_from_github(repositoy = "cNMF_functions",version = "0.3.58",script_name = "cnmf_function_Harmony.R")
+```
+
+
+```{r}
+egfr.counts <- read.delim("../../../lung_sc/LCM/egf816_counts.txt",skip=1,header=T,sep="\t",stringsAsFactors=F,row.names=1)
+rownames(egfr.counts)=make.unique(egfr.counts$gene_name) #change row names to gene names
+```
+
+```{r}
+source(file = "./scripts/lcm_funs.R")
+egfr.counts = change_cell_names(egfr.counts)
+lengths = egfr.counts[,5] #get genes lengths
+omitgenes=startsWith(rownames(egfr.counts),"MT-")|startsWith(rownames(egfr.counts),"ERCC-") #remove mito genes and ERCC
+
+egfr.tpm=apply(egfr.counts[!omitgenes,7:dim(egfr.counts)[2]], 2, function(x) tpm(x, lengths[!omitgenes]) ) #apply TPM
+egfr.counts=egfr.counts[,7:ncol(egfr.counts)] #remove un relevant cols
+```
+
+```{r}
+lcm_counts <- CreateSeuratObject(counts = egfr.counts, project = "EGFR_LCM", min.cells = 3, min.features = 2000)
+percent.mt <- PercentageFeatureSet(lcm_counts, pattern = "^MT-")
+lcm_counts[["percent.mt"]] <- percent.mt
+```
+
+```{r}
+lcm <- CreateSeuratObject(counts = log2(egfr.tpm+1), project = "EGFR_LCM", min.cells = 3, min.features = 2000)
+lcm[["percent.mt"]] <- percent.mt #get mt from counts
+# lcm@assays$RNA@data = log2(lcm@assays$RNA@data+1) %>% as.sparse() #log normalize
+```
+
+```{r}
+VlnPlot(lcm, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3,)
+```
+```{r}
+nCount_RNA = FetchData(object = lcm,vars = "nFeature_RNA")
+ggplot(nCount_RNA, aes(x=nFeature_RNA)) + 
+  geom_density()
+```
+
+
+```{r}
+lcm_unfiltered = lcm
+lcm <- subset(lcm, subset = nFeature_RNA > 10000 & percent.mt < 40)
+```
+
+```{r}
+lcm = add_tumor_stroma(lcm)
+lcm = subset(lcm, subset = cell.origin == "Tumor")
+```
+
+```{r}
+lcm <- FindVariableFeatures(lcm, selection.method = "vst", nfeatures = 15000)
+```
+```{r}
+lcm <- ScaleData(lcm, vars.to.regress = c("percent.mt","nFeature_RNA"))
+lcm <- RunPCA(lcm, features = VariableFeatures(object = lcm),verbose = F)
+ElbowPlot(lcm, ndims = 50) # checking the dimensionality 
+
+```
+
+```{r}
+lcm <- FindNeighbors(lcm, dims = 1:15)
+lcm <- FindClusters(lcm, resolution = 1)
+
+# Run non-linear dimensional reduction (UMAP)
+lcm <- RunUMAP(lcm, dims = 1:15,verbose = F)
+```
+
+```{r}
+lcm = patient.iden_toMetadata(lcm)
+lcm = time.point_toMetadata(lcm)
+lcm@meta.data[["time.point"]] <- relevel(lcm@meta.data[["time.point"]], "pre-treatment") #change factor so pre will be 1
+DimPlot(object = lcm, reduction = "umap", group.by = "patient.ident",pt.size = 3)
+DimPlot(object = lcm, reduction = "umap", group.by = "time.point",pt.size = 3)
+
+```
+```{r}
+saveRDS(object = lcm,file = "./Data/LCM/egf816_V5.RDS")
+```
+```{r}
+lcm = readRDS("./Data/LCM/egf816_V5.RDS")
+```
+
+# LCM ORA 
+
+```{r}
+lcm = SetIdent(object = lcm,value = "time.point")
+features = filter_features(object = lcm,ident.1 = "pre-treatment",ident.2 = "on-treatment",min.pct = 0.1)
+# features = intersect(features,VariableFeatures(lcm)[1:2000])
+  deg_df = FindMarkers(object = lcm,ident.1 = "pre-treatment",ident.2 = "on-treatment",densify = T,features = features,logfc.threshold = 
+                         1.5) %>% mutate(fdr = p.adjust(p_val,method = "fdr"))
+  
+  #add first up genes vector and background:
+  down_deg_vector = deg_df%>%
+    filter(avg_log2FC>1.5 & fdr<0.1) %>% #filter significant
+    rownames() #get genes
+
+  #add second up genes vector and background:
+  up_deg_vector = deg_df %>% 
+    filter(avg_log2FC<(-1.5) & fdr<0.1) %>% #filter significant
+    rownames() #get genes
+  
+  bg = features
+
+```
+
+
+```{r}
+require(gridExtra)
+downreg  = genes_vec_enrichment(genes = down_deg_vector,background = bg,homer = T,title = "downregulated during treatment",bar_color = "indianred2",return_all = T,silent = T)
+    upreg = genes_vec_enrichment(genes = up_deg_vector,background = bg,homer = T,title = "upregulated during treatment",return_all = T,silent = T)
+  grid.arrange(downreg$plt, upreg$plt, ncol=2)
+```
+# Xeno program
+
+
+
+
+
+
+```{r}
+suffix = "2Kvargenes"
+```
+
+```{python}
+suffix = r.suffix
+import pickle
+from cnmf import cNMF
+f = open('./Data/cnmf/cnmf_objects/models_' + suffix + '_cnmf_obj.pckl', 'rb')
+cnmf_obj = pickle.load(f)
+f.close()
+```
+
+
+
+
+```{python}
+selected_k = 3
+density_threshold = 0.1
+# cnmf_obj.consensus(k=selected_k, density_threshold=density_threshold)
+usage_norm, gep_scores, gep_tpm, topgenes = cnmf_obj.load_results(K=selected_k, density_threshold=density_threshold)
+```
+
+
+# testing xeno geps
+```{r}
+gep_scores= py$gep_scores
+# gep_scores = apply(gep_scores, MARGIN = 2, FUN = min_max_normalize)%>% as.data.frame()
+nonneg <- function(x) {
+  x[x<0] = 0
+  x
+}
+gep_scores = apply(gep_scores, MARGIN = 2, FUN = nonneg)%>% as.data.frame()
+
+gep_scores = sum2one(gep_scores)
+# gep_scores = scale(gep_scores) %>% as.data.frame()
+all_metagenes = expression_mult(gep_scores = gep_scores,dataset = lcm,top_genes = T,max_genes = T,min_max  = F)
+```
+
+
+```{r fig.height=6, fig.width=8}
+#Make metagene names
+for (i in 1:ncol(all_metagenes)) {
+  colnames(all_metagenes)[i] = "metagene." %>% paste0(i)
+}
+
+#add each metagene to metadata
+for (i in 1:ncol(all_metagenes)) {
+  metage_metadata = all_metagenes %>% dplyr::select(i)  
+  lcm = AddMetaData(object = lcm,metadata = metage_metadata)
+}
+
+FeaturePlot(object = lcm,features = colnames(all_metagenes))
+```
+```{r}
+larger_by = 1
+lcm = program_assignment(dataset = lcm,larger_by = larger_by,program_names = colnames(all_metagenes))
+```   
+
+```{r}
+cell_percentage(dataset = lcm,time.point_var = "time.point")
+```
+```{r}
+DimPlot(lcm,group.by = "program.assignment",cols = c("red","green","blue","grey"))
+```
+
+
+# LCM cNMF
+
+```{r}
+suffix = "2Kvargenes_sigma0,5"
+```
+
+
+```{python}
+suffix = r.suffix
+import pickle
+from cnmf import cNMF
+f = open('./Data/cnmf/cnmf_objects/lcm_' + suffix + '_cnmf_obj.pckl', 'rb')
+cnmf_obj = pickle.load(f)
+f.close()
+```
+
+
+
+
+```{python}
+selected_k = 3
+density_threshold = 0.1
+# cnmf_obj.consensus(k=selected_k, density_threshold=density_threshold)
+usage_norm, gep_scores, gep_tpm, topgenes = cnmf_obj.load_results(K=selected_k, density_threshold=density_threshold)
+```
+
+```{r fig.height=8, fig.width=8, results='hide'}
+gep_scores = py$gep_scores
+plt_list = list()
+for (i in 1:ncol(gep_scores)) {
+  top_genes = gep_scores  %>%  arrange(desc(gep_scores[i])) #sort by score a
+  top = head(rownames(top_genes),200) #take top top_genes_num
+  res = genes_vec_enrichment(genes = top,background = rownames(gep_scores),homer = T,title = 
+                    i,silent = T,return_all = T)
+   
+  plt_list[[i]] = res$plt
+}
+gridExtra::grid.arrange(grobs = plt_list)
+```
+
+```{r}
+library(msigdbr)
+m_df = msigdbr(species = "Homo sapiens", category = 'C2', subcategory = 'CP:KEGG')
+length(unique(m_df$gs_name))
+
+kegg_gs = msigdbr(species = "Homo sapiens", category = 'C2', subcategory = 'CP:REACTOME') %>%as.data.frame() %>%  dplyr::distinct(gs_name, gene_symbol) %>% as.data.frame()
+
+```
+
+```{r fig.height=8, fig.width=8, results='hide'}
+gep_scores = py$gep_scores
+plt_list = list()
+for (i in 1:ncol(gep_scores)) {
+  top_genes = gep_scores  %>%  arrange(desc(gep_scores[i])) #sort by score a
+  top = head(rownames(top_genes),200) #take top top_genes_num
+  res = genes_vec_enrichment(genes = top,background = rownames(gep_scores),homer = T,title = 
+                    i,silent = T,return_all = T,custom_pathways = kegg_gs)
+   
+  plt_list[[i]] = res$plt
+}
+gridExtra::grid.arrange(grobs = plt_list)
+```
+
+```{r}
+gep_scores= py$gep_scores
+# gep_scores = apply(gep_scores, MARGIN = 2, FUN = min_max_normalize)%>% as.data.frame()
+nonneg <- function(x) {
+  x[x<0] = 0
+  x
+}
+gep_scores = apply(gep_scores, MARGIN = 2, FUN = nonneg)%>% as.data.frame()
+
+gep_scores = sum2one(gep_scores)
+# gep_scores = scale(gep_scores) %>% as.data.frame()
+all_metagenes = expression_mult(gep_scores = gep_scores,dataset = lcm,top_genes = T,max_genes = T,min_max  = F)
+```
+
+```{r}
+usage_norm = py$usage_norm
+all_metagenes = usage_norm 
+```
+
+```{r fig.height=6, fig.width=8}
+#Make metagene names
+for (i in 1:ncol(all_metagenes)) {
+  colnames(all_metagenes)[i] = "metagene." %>% paste0(i)
+}
+
+#add each metagene to metadata
+for (i in 1:ncol(all_metagenes)) {
+  metage_metadata = all_metagenes %>% dplyr::select(i)  
+  lcm = AddMetaData(object = lcm,metadata = metage_metadata)
+}
+
+FeaturePlot(object = lcm,features = colnames(all_metagenes))
+```
+```{r}
+larger_by = 1.2
+lcm = program_assignment(dataset = lcm,larger_by = larger_by,program_names = colnames(all_metagenes))
+```   
+
+```{r}
+cell_percentage(dataset = lcm,time.point_var = "time.point")
+```
+```{r}
+DimPlot(lcm,group.by = "program.assignment",cols = c("red","green","blue","grey"),pt.size = 3)
+DimPlot(lcm,group.by = "time.point",pt.size = 3)
+DimPlot(lcm,group.by = "patient.ident",pt.size = 3)
+
+```

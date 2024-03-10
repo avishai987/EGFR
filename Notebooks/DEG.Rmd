@@ -36,15 +36,104 @@ lung_patients_filtered = lung_patients[!(lung_patients %in% c("X1055new","X1099"
 lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
 ```
 
+## Patients DEG
 ```{r}
 patients_list = lung$patient.ident %>% unique()
 lung = SetIdent(object = lung,value = "time.point")
 
-all_up = list()
+first_up = list() #all first group up genes
+second_up = list() #all second group up genes
 for (patient in patients_list) {
   patient_data = subset(x = lung,subset = patient.ident == patient)
-  deg = FindMarkers(object = patient_data,ident.1 = "pre-treatment",ident.2 = "on-treatment")
-  all_up[[patient]] =  deg %>% mutate(fdr = p.adjust(p_val,method = "fdr")) %>% filter()
+  features = filter_features(object = patient_data,ident.1 = "pre-treatment",ident.2 = "on-treatment",min.pct = 0.1)
+  deg_df = FindMarkers(object = patient_data,ident.1 = "pre-treatment",ident.2 = "on-treatment",densify = T,features = features)
+  
+  #add first up genes vector and background:
+  deg_vector = deg_df %>% mutate(fdr = p.adjust(p_val,method = "fdr"))%>% #add fdr
+    filter(avg_log2FC>1.5 & fdr<0.05) %>% #filter significant
+    rownames() #get genes
+  bg = features
+  first_up[[patient]] =  list(deg = deg_vector, bg = bg)
+  
+  #add second up genes vector and background:
+  deg_vector = deg_df %>% mutate(fdr = p.adjust(p_val,method = "fdr"))%>% #add fdr
+    filter(avg_log2FC<(-1.5) & fdr<0.05) %>% #filter significant
+    rownames() #get genes
+  bg = features
+  second_up[[patient]] =  list(deg = deg_vector, bg = bg)
+
+
 }
 ```
+
+```{r fig.height=4, fig.width=10}
+require(gridExtra)
+
+for (patient in patients_list) {
+  downreg  = genes_vec_enrichment(genes = first_up[[patient]]$deg,background = first_up[[patient]]$bg,homer = T,title = paste(patient,"downregulated during treatment"),bar_color = "indianred2",return_all = T,silent = T)
+    upreg = genes_vec_enrichment(genes = second_up[[patient]]$deg,background = second_up[[patient]]$bg,homer = T,title = paste(patient,"upregulated during treatment"),return_all = T,silent = T)
+  grid.arrange(downreg$plt, upreg$plt, ncol=2)
+
+}
+```
+
+```{r}
+DimPlot(lung,group.by = "patient.ident")
+DimPlot(lung,group.by = "time.point")
+```
+
+## Xeno DEG
+
+```{r}
+patients_list = xeno$orig.ident %>% unique()
+xeno = SetIdent(object = xeno,value = "treatment")
+
+first_up = list() #all first group up genes
+second_up = list() #all second group up genes
+for (patient in patients_list) {
+  patient_data = subset(x = xeno,subset = orig.ident == patient)
+  features = filter_features(object = patient_data,ident.1 = "NT",ident.2 = "OSI",min.pct = 0.1 )
+  deg_df = FindMarkers(object = patient_data,ident.1 = "NT",ident.2 = "OSI",densify = T,features = features)
+  
+  #add first up genes vector and background:
+  deg_vector = deg_df %>% mutate(fdr = p.adjust(p_val,method = "fdr"))%>% #add fdr
+    filter(avg_log2FC>1.5 & fdr<0.05) %>% #filter significant
+    rownames() #get genes
+  bg = features
+  first_up[[patient]] =  list(deg = deg_vector, bg = bg)
+  
+  #add second up genes vector and background:
+  deg_vector = deg_df %>% mutate(fdr = p.adjust(p_val,method = "fdr"))%>% #add fdr
+    filter(avg_log2FC<(-1.5) & fdr<0.05) %>% #filter significant
+    rownames() #get genes
+  bg = features
+  second_up[[patient]] =  list(deg = deg_vector, bg = bg)
+
+
+}
+```
+```{r fig.height=4, fig.width=10}
+require(gridExtra)
+
+for (patient in patients_list) {
+  downreg  = genes_vec_enrichment(genes = first_up[[patient]]$deg,background = first_up[[patient]]$bg,homer = T,title = paste(patient,"downregulated during treatment"),bar_color = "indianred2",return_all = T,silent = T)
+    upreg = genes_vec_enrichment(genes = second_up[[patient]]$deg,background = second_up[[patient]]$bg,homer = T,title = paste(patient,"upregulated during treatment"),return_all = T,silent = T)
+  grid.arrange(downreg$plt, upreg$plt, ncol=2)
+
+}
+```
+
+```{r}
+DimPlot(xeno,group.by = "orig.ident")
+DimPlot(xeno,group.by = "treatment")
+```
+
+```{r}
+patient_data = subset(x = lung,subset = patient.ident == "X1071")
+DimPlot(patient_data,group.by = "orig.ident")
+DimPlot(patient_data,group.by = "time.point")
+
+```
+
+
 

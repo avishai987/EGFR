@@ -20,7 +20,7 @@ suffix = "2Kvargenes"
 library(stringi)
 library(reticulate)
 source_from_github(repositoy = "DEG_functions",version = "0.2.24")
-source_from_github(repositoy = "cNMF_functions",version = "0.3.56",script_name = "cnmf_function_Harmony.R")
+source_from_github(repositoy = "cNMF_functions",version = "0.3.64",script_name = "cnmf_function_Harmony.R")
 ```
 
 ## Data
@@ -112,7 +112,7 @@ data_matrix2 = apply(data_matrix, 2, FUN = zero_low_values) %>% as.data.frame()
   fwrite(x = data_matrix2, file = "./Data/cNMF/models_SeuratIntegration_data_sparse" %>% paste(suffix,sep = "_") %>% paste0(".txt"),sep = '\t',row.names=T)
 ```
 ```{r}
-data_matrix <- data.frame(immune.combined@assays$integrated@data) %>% t() %>% as.data.frame()
+data_matrix <- immune.combined@assays$integrated@data %>% t() %>% as.data.frame()
 zero_negative_values <- function(x) {
   x[x<0] = 0
   x
@@ -121,6 +121,9 @@ data_matrix3 = apply(data_matrix, 2, FUN = zero_negative_values) %>% as.data.fra
   fwrite(x = data_matrix3, file = "./Data/cNMF/models_SeuratIntegration_data_noNeg" %>% paste(suffix,sep = "_") %>% paste0(".txt"),sep = '\t',row.names=T)
 ```
 
+```{python}
+'/sci/labs/yotamd/lab_share/avishai.wizel/R_projects/EGFR/Data/cnmf/cnmf_objects/models_SeuratIntegration_data_noNeg_' + suffix +'_cnmf_obj.pckl'
+```
 
 
 cNMF:

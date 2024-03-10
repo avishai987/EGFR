@@ -1,0 +1,5 @@
+/var/spool/slurmd/job18924418/slurm_script: line 8: conda: command not found
+Traceback (most recent call last):
+  File "/sci/labs/yotamd/lab_share/avishai.wizel/R_projects/EGFR/scripts/run_cnmf.py", line 1, in <module>
+    from cnmf import cNMF
+ImportError: No module named cnmf

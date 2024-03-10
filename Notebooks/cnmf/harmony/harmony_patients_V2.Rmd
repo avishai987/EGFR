@@ -23,12 +23,12 @@ source_from_github(repositoy = "cNMF_functions",version = "0.3.55",script_name =
 ```{r}
 #define parametes
 nfeatures = 2000 #default: 2000
-n_iter = 10 #default: 10
+n_iter = 100 #default: 10
 densify = T #default: T
 convert_to_tpm = T #default: T
 provideTPM = F  #default: T
 theta = 2.7 #default: 2
-normalize = T #default: F
+normalize = F #default: F
 lamb = 1 #default: 1
 sigma = 0.5  #default: 0.1
 options_for_genes = c("var_genes","combined","positive","xeno","dana")
@@ -36,7 +36,7 @@ genes_from = options_for_genes[4]
 ```
 
 ```{r}
-suffix ="xeno_genes_normalized_0-5sigma_2-7theta"
+suffix ="xeno_genes_0-5sigma_2-7theta_100iter_26_9"
 print(suffix)
 ```
 
@@ -102,6 +102,8 @@ adata <- sc$AnnData(
   obs = lung[[]],
   var = GetAssay(lung)[[]]
 )
+
+
 rm(gene_expression)
 ```
 
@@ -141,6 +143,7 @@ def moe_correct_ridge(Z_orig, Z_cos, Z_corr, R, W, K, Phi_Rk, Phi_moe, lamb):
 adata = r.adata
 
 if (normalize == True):
+  print('normalized')
   sc.pp.normalize_per_cell(adata) #Data is already normlized
 adata.var['highly_variable'] = adata.var['vst.variable']
 if (not genes_from_list):
@@ -201,7 +204,7 @@ ElbowPlot(lung_corr_nonneg)
 ```
 ## Run dim reduction
 ```{r results='hide',include=FALSE}
-pc2use = 1:5
+pc2use = 1:10
 lung_corr_nonneg <- FindNeighbors(lung_corr_nonneg, dims = pc2use)
 lung_corr_nonneg <- FindClusters(lung_corr_nonneg, resolution = 0.5)
 lung_corr_nonneg <- RunUMAP(lung_corr_nonneg, dims = pc2use)
@@ -209,6 +212,8 @@ lung_corr_nonneg <- RunUMAP(lung_corr_nonneg, dims = pc2use)
 ```
 
 ## UMAP after correction
+
+
 ```{r}
 DimPlot(lung_corr_nonneg, reduction = "umap",group.by = "patient.ident")
 DimPlot(lung_corr_nonneg, reduction = "umap",group.by = "time.point")
@@ -219,7 +224,9 @@ suffix
 ```
 
 ```{python}
-sc.write('./Data/cnmf/lung_Harmony_NoNeg_' + suffix +'.h5ad', adata_corr_nonneg)
+adata_corr_nonneg_noZeros = adata_corr_nonneg[:, ~(adata_corr_nonneg.X==0).all(axis=0)].copy()
+sc.write('./Data/cnmf/lung_Harmony_NoNeg_' + suffix +'.h5ad', adata_corr_nonneg_noZeros) #remove genes with all 0 (necessary for cnmf)
+
 ```
 
 
@@ -228,7 +235,7 @@ cNMF:
 ```{python}
 name = 'cNMF_patients_Varnorm_Harmony_' + suffix
 outdir = './Data/cnmf'
-K_range = np.arange(3,10)
+K_range = np.arange(3,11)
 cnmf_obj = cNMF(output_dir=outdir, name=name)
 counts_fn='./Data/cnmf/lung_Harmony_NoNeg_' + suffix +'.h5ad'
 if (provideTPM == True):

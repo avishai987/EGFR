@@ -1,0 +1,16 @@
+/sci/home/avishaiw/.profile: line 7: $'\r': command not found
+/sci/home/avishaiw/.profile: line 9: $'\r': command not found
+/sci/home/avishaiw/.profile: line 11: $'\r': command not found
+/sci/home/avishaiw/.profile: line 14: $'\r': command not found
+/sci/home/avishaiw/.profile: line 17: $'\r': command not found
+/sci/home/avishaiw/.profile: line 23: $'\r': command not found
+/sci/home/avishaiw/.profile: line 25: $'\r': command not found
+locale: invalid option -- 'u'
+Try `locale --help' or `locale --usage' for more information.
+/sci/home/avishaiw/.profile: line 28: $'\r': command not found
+/sci/home/avishaiw/.profile: line 38: syntax error: unexpected end of file
+/var/spool/slurmd/job18924404/slurm_script: line 6: conda: command not found
+Traceback (most recent call last):
+  File "/sci/labs/yotamd/lab_share/avishai.wizel/R_projects/EGFR/scripts/run_cnmf.py", line 1, in <module>
+    from cnmf import cNMF
+ImportError: No module named cnmf

@@ -1,0 +1,76 @@
+---
+title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: FALSE
+    number_sections: true
+    toc_depth: 1
+---
+
+
+
+# Functions
+
+```{r warning=FALSE}
+```
+
+# Data
+
+```{r}
+genesets <- msigdb_download("Homo sapiens",category="H") %>% append( msigdb_download("Homo sapiens",category="C2",subcategory = "CP:KEGG"))
+xeno_bulk = read.table(
+  file = "/sci/labs/yotamd/lab_share/lung_sc/bulk/RoxaOsi/Oct23/star/mm39unmapped_noMTGLKI_tpm.txt",
+  sep = "\t",
+  header = TRUE
+)
+rownames(xeno_bulk) = make.unique(xeno_bulk[,"gene_name",drop=T])
+xeno_bulk = xeno_bulk[,8:19]
+names (xeno_bulk) = gsub(pattern = "_mm.*$",replacement = "",x = names (xeno_bulk))
+xeno_bulk = xeno_bulk[,c("M2_ctrl", "M21_ctrl", "M36_ctrl", "M14_osi", "M33_osi", "M14_2_osi", 
+"M20_roxa", "M30_roxa", "M31_roxa", "M3_combo", "M26_combo", 
+"M32_combo")]
+```
+
+```{r}
+cell.labels = names(xeno_bulk)
+condition = str_extract(cell.labels, "osi|combo|ctrl|roxa")
+metadata = data.frame(condition = condition, row.names = colnames(xeno_bulk))
+```
+
+
+```{r}
+library(limma)
+
+xen_bulk_eset = ExpressionSet(assayData = as.matrix(xeno_bulk),phenoData = AnnotatedDataFrame(data=metadata))
+xen_bulk_eset
+```
+
+```{r}
+ourData <- xen_bulk_eset[, xen_bulk_eset$condition %in% c("roxa", "ctrl")]
+ourData$condition <- factor(ourData$condition)
+
+```
+
+```{r}
+design <- model.matrix(~ ourData$condition)
+fit <- lmFit(ourData, design)
+fit <- eBayes(fit)
+topTable(fit,p.value = 0.1,number = 40)
+
+```
+
+
+
+```{r}
+1
+```
+
+
+<script src="https://hypothes.is/embed.js" async></script>
+

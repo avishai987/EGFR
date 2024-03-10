@@ -1,0 +1,342 @@
+---
+title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: FALSE
+    number_sections: true
+    toc_depth: 1
+---
+
+# Data
+```{r}
+lung = readRDS("./Data/lung_cancercells_withTP_onlyPatients.rds")
+lung_patients = lung$patient.ident %>% unique() %>% as.character()
+lung_patients_filtered = lung_patients[!(lung_patients %in% c("X1055new","X1099"))] # remove patients with less than 100 malignant cells
+lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
+```
+
+```{r}
+suffix ="2Kvargenes_normalized_0-5sigma_2-7theta"
+by_expression = T #calculate metagenes by multiplie expression in genes coef, or by cnmf usage
+```
+
+```{python}
+from cnmf import cNMF
+suffix = r.suffix
+import pickle
+f = open('./Data/cnmf/cnmf_objects/patients_' + suffix + '_cnmf_obj.pckl', 'rb')
+cnmf_obj = pickle.load(f)
+f.close()
+```
+
+
+# Functions
+
+```{r }
+library(stringi)
+library(reticulate)
+source_from_github(repositoy = "DEG_functions",version = "0.2.24")
+source_from_github(repositoy = "cNMF_functions",version = "0.3.88",script_name = "cnmf_function_Harmony.R") 
+```
+
+# K selection plot
+```{r}
+plot_path = paste0("/sci/labs/yotamd/lab_share/avishai.wizel/R_projects/EGFR/Data/cnmf/cNMF_patients_Varnorm_Harmony_",suffix,"/cNMF_patients_Varnorm_Harmony_",suffix,".k_selection.png")
+knitr::include_graphics(plot_path)
+```
+
+
+
+# gep scores for all NMF k's
+```{python}
+density_threshold = 0.1
+cnmf_obj.consensus(k=3, density_threshold=density_threshold,show_clustering=True)
+cnmf_obj.consensus(k=4, density_threshold=density_threshold,show_clustering=True)
+cnmf_obj.consensus(k=5, density_threshold=density_threshold,show_clustering=True)
+cnmf_obj.consensus(k=6, density_threshold=density_threshold,show_clustering=True)
+cnmf_obj.consensus(k=7, density_threshold=density_threshold,show_clustering=True)
+cnmf_obj.consensus(k=8, density_threshold=density_threshold,show_clustering=True)
+cnmf_obj.consensus(k=9, density_threshold=density_threshold,show_clustering=True)
+
+usage_norm, gep_scores3, gep_tpm, topgenes = cnmf_obj.load_results(K=3, density_threshold=density_threshold)
+usage_norm, gep_scores4, gep_tpm, topgenes = cnmf_obj.load_results(K=4, density_threshold=density_threshold)
+usage_norm, gep_scores5, gep_tpm, topgenes = cnmf_obj.load_results(K=5, density_threshold=density_threshold)
+usage_norm, gep_scores6, gep_tpm, topgenes = cnmf_obj.load_results(K=6, density_threshold=density_threshold)
+usage_norm, gep_scores7, gep_tpm, topgenes = cnmf_obj.load_results(K=7, density_threshold=density_threshold)
+usage_norm, gep_scores8, gep_tpm, topgenes = cnmf_obj.load_results(K=8, density_threshold=density_threshold)
+usage_norm, gep_scores9, gep_tpm, topgenes = cnmf_obj.load_results(K=9, density_threshold=density_threshold)
+
+
+```
+
+
+# Enrichment analysis by top 200 genes of each program {.tabset}
+```{r fig.height=8, fig.width=8, results='asis'}
+gep_scores3 = py$gep_scores3
+gep_scores4 = py$gep_scores4
+gep_scores5 = py$gep_scores5
+gep_scores6 = py$gep_scores6
+gep_scores7 = py$gep_scores7
+gep_scores8 = py$gep_scores8
+gep_scores9 = py$gep_scores9
+
+
+all_gep_scores =  list(gep_scores3 = gep_scores3, gep_scores4 = gep_scores4, gep_scores5 = gep_scores5, gep_scores6 = gep_scores6, gep_scores7 = gep_scores7, gep_scores8 = gep_scores8, gep_scores9 = gep_scores9)
+# canonical_pathways = msigdbr(species = "Homo sapiens", category = "C2") %>% dplyr::filter(gs_subcat != "CGP") %>%  dplyr::distinct(gs_name, gene_symbol) 
+for (gep_name in names(all_gep_scores)) {
+  gep_scores = all_gep_scores[[gep_name]]
+  top_genes_num = 200
+  plt_list = list()
+  for (i in 1:ncol(gep_scores)) {
+    top_genes = gep_scores  %>%  arrange(desc(gep_scores[i])) #sort by score a
+    top = head(rownames(top_genes),top_genes_num) #take top top_genes_num
+    res = genes_vec_enrichment(genes = top,background = rownames(gep_scores),homer = T,title = 
+                      names(gep_scores)[i],silent = T,return_all = T,custom_pathways = NULL )
+     
+    plt_list[[i]] = res$plt
+  }
+  print_tab(plt =   ggarrange(plotlist = plt_list),
+            title = gep_name)
+}
+```
+
+# Chosen K
+```{python}
+selected_k = 4
+print("selected k = ",selected_k)
+density_threshold = 0.1
+cnmf_obj.consensus(k=selected_k, density_threshold=density_threshold,show_clustering=True)
+usage_norm, gep_scores, gep_tpm, topgenes = cnmf_obj.load_results(K=selected_k, density_threshold=density_threshold)
+```
+
+
+```{r fig.height=8, fig.width=8, results='hide'}
+gep_scores = py$gep_scores
+
+# canonical_pathways = msigdbr(species = "Homo sapiens", category = "C2") %>% dplyr::filter(gs_subcat != "CGP") %>%  dplyr::distinct(gs_name, gene_symbol) 
+
+top_genes_num = 200
+plt_list = list()
+for (i in 1:ncol(gep_scores)) {
+  top_genes = gep_scores  %>%  arrange(desc(gep_scores[i])) #sort by score a
+  top = head(rownames(top_genes),top_genes_num) #take top top_genes_num
+  res = genes_vec_enrichment(genes = top,background = rownames(gep_scores),homer = T,title = 
+                    names(gep_scores)[i],silent = T,return_all = T,custom_pathways = NULL )
+   
+  plt_list[[i]] = res$plt
+}
+gridExtra::grid.arrange(grobs = plt_list)
+```
+
+
+
+# Calculate usage
+```{r echo=TRUE, results='asis'}
+# get expression with genes in cnmf input
+lung = FindVariableFeatures(object = lung,nfeatures = 2000)
+genes =  VariableFeatures(object = lung)[1:2000]
+lung_expression = t(as.matrix(GetAssayData(lung,slot='data'))) 
+lung_expression = 2**lung_expression #convert from log2(tpm+1) to tpm
+lung_expression = lung_expression-1
+lung_expression = lung_expression[,genes] %>% as.data.frame()
+
+all_0_genes = colnames(lung_expression)[colSums(lung_expression==0, na.rm=TRUE)==nrow(lung_expression)] #delete rows that have all 0
+genes = genes[!genes %in% all_0_genes]
+lung_expression = lung_expression[,!colnames(lung_expression) %in% all_0_genes]
+gc()
+```
+
+
+
+
+
+
+```{python}
+
+lung_expression = r.lung_expression
+genes = r.genes
+gep_scores = r.gep_scores
+usage_by_calc = get_usage_from_score(counts=lung_expression,tpm=lung_expression,genes=genes,cnmf_obj=cnmf_obj,k=selected_k,sumTo1=True)
+```
+
+
+```{r}
+usage_by_calc = py$usage_by_calc
+```
+
+
+
+# Usgage UMAP
+```{r fig.height=9, fig.width=13}
+all_metagenes= usage_by_calc
+
+# Make metagene names
+for (i in 1:ncol(all_metagenes)) {
+  colnames(all_metagenes)[i] = "metagene." %>% paste0(i)
+}
+
+#add each metagene to metadata
+for (i in 1:ncol(all_metagenes)) {
+  metage_metadata = all_metagenes %>% dplyr::select(i)
+  lung = AddMetaData(object = lung,metadata = metage_metadata)
+}
+FeaturePlot(object = lung,features = colnames(all_metagenes))
+```
+
+
+```{r fig.height=7, fig.width=10}
+DimPlot(object = lung,group.by = "time.point",pt.size = 0.5)
+pre_treatment_cells = FetchData(object = lung,vars = "time.point") %>% filter(time.point == "pre-treatment") %>% rownames()
+on_treatment_cells = FetchData(object = lung,vars = "time.point") %>% filter(time.point == "on-treatment") %>% rownames()
+
+cells_to_highlight =  list(pre_treatment_cells = pre_treatment_cells)
+DimPlot(object = lung, cells.highlight = cells_to_highlight, cols.highlight = c("red"), cols = "gray", order = TRUE, label = T, repel = T)
+
+cells_to_highlight =  list(on_treatment_cells = on_treatment_cells)
+DimPlot(object = lung, cells.highlight = cells_to_highlight, cols.highlight = c("cyan3"), cols = "gray", order = TRUE,  label = T, repel = T)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Assignment 
+```{r}
+larger_by = 1.25
+lung = program_assignment(dataset = lung,larger_by = larger_by,program_names = colnames(all_metagenes))
+```   
+
+
+
+
+```{r echo=TRUE, fig.width=10, results='asis'}
+p = cell_percentage(dataset = lung,time.point_var = "time.point",by_program = T)
+print_tab(plt = p,title = "by program")
+p = cell_percentage(dataset = lung,time.point_var = "time.point",by_tp = T,x_order = NULL)
+print_tab(plt = p,title = "by timepoint")
+
+
+```
+
+## program.assignment
+```{r fig.height=8, fig.width=10}
+# colors =  rainbow(ncol(all_metagenes))
+# fc <- colorRampPalette(c("lightgreen", "darkgreen"))
+# greens = fc(4)
+# colors[1] = "blue"
+# colors[2:3] = greens[1:2]
+# colors[4] = "red"
+# colors[5:6] = greens[3:4]
+# colors = c(colors,"grey")
+# DimPlot(lung,group.by = "program.assignment",pt.size = 0.5,cols =colors)
+
+
+# colors =  rainbow(ncol(all_metagenes))
+# colors = c(colors,"grey")
+# DimPlot(lung,group.by = "program.assignment",pt.size = 0.5,cols =colors)
+
+DimPlot(lung,group.by = "program.assignment",pt.size = 0.5)
+DimPlot(lung,group.by = "patient.ident",pt.size = 0.5)
+DimPlot(lung,group.by = "time.point",pt.size = 0.5)
+```
+
+
+# Score regulation {.tabset}
+
+```{r echo=TRUE, results='asis'}
+metagenes_mean_compare(dataset = lung, time.point_var = "time.point",prefix = "patient",patient.ident_var = "patient.ident",pre_on = c("pre-treatment","on-treatment"),axis.text.x = 8,programs = c("hypoxia_like","interferon_like","cell_cycle"))
+```
+
+
+
+
+```{r}
+hallmark_name = "GO_MITOTIC_CELL_CYCLE"
+genesets  =getGmt("./Data/h.all.v7.0.symbols.pluscc.gmt")
+var_features=lung@assays$RNA@var.features
+geneIds= genesets[[hallmark_name]]@geneIds
+score <- apply(lung@assays$RNA@data[intersect(geneIds,var_features),],2,mean)
+lung=AddMetaData(lung,score,"GO_MITOTIC_CC")
+```
+
+```{r echo=TRUE, results='asis'}
+metagenes_mean_compare(dataset = lung, time.point_var = "time.point",prefix = "patient",patient.ident_var = "patient.ident",pre_on = c("pre-treatment","on-treatment"),axis.text.x = 8,programs = c("GO_MITOTIC_CC"))
+```
+
+```{r}
+DotPlot(object = lung, features = c("hypoxia_like","interferon_like","cell_cycle","GO_MITOTIC_CC"),scale = T,group.by  = 'time.point')
+```
+
+
+
+```{r}
+ df  = FetchData(object = lung,vars = c("program.assignment","time.point")) %>% 
+    mutate(program.assignment = if_else(!(program.assignment %in% "metagene.3"), 
+                       "not_hypoxia", 
+                       program.assignment)) %>% 
+    filter (time.point %in% c("pre-treatment","on-treatment")) %>% 
+    droplevels() 
+  test = fisher.test(table(df))
+    
+  library(ggstatsplot)
+print(
+    ggbarstats(
+    df, program.assignment, time.point,
+    results.subtitle = FALSE,
+    subtitle = paste0(
+      "Fisher's exact test", ", p-value = ",
+      ifelse(test$p.value < 0.001, "< 0.001", round(test$p.value, 3))
+    )
+  )
+)
+```
+
+
+# per patient fisher test
+
+```{r}
+patients_vector = lung$patient.ident %>% unique()
+for (patient_name in patients_vector) {
+  df  = FetchData(object = lung,vars = c("program.assignment","patient.ident","time.point")) %>% 
+    filter (patient.ident == patient_name) %>% 
+    filter (program.assignment %in% c("metagene.1","metagene.2")) %>% 
+    filter (time.point %in% c("pre-treatment","on-treatment")) %>% 
+    select(-patient.ident) %>% 
+    droplevels() 
+  test = fisher.test(table(df))
+    
+  library(ggstatsplot)
+print(
+    ggbarstats(
+    df, program.assignment, time.point,
+    results.subtitle = FALSE,
+    subtitle = paste0(
+      "Fisher's exact test", ", p-value = ",
+      ifelse(test$p.value < 0.001, "< 0.001", round(test$p.value, 3))
+    ),title = patient_name
+  )
+)
+}
+```
+
+
+
+
+
+

@@ -21,12 +21,10 @@ xeno = DietSeurat(object = xeno)
 ```{r}
 library(stringi)
 library(reticulate)
-source_from_github(repositoy = "cNMF_functions",version = "0.3.48",script_name = "cnmf_function_Harmony.R")
+source_from_github(repositoy = "cNMF_functions",version = "0.3.58",script_name = "cnmf_function_Harmony.R")
 ```
 
-```{r}
-library(reticulate)
-```
+
 
 ## Parameters
 ```{r}
@@ -36,11 +34,11 @@ n_iter = 10 #default: 10
 densify = T #default: T
 theta = 2 #default: 2
 options_for_genes = c("var_genes","combined","positive")
-genes_from = options_for_genes[2] 
+genes_from = options_for_genes[1] 
 ```
 
 ```{r}
-suffix ="4Kcombined_genes"
+suffix ="2Kvargenes_normalize_total"
 print(suffix)
 print(genes_from)
 ```
@@ -54,6 +52,7 @@ draw.pairwise.venn(area1=20, area2=45,cross.area=10,
 genes_from_list = F
 if (genes_from == "var_genes"){
   xeno = FindVariableFeatures(object = xeno,nfeatures = nfeatures)
+  genes_lst = NULL
 
 }else if(genes_from == "combined"){
   genes_lst = combine_var_genes(dataset_1 = xeno,dataset_2 = xeno,all_var_genes_num = 15000,most_var_genes_num = 4000,plot = T)
@@ -80,7 +79,7 @@ genes_from_list = r.genes_from_list
 ## Convert seurat to scanpy
 ```{r}
 sc <- import('scanpy', convert = FALSE)
-gene_expression = t(as.matrix(GetAssayData(xeno,slot='counts'))) #cnmf expect 10x counts
+gene_expression = t(as.matrix(GetAssayData(xeno,slot='counts'))) 
 
 
 adata <- sc$AnnData(
@@ -126,7 +125,8 @@ def moe_correct_ridge(Z_orig, Z_cos, Z_corr, R, W, K, Phi_Rk, Phi_moe, lamb):
 ```{python}
 adata = r.adata
 
-sc.pp.normalize_per_cell(adata) 
+# sc.pp.normalize_per_cell(adata) 
+sc.pp.normalize_total(adata, target_sum=1e4)
 adata.var['highly_variable'] = adata.var['vst.variable']
 if (not genes_from_list):
   adata = adata[:,adata.var['highly_variable']].copy()
@@ -165,22 +165,32 @@ X_corr_nonneg[X_corr_nonneg<0]= 0
 adata_corr_nonneg = adata_corr.copy()
 adata_corr_nonneg.X = X_corr_nonneg
 ```
+
+```{python}
+import scipy
+import matplotlib.pyplot as plt
+import scanpy as sc
+adata_corr_nonneg = sc.read_h5ad('/sci/labs/yotamd/lab_share/avishai.wizel/R_projects/EGFR/Data/cnmf/xeno_Harmony_NoNeg_2Kvargenes.h5ad')
+```
+
 ## import to seurat for plotting UMAP
 ```{r}
 exprs <- t(py$adata_corr_nonneg$X)
-colnames(exprs) <- py$adata$obs_names$to_list()
-rownames(exprs) <- py$adata$var_names$to_list()
+colnames(exprs) <- py$adata_corr_nonneg$obs_names$to_list()
+rownames(exprs) <- py$adata_corr_nonneg$var_names$to_list()
 
 # Create the Seurat object
 xeno_corr_nonneg <- CreateSeuratObject(counts = exprs)
-xeno_corr_nonneg$orig.ident <- py$adata$obs["orig.ident"]
-xeno_corr_nonneg$treatment <- py$adata$obs["treatment"]
+xeno_corr_nonneg$orig.ident <- py$adata_corr_nonneg$obs["orig.ident"]
+xeno_corr_nonneg$treatment <- py$adata_corr_nonneg$obs["treatment"]
 
 ```
 
 ## PCA after correction
 ```{r}
-xeno_corr_nonneg@assays$RNA@scale.data = exprs
+xeno_corr_nonneg = ScaleData(object = xeno_corr_nonneg,features = rownames(xeno_corr_nonneg))
+# xeno_corr_nonneg@assays$RNA@scale.data = exprs
+
 xeno_corr_nonneg <- RunPCA(xeno_corr_nonneg, features = rownames(xeno_corr_nonneg))
 
 ElbowPlot(xeno_corr_nonneg)
@@ -195,9 +205,9 @@ xeno_corr_nonneg <- RunUMAP(xeno_corr_nonneg, dims = pc2use)
 ```
 
 ## UMAP after correction
-```{r}
-DimPlot(xeno_corr_nonneg, reduction = "umap",group.by = "orig.ident")
-DimPlot(xeno_corr_nonneg, reduction = "umap",group.by = "treatment")
+```{r fig.height=4, fig.width=10}
+DimPlot(xeno_corr_nonneg, reduction = "umap",group.by = "orig.ident",shuffle = T)+
+  DimPlot(xeno_corr_nonneg, reduction = "umap",group.by = "treatment",shuffle = T)
 ```
 
 ```{python}

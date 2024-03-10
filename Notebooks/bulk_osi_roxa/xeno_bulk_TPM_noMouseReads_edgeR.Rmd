@@ -1,0 +1,70 @@
+---
+title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: FALSE
+    number_sections: true
+    toc_depth: 1
+---
+
+
+
+# Functions
+
+```{r warning=FALSE}
+```
+
+# Data
+
+```{r}
+xeno_bulk_no_mouse = read.table(
+  file = "/sci/labs/yotamd/lab_share/lung_sc/bulk/RoxaOsi/Oct23/star/mm39unmapped_noMTGLKI_tpm.txt",
+  sep = "\t",
+  header = TRUE
+)
+rownames(xeno_bulk_no_mouse) = make.unique(xeno_bulk_no_mouse[,"gene_name",drop=T])
+xeno_bulk_no_mouse = xeno_bulk_no_mouse[,8:19]
+names (xeno_bulk_no_mouse) = gsub(pattern = "_mm.*$",replacement = "",x = names (xeno_bulk_no_mouse))
+xeno_bulk_no_mouse = xeno_bulk_no_mouse[,c("M2_ctrl", "M21_ctrl", "M36_ctrl", "M14_osi", "M33_osi", "M14_2_osi", 
+"M20_roxa", "M30_roxa", "M31_roxa", "M3_combo", "M26_combo", 
+"M32_combo")]
+```
+
+```{r}
+library(edgeR)
+cell.labels = names(xeno_bulk)
+condition = str_extract(cell.labels, "osi|combo|ctrl|roxa")
+d <- DGEList(counts=xeno_bulk_no_mouse,group=factor(condition))
+keep <- rowSums(cpm(d)>50) >= 2
+d <- d[keep,]
+d <- calcNormFactors(d)
+d1 <- estimateCommonDisp(d, verbose=T)
+d1 <- estimateTagwiseDisp(d1)
+
+```
+```{r}
+design.mat <- model.matrix(~ 0 + d$samples$group)
+colnames(design.mat) <- levels(d$samples$group)
+d2 <- estimateGLMCommonDisp(d,design.mat)
+d2 <- estimateGLMTrendedDisp(d2,design.mat, method="power")
+# You can change method to "auto", "bin.spline", "power", "spline", "bin.loess".
+# The default is "auto" which chooses "bin.spline" when > 200 tags and "power" otherwise.
+d2 <- estimateGLMTagwiseDisp(d2,design.mat)
+plotBCV(d2)
+```
+```{r}
+et13 <- exactTest(d1, pair=c(1,3)) # compare groups 1 and 3
+et24 <- exactTest(d1, pair=c(2,4)) # compare groups 2 and 3
+topTags(et13, n=10,p.value = 0.1)
+topTags(et24, n=10,p.value = 0.1) 
+
+```
+
+<script src="https://hypothes.is/embed.js" async></script>
+

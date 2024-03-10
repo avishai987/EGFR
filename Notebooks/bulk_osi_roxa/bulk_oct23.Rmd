@@ -1,0 +1,109 @@
+---
+title: "asd"
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: FALSE
+    number_sections: true
+    toc_depth: 1
+---
+
+
+
+# Functions
+
+```{r warning=FALSE}
+```
+
+# Data
+
+```{r}
+my_data <- read.table(file = "/sci/labs/yotamd/lab_share/lung_sc/bulk/RoxaOsi/Oct23/03.Result_X202SC23082844-Z01-F001_Homo_sapiens/Result_X202SC23082844-Z01-F001_Homo_sapiens/3.Quant/1.Count/gene_fpkm.xls", 
+                      sep = "\t", header=TRUE)
+rownames(my_data) = make.unique(my_data[,38,drop=T])
+my_data = my_data[,2:37]
+
+names (my_data) = gsub(x = names(my_data),pattern = "_C",replacement = "_ctrl")%>% gsub(pattern = "p_OR",replacement = "_osiRoxaPersistors") %>% gsub(pattern = "p_O",replacement = "_osiPersistors") %>% gsub(pattern = "_R",replacement = "_roxa")%>% gsub(,pattern = "_O",replacement = "_osi")
+
+my_data = my_data[,1:24]
+
+```
+
+```{r}
+cell.labels = names(my_data)
+cell_type = str_extract(cell.labels, "^[A-Z]{1,3}[0-9]{3}")
+condition = str_extract(cell.labels, "osiPersistors|osiRoxaPersistor|osi|ctrl|roxa")
+condition = paste(cell_type,condition,sep = "_")
+replicate = str_extract(cell.labels, ".$")
+metadata = data.frame(cell_type = cell_type, condition = condition, replicate = replicate, row.names = colnames(counts))
+```
+
+```{r}
+library(DESeq2)
+dds <- DESeqDataSetFromMatrix(countData = round(my_data),
+                              colData = metadata,
+                              design = ~condition)
+```
+
+```{r}
+nrow(dds)
+dds1 <- dds[ rowSums(counts(dds)) >= 3, ]
+nrow(dds1)
+```
+```{r}
+vst = vst(dds1, blind=FALSE)
+```
+
+```{r}
+library("ggfortify")
+PCAdata <- prcomp(t(assay(vst)))
+autoplot(PCAdata, data = metadata,colour = "condition",label = FALSE, main="PCA") # Show dots
+autoplot(PCAdata, data = metadata,colour = "cell_type",label = FALSE, main="PCA") # Show dots
+
+```
+```{r}
+dds <- DESeq(dds)
+```
+
+```{r}
+H1975_cpVSop <- results(dds,contrast = c("condition","H197_osiRoxaPersistor","H197_osiPersistors"))  %>% as.data.frame()
+H1975_roxaVSctrl <- results(dds,contrast = c("condition","H197_roxa","H197_ctrl"))  %>% as.data.frame()
+diff_genes = data.frame(row.names = rownames(H1975_cpVSop), cpVSop_FC = 2**H1975_cpVSop$log2FoldChange,roxaVSctrl_FC = 2**H1975_roxaVSctrl$log2FoldChange,  H1975_cpVSop_padj = H1975_cpVSop$padj)
+
+```
+
+```{r}
+ranked_vec = diff_genes[, 1] %>% setNames(rownames(diff_genes)) %>% sort(decreasing = TRUE)
+hyp_obj <- hypeR_fgsea(ranked_vec, genesets, up_only = T)
+hyp_dots(hyp_obj,title = paste("program",col))+ aes(size=nes)
+
+ranked_vec = diff_genes[, 2] %>% setNames(rownames(diff_genes)) %>% sort(decreasing = TRUE)
+hyp_obj <- hypeR_fgsea(ranked_vec, genesets, up_only = T)
+hyp_dots(hyp_obj,title = paste("program",col))+ aes(size=nes)
+```
+```{r}
+up_genes_df =  diff_genes %>% filter(cpVSop_FC > 2 & roxaVSctrl_FC<1.2 & H1975_cpVSop_padj<0.05) 
+down_genes_df = diff_genes %>% filter(cpVSop_FC < 0.5 & roxaVSctrl_FC>0.8 & H1975_cpVSop_padj<0.05)
+up_genes = diff_genes %>% filter(cpVSop_FC > 2 & roxaVSctrl_FC<1.2 & H1975_cpVSop_padj<0.05) %>% rownames()
+down_genes = diff_genes %>% filter(cpVSop_FC < 0.5 & roxaVSctrl_FC>0.8 & H1975_cpVSop_padj<0.1)%>% rownames()
+
+up_genes_df
+down_genes_df
+```
+```{r}
+hyp_obj <- hypeR(up_genes, genesets, test = "hypergeometric", fdr=1, plotting=F,background = rownames(H1975_cpVSop))
+ hyp_dots(hyp_obj,size_by = "none",title = paste0("cluster",chosen_clusters))
+
+hyp_obj <- hypeR(down_genes, genesets, test = "hypergeometric", fdr=1, plotting=F,background = rownames(H1975_cpVSop))
+ hyp_dots(hyp_obj,size_by = "none",title = paste0("cluster",chosen_clusters))
+
+```
+
+
+<script src="https://hypothes.is/embed.js" async></script>
+

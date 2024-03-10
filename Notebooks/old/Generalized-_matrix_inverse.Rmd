@@ -1,0 +1,110 @@
+---
+title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: FALSE
+    number_sections: true
+    toc_depth: 1
+---
+
+## Data
+```{r}
+xeno = readRDS("./Data/10x_xeno_1000.Rds")
+```
+
+
+```{r}
+by_expression = T #calculate metagenes by multiplie expression in genes coef, or by cnmf usage
+suffix = "2Kvargenes"
+```
+
+```{python}
+suffix = r.suffix
+import pickle
+from cnmf import cNMF
+f = open('./Data/cnmf/cnmf_objects/models_' + suffix + '_cnmf_obj.pckl', 'rb')
+cnmf_obj = pickle.load(f)
+f.close()
+```
+## Functions
+
+```{r}
+library(stringi)
+library(reticulate)
+source_from_github(repositoy = "DEG_functions",version = "0.2.24")
+source_from_github(repositoy = "cNMF_functions",version = "0.3.63",script_name = "cnmf_function_Harmony.R")
+```
+
+```{r}
+selected_k = 3
+suffix = paste(suffix,paste0(selected_k,"nmfK"),sep="_")
+```
+
+
+```{python}
+selected_k = int(r.selected_k)
+density_threshold = 0.1
+# cnmf_obj.consensus(k=selected_k, density_threshold=density_threshold)
+usage_norm, gep_scores, gep_tpm, topgenes = cnmf_obj.load_results(K=selected_k, density_threshold=density_threshold)
+```
+
+```{r}
+gep_scores= py$gep_scores
+usage_norm= py$usage_norm
+```
+
+
+```{python}
+import scanpy as sc
+data = sc.read_h5ad('./Data/cnmf/xeno_Harmony_NoNeg_' + suffix +'.h5ad')
+expression = data.X
+expression
+```
+
+
+```{r}
+harmoby_expression = py$expression %>% as.matrix()
+left_inversion = MASS::ginv(gep_scores%>% as.matrix()) %>% t() %>% as.matrix()
+
+dim(harmoby_expression)
+dim(left_inversion)
+
+res = harmoby_expression %*%  left_inversion %>% as.data.frame()
+
+```
+
+```{r}
+dim(gep_scores)
+dim(usage_norm)
+
+
+res = as.matrix(usage_norm)  %*%  as.matrix( gep_scores %>% t() ) %>% as.data.frame()
+res[1,3]
+harmoby_expression[1,3]
+
+cor(res[,3],harmoby_expression[,3])
+```
+
+```{r}
+dim(res)
+dim(usage_norm)
+
+res[1,3]
+usage_norm[1,3]
+```
+```{r}
+
+```
+
+```{r}
+library(NMF)
+nmf_res <- nmf(xeno@assays$RNA@counts %>% as.data.frame(), 3)
+
+```
+

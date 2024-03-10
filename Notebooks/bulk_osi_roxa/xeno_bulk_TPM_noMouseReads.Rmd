@@ -1,0 +1,233 @@
+---
+title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: FALSE
+    number_sections: true
+    toc_depth: 1
+---
+
+
+
+# Functions
+
+```{r warning=FALSE}
+```
+
+# Data
+
+```{r}
+genesets <- msigdb_download("Homo sapiens",category="H") %>% append( msigdb_download("Homo sapiens",category="C2",subcategory = "CP:KEGG"))
+xeno_bulk = read.table(
+  file = "/sci/labs/yotamd/lab_share/lung_sc/bulk/RoxaOsi/Oct23/star/mm39unmapped_noMTGLKI_tpm.txt",
+  sep = "\t",
+  header = TRUE
+)
+rownames(xeno_bulk) = make.unique(xeno_bulk[,"gene_name",drop=T])
+xeno_bulk = xeno_bulk[,8:19]
+names (xeno_bulk) = gsub(pattern = "_mm.*$",replacement = "",x = names (xeno_bulk))
+xeno_bulk = xeno_bulk[,c("M2_ctrl", "M21_ctrl", "M36_ctrl", "M14_osi", "M33_osi", "M14_2_osi", 
+"M20_roxa", "M30_roxa", "M31_roxa", "M3_combo", "M26_combo", 
+"M32_combo")]
+```
+
+```{r}
+cell.labels = names(xeno_bulk)
+condition = str_extract(cell.labels, "osi|combo|ctrl|roxa")
+metadata = data.frame(condition = condition, row.names = colnames(xeno_bulk))
+```
+
+```{r}
+library(DESeq2)
+dds <- DESeqDataSetFromMatrix(countData = round(xeno_bulk),
+                              colData = metadata,
+                              design = ~condition)
+```
+
+
+# PCA
+```{r}
+nrow(dds)
+dds1 <- dds[ rowSums(counts(dds)) >= 3, ]
+nrow(dds1)
+```
+
+```{r}
+vst = vst(dds, blind=FALSE)
+```
+
+```{r}
+library("ggfortify")
+PCAdata <- prcomp(t(assay(vst)))
+autoplot(PCAdata, data = metadata,colour = "condition",label = FALSE, main="PCA") # Show dots
+
+```
+# DESeq
+```{r}
+dds <- DESeq(dds)
+dds_xeno_TPM = dds
+
+```
+
+```{r}
+dds = dds_xeno_TPM
+```
+
+
+
+# Top variable genes heatmap
+```{r}
+genes <- head(order(rowVars(assay(dds)), decreasing = TRUE), 1000)
+
+mat <- xeno_bulk[ genes, ]
+mat <- t(scale(t(mat)))
+anno <- as.data.frame(mat)
+
+library(ComplexHeatmap) 
+library(ggplot2) 
+Heatmap(mat, cluster_rows = T, cluster_columns = F, column_labels = colnames(anno), name = "TPM Z-score",row_names_gp = gpar(fontsize = 0)) 
+```
+
+# Expression heatmap {.tabset}
+
+```{r fig.height=6}
+# select the 50 most differentially expressed genes 
+genes <- c("DUSP6","MKI67","EGFR","IL11")
+mat <- xeno_bulk[ genes, ]
+mat <- t(scale(t(mat)))
+anno <- as.data.frame(mat)
+
+library(ComplexHeatmap) 
+library(ggplot2) 
+Heatmap(mat, cluster_rows = F, cluster_columns = F, column_labels = colnames(anno), name = "TPM Z-score") 
+
+genes <- hif_targets
+mat <- xeno_bulk[genes, ] %>% filter(rowSums(across(where(is.numeric)))!=0)
+mat <- t(scale(t(mat)))
+anno <- as.data.frame(mat)
+
+ 
+Heatmap(mat, cluster_rows = T, cluster_columns = F, column_labels = colnames(anno), name = "TPM Z-score",column_title = "HIF targets",row_names_gp = gpar(fontsize = 8)) 
+
+
+genes <- genesets$HALLMARK_G2M_CHECKPOINT
+mat <- xeno_bulk[genes, ] %>% filter(rowSums(across(where(is.numeric)))!=0)
+mat <- t(scale(t(mat)))
+anno <- as.data.frame(mat)
+
+ 
+Heatmap(mat, cluster_rows = T, cluster_columns = F, column_labels = colnames(anno), name = "TPM Z-score",column_title = "G2M targets",row_names_gp = gpar(fontsize = 0)) 
+
+genes <- genesets$HALLMARK_HYPOXIA
+mat <- xeno_bulk[genes, ] %>% filter(rowSums(across(where(is.numeric)))!=0)
+mat <- t(scale(t(mat)))
+anno <- as.data.frame(mat)
+
+ 
+Heatmap(mat, cluster_rows = T, cluster_columns = F, column_labels = colnames(anno), name = "TPM Z-score",column_title = "Hallmark Hypoxia",row_names_gp = gpar(fontsize = 0)) 
+
+
+```
+
+# DEG {.tabset}
+```{r}
+cpVSop <- results(dds,contrast = c("condition","combo","osi"))  %>% as.data.frame()
+roxaVSctrl <- results(dds,contrast = c("condition","roxa","ctrl"))  %>% as.data.frame()
+diff_genes = data.frame(row.names = rownames(cpVSop), cpVSop_FC = cpVSop$log2FoldChange,roxaVSctrl_FC = roxaVSctrl$log2FoldChange,  cpVSop_padj = cpVSop$padj)
+```
+
+```{r results='asis'}
+library(DT)
+roxa_vs_ctrl = results(dds,contrast = c("condition","roxa","ctrl"))  %>% as.data.frame()
+combo_vs_ctrl = results(dds,contrast = c("condition","combo","ctrl"))  %>% as.data.frame()
+osi_vs_ctrl = results(dds,contrast = c("condition","osi","ctrl"))  %>% as.data.frame()
+
+combo_vs_roxa = results(dds,contrast = c("condition","combo","roxa"))  %>% as.data.frame()
+osi_vs_roxa = results(dds,contrast = c("condition","osi","roxa"))  %>% as.data.frame()
+combo_vs_osi <- results(dds,contrast = c("condition","combo","osi"))  %>% as.data.frame()
+
+dt1 = datatable(roxa_vs_ctrl%>% filter(padj <0.1)  ,caption = "significant roxa VS ctrl")
+dt2= datatable(combo_vs_ctrl %>% filter(padj <0.1),caption = "significant combo vs ctrl")
+dt3 = datatable(osi_vs_ctrl %>% filter(padj <0.1),caption = "significant osi_vs_ctrl")
+dt4 =datatable(combo_vs_roxa %>% filter(padj <0.1),caption = "significant combo_vs_roxa")
+dt5 =datatable(osi_vs_roxa %>% filter(padj <0.1),caption = "significant osi_vs_roxa")
+dt6 =datatable(combo_vs_osi %>% filter(padj <0.1),caption = "significant combo VS osi")
+print_tab(plt = dt1,title = "significant roxa VS ctrl")
+print_tab(plt = dt2,title = "significant combo vs ctrl")
+print_tab(plt = dt3,title = "significant osi VS ctrl")
+print_tab(plt = dt4,title = "significant combo VS roxa")
+print_tab(plt = dt5,title = "significant osi VS roxa")
+print_tab(plt = dt6,title = "significant combo VS osi")
+```
+```{r fig.height=6, fig.width=13, results='asis'}
+all_comparision = list(roxa_vs_ctrl = roxa_vs_ctrl,combo_vs_ctrl = combo_vs_ctrl,osi_vs_ctrl = osi_vs_ctrl,combo_vs_roxa = combo_vs_roxa,osi_vs_roxa= osi_vs_roxa,combo_vs_osi = combo_vs_osi)
+for (i in 1:length(all_comparision)) {
+  comparision = all_comparision[[i]]
+  comparision = comparision[order(comparision$log2FoldChange, comparision$padj,decreasing = T),] #order by FC, ties bt padj
+ranked_vec = comparision[,"log2FoldChange"]%>% setNames(rownames(comparision)) %>% na.omit() # make named vector
+
+hyp_obj <- hypeR_fgsea(ranked_vec, genesets, up_only = F)
+plt = hyp_dots(hyp_obj,merge = F)
+plt1 = plt$up+ aes(size=nes)
+plt2 = plt$dn+ aes(size=abs(nes))
+print_tab(plt1+plt2,title =   names(all_comparision)[i])
+}
+
+```
+
+
+
+```{r}
+vsd <- vst(dds, blind=FALSE)
+sampleDists <- dist(t(assay(vsd)))
+library("RColorBrewer")
+sampleDistMatrix <- as.matrix(sampleDists)
+colnames(sampleDistMatrix) <- NULL
+colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows=sampleDists,
+         clustering_distance_cols=sampleDists,
+         col=colors)
+```
+
+```{r}
+xeno_bulk_no_mouse = read.table(
+  file = "/sci/labs/yotamd/lab_share/lung_sc/bulk/RoxaOsi/Oct23/star/mm39unmapped_noMTGLKI_tpm.txt",
+  sep = "\t",
+  header = TRUE
+)
+rownames(xeno_bulk_no_mouse) = make.unique(xeno_bulk_no_mouse[,"gene_name",drop=T])
+xeno_bulk_no_mouse = xeno_bulk_no_mouse[,8:19]
+names (xeno_bulk_no_mouse) = gsub(pattern = "_mm.*$",replacement = "",x = names (xeno_bulk_no_mouse))
+xeno_bulk_no_mouse = xeno_bulk_no_mouse[,c("M2_ctrl", "M21_ctrl", "M36_ctrl", "M14_osi", "M33_osi", "M14_2_osi", 
+"M20_roxa", "M30_roxa", "M31_roxa", "M3_combo", "M26_combo", 
+"M32_combo")]
+colnames(xeno_bulk_no_mouse) = paste0(colnames(xeno_bulk_no_mouse),"_noMouse")
+xeno_bulk = read.table(
+  file = "/sci/labs/yotamd/lab_share/avishai.wizel/R_projects/EGFR/Data/osiRoxa_bulk/Oct23/03.Result_X202SC23082844-Z01-F001_Homo_sapiens/Result_X202SC23082844-Z01-F001_Homo_sapiens/3.Quant/1.Count/gene_fpkm.xls",
+  sep = "\t",
+  header = TRUE
+)
+rownames(xeno_bulk) = make.unique(xeno_bulk[,"gene_name",drop=T])
+xeno_bulk = xeno_bulk[,26:37]
+
+```
+
+```{r fig.height=6, fig.width=8}
+common_genes = intersect(rownames(xeno_bulk),rownames(xeno_bulk_no_mouse))
+xeno_bulk_comp = cbind(xeno_bulk[common_genes,],xeno_bulk_no_mouse[common_genes,])
+xeno_comp_cor = cor(xeno_bulk_comp)
+
+ComplexHeatmap::Heatmap(xeno_comp_cor,name  = "pearson")
+```
+
+
+
+<script src="https://hypothes.is/embed.js" async></script>
+

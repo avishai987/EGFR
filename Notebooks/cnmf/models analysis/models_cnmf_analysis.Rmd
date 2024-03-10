@@ -1,0 +1,864 @@
+---
+title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: FALSE
+    number_sections: true
+    toc_depth: 1
+---
+
+
+
+# Functions
+```{r warning=FALSE}
+
+library(stringi)
+library(reticulate)
+source_from_github(repositoy = "DEG_functions",version = "0.2.24")
+source_from_github(repositoy = "cNMF_functions",version = "0.3.91",script_name = "cnmf_function_Harmony.R")
+
+no_neg <- function(x) {
+  x = x + abs(min(x))
+  x
+}
+
+sum_2_one <- function(x) {
+  x =x/sum(x)
+  x
+}
+
+```
+
+
+
+
+# Data
+```{r}
+xeno = readRDS("./Data/10x_xeno_1000.Rds")
+lung = readRDS("./Data/lung_cancercells_withTP_onlyPatients.rds")
+lung_patients = lung$patient.ident %>% unique() %>% as.character()
+lung_patients_filtered = lung_patients[!(lung_patients %in% c("X1055new","X1099"))] # remove patients with less than 100 malignant cells
+lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
+```
+
+
+# Models 2K vargenes 
+
+```{python}
+import pickle
+from cnmf import cNMF
+f = open('./Data/cnmf/cnmf_objects/models_2Kvargenes_cnmf_obj.pckl', 'rb')
+cnmf_obj = pickle.load(f)
+f.close()
+```
+
+# K selection plot
+```{r fig.height=2, fig.width=2}
+plot_path = paste0("/sci/labs/yotamd/lab_share/avishai.wizel/R_projects/EGFR/Data/cnmf/cNMF_models_Varnorm_Harmony_2Kvargenes/cNMF_models_Varnorm_Harmony_2Kvargenes.k_selection.png")
+knitr::include_graphics(plot_path)
+```
+
+
+
+# gep scores for all NMF k's {.tabset}
+```{python}
+density_threshold = 0.1
+usage_norm3, gep_scores3, _, _ = cnmf_obj.load_results(K=3, density_threshold=density_threshold)
+usage_norm4, gep_scores4, _, _ = cnmf_obj.load_results(K=4, density_threshold=density_threshold)
+usage_norm5, gep_scores5, _, _ = cnmf_obj.load_results(K=5, density_threshold=density_threshold)
+```
+
+```{r}
+gep_scores3 = py$gep_scores3
+gep_scores4 = py$gep_scores4
+gep_scores5 = py$gep_scores5
+
+usage_norm3 = py$usage_norm3
+usage_norm4 = py$usage_norm4
+usage_norm5 = py$usage_norm5
+
+```
+
+```{r fig.height=7, fig.width=10, results='asis'}
+all_usage_norm = list(usage_norm3 = usage_norm3, usage_norm4 = usage_norm4, usage_norm5 = usage_norm5)
+for (usage_num in seq_along(all_usage_norm)) {
+  usage = all_usage_norm[[usage_num]]
+  #add each metagene to metadata
+  for (i in 1:ncol(usage)) {
+    metage_metadata = usage %>% dplyr::select(i)
+    xeno = AddMetaData(object = xeno,metadata = metage_metadata,col.name = paste0("gep",i))
+  }
+  if (usage_num==1) {
+      print_tab(FeaturePlot(object = xeno,features = paste0("gep",1:ncol(usage)),ncol = 2),title = usage_num)
+
+  }else{ print_tab(FeaturePlot(object = xeno,features = paste0("gep",1:ncol(usage)),ncol = 3),title = usage_num)}
+}
+```
+# all NMF k's  enrichment{.tabset}
+
+
+```{r results='asis'}
+
+all_gep_scores =  list(gep_scores3 = gep_scores3, gep_scores4 = gep_scores4, gep_scores5 = gep_scores5)
+
+genesets <- msigdb_download("Homo sapiens",category="H") %>% append( msigdb_download("Homo sapiens",category="C2",subcategory = "CP:KEGG"))
+genesets[["HIF_targets"]] = hif_targets
+genesets_env = gsets$new(genesets, name="my genesets", version="v1.0")
+
+for (gep_num in seq_along(all_gep_scores)) {
+  gep = all_gep_scores[[gep_num]]
+  ranked_list = list()
+  for (col in (gep)) {
+   lst = col %>% setNames(rownames(gep)) %>% sort(decreasing = TRUE) 
+   ranked_list  %<>% append(list(lst))
+  }
+  names(ranked_list) = paste0("gep",1:ncol(gep))
+  
+  
+  
+  hyp_obj <- hypeR(ranked_list, genesets_env, test="kstest", fdr=0.05, plotting=F,background = rownames(gep_scores3))
+  print_tab(
+    hyp_dots(hyp_obj,size_by = "significance",abrv = 100,merge = T)+
+      scale_color_continuous(low = "red", high = "black", guide = guide_colorbar(reverse = TRUE))
+    ,title = gep_num)
+  
+}
+
+```
+
+
+
+
+
+
+```{r}
+  for (col in seq_along(gep_scores3)) {
+     ranked_vec = gep_scores3[,col] %>% setNames(rownames(gep_scores3)) %>% sort(decreasing = TRUE) 
+     hyp_obj <- fgsea.wrapper(ranked_vec, genesets)
+    # hyp_list[[paste0("gep",col)]] = hyp_obj
+       print(hyp_dots(hyp_obj))
+  }
+```
+
+
+```{r}
+col = 2
+ ranked_vec = gep_scores3[,col] %>% setNames(rownames(gep_scores3)) %>% sort(decreasing = TRUE) 
+ hyp_obj <- fgsea.wrapper(ranked_vec, genesets)
+# hyp_list[[paste0("gep",col)]] = hyp_obj
+ for (i in 1:5) {
+  le_genes =  hyp_obj$data[i,"le",drop=T] %>% strsplit(",") %>% unlist()
+  scoresAndIndices = getPathwayScores(dataMatrix = xeno@assays$RNA@data,pathwayGenes = le_genes)
+  xeno=AddMetaData(xeno,scoresAndIndices$pathwayScores,paste0(hyp_obj$data[i,"label",drop=T],"_gsea"))
+  print(FeaturePlot(object = xeno,features = paste0(hyp_obj$data[i,"label",drop=T],"_gsea")))
+ }
+
+  
+```
+
+
+# programs enrichment
+```{r}
+gep_scores = py$gep_scores3
+usage_norm= py$usage_norm3
+```
+
+```{r}
+# or:
+gep_scores = readRDS("/sci/labs/yotamd/lab_share/avishai.wizel/R_projects/EGFR/Data/cnmf/harmony_models_gep_scores.rds")
+```
+
+```{r fig.height=6, fig.width=8}
+names (gep_scores) = c("Hypoxia","TNFa","Cell_cycle")
+plt_list = list()
+
+for (program  in names (gep_scores)) {
+ p = ggplot(gep_scores, aes(x=!!ensym(program))) +
+  geom_density()+xlab(program)+
+   geom_vline(
+    aes(xintercept=sort(gep_scores[,program],TRUE)[200]  ,color="top200"),
+          linetype="dashed", size=1)+
+   geom_vline(
+    aes(xintercept=sort(gep_scores[,program],TRUE)[100]  ,color="top100"),
+          linetype="dashed", size=1)+
+      geom_vline(
+    aes(xintercept=sort(gep_scores[,program],TRUE)[50]  ,color="top50"),
+          linetype="dashed", size=1)+
+         geom_vline(
+    aes(xintercept=sort(gep_scores[,program],TRUE)[150]  ,color="top150"),
+          linetype="dashed", size=1)+
+   scale_color_manual(name = "top n genes", values = c(top200 = "blue",top100 = "red",top150 = "yellow",top50 = "green"))
+   plt_list[[program]] <- p
+
+}
+ 
+ggarrange(plotlist = plt_list)
+
+```
+
+
+
+
+
+# Programs hallmark enrichment
+
+```{r fig.height=8, fig.width=8}
+ntop = 150
+plt_list = list()
+hif_targets_set = data.frame(gs_name = "hif_targets",gene_symbol = hif_targets)
+
+for (i in 1:ncol(gep_scores)) {
+  top_genes = gep_scores  %>%  arrange(desc(gep_scores[i])) #sort by score a
+  top = head(rownames(top_genes),ntop) #take top top_genes_num
+  res = genes_vec_enrichment(genes = top,background = rownames(gep_scores),homer = T,title = 
+                    i,silent = T,return_all = T,custom_pathways  = hif_targets_set)
+   
+  plt_list[[i]] = res$plt
+}
+gridExtra::grid.arrange(grobs = plt_list)
+```
+
+# program 2 all cp
+```{r}
+ntop = 150
+i = 2 
+
+  top_genes = gep_scores  %>%  arrange(desc(gep_scores[i])) #sort by score a
+  top = head(rownames(top_genes),ntop) #take top top_genes_num
+  res = genes_vec_enrichment(genes = top,background = rownames(gep_scores),homer = T,title = 
+                    i,silent = T,return_all = T,custom_pathways  = canonical_pathways)
+   
+ print(res$plt) 
+
+
+```
+
+# Program 2 all msigdb
+```{r}
+ntop = 150
+i = 2 
+
+  top_genes = gep_scores  %>%  arrange(desc(gep_scores[i])) #sort by score a
+  top = head(rownames(top_genes),ntop) #take top top_genes_num
+  res = genes_vec_enrichment(genes = top,background = rownames(gep_scores),homer = T,title = 
+                    i,silent = T,return_all = T,custom_pathways  = all_pathways)
+   
+ print(res$plt) 
+
+
+```
+
+
+```{r}
+xeno = FindVariableFeatures(object = xeno,nfeatures = 2000)
+xeno_vargenes = VariableFeatures(object = xeno)
+
+xeno_expression = FetchData(object = xeno,vars = xeno_vargenes,slot='counts')
+all_0_genes = colnames(xeno_expression)[colSums(xeno_expression==0, na.rm=TRUE)==nrow(xeno_expression)] #delete rows that have all 0
+xeno_vargenes = xeno_vargenes[!xeno_vargenes %in% all_0_genes]
+
+```
+
+
+
+# Test with expr after harmony
+```{python}
+# import numpy as np
+# import scanpy as sc
+# 
+# expr_after_harmony = sc.read_h5ad('./Data/cnmf/xeno_Harmony_NoNeg_2Kvargenes.h5ad').to_df()
+# tpm =  compute_tpm(expr_after_harmony)
+# cnmf_genes = expr_after_harmony.keys().to_list()
+# usage_by_calc = get_usage_from_score(counts=expr_after_harmony,tpm=tpm,genes=cnmf_genes,cnmf_obj=cnmf_obj,k=3)
+```
+
+# Check if original cNMF score is like the calculated score
+```{r}
+usage_by_calc = py$usage_by_calc
+usage_norm = py$usage_norm3
+cor(usage_by_calc,usage_norm)
+```
+
+# calculate score for Xeno
+```{python}
+import numpy as np
+import scanpy as sc
+xeno_expression = r.xeno_expression
+xeno_vargenes = r.xeno_vargenes
+tpm =  compute_tpm(xeno_expression)
+usage_by_calc = get_usage_from_score(counts=xeno_expression,tpm=tpm,genes=xeno_vargenes, cnmf_obj=cnmf_obj,k=3)
+```
+
+```{r}
+xeno_usage = py$usage_by_calc
+```
+
+# programs expression {.tabset}
+```{r echo=TRUE, fig.height=7, fig.width=9, results='asis'}
+
+names (xeno_usage) = c("Hypoxia","TNFa","Cell_cycle")
+#add each metagene to metadata
+for (i  in 1:ncol(xeno_usage)) {
+  metage_metadata = xeno_usage %>% dplyr::select(i)
+  xeno = AddMetaData(object = xeno,metadata = metage_metadata,col.name = names(xeno_usage)[i])
+}
+
+print_tab(plt = FeaturePlot(object = xeno,features = colnames(xeno_usage)),title = "umap expression")
+
+
+```
+
+
+
+# programs regulation {.tabset}
+```{r echo=TRUE,  results='asis'}
+metagenes_mean_compare(dataset = xeno,time.point_var = "treatment",prefix = "model",patient.ident_var = "orig.ident",pre_on = c("NT","OSI"),test = "wilcox.test",programs = c("Hypoxia","TNFa","Cell_cycle"))
+
+```
+
+```{r}
+DotPlot(object = xeno, features =  c("Hypoxia","TNFa","Cell_cycle"),group.by  = 'treatment')
+```
+
+
+
+# CC signature  {.tabset}
+
+
+```{r results='asis'}
+hallmark_name = "HALLMARK_G2M_CHECKPOINT"
+annotation = plot_genes_cor(dataset = xeno,geneIds = genesets[[hallmark_name]],height = 3)
+```
+
+```{r results='asis'}
+hallmark_name = "HALLMARK_G2M_CHECKPOINT"
+annotation = plot_genes_cor(dataset = xeno,hallmark_name = hallmark_name,num_of_clusters = 4)
+```
+
+```{r results='asis'}
+#choose clusters
+chosen_clusters = c(1,2)
+print (paste("chosen_clusters = ", chosen_clusters %>% toString()))
+
+#UMAP expression of signature
+chosen_genes = annotation[["myannotation"]] %>% dplyr::filter(cluster %in% chosen_clusters) %>% rownames() #take relevant genes
+score <- apply(xeno@assays$RNA@data[chosen_genes,],2,mean)
+xeno=AddMetaData(xeno,score,hallmark_name)
+scoresAndIndices <- getPathwayScores(xeno@assays$RNA@data, chosen_genes)
+xeno=AddMetaData(xeno,scoresAndIndices$pathwayScores,paste0(hallmark_name,"_sipsic"))
+print_tab(FeaturePlot(object = xeno, features = paste0(hallmark_name,"_sipsic")),title = "Expression")
+print_tab(FeaturePlot(object = xeno, features = hallmark_name),title = "Expression")
+```
+
+```{r echo=TRUE, results='asis'}
+
+#plot signature distribution
+cc_scores = FetchData(object = xeno,vars = "HALLMARK_G2M_CHECKPOINT")
+plt  =  ggplot(cc_scores, aes(x=HALLMARK_G2M_CHECKPOINT)) +
+  geom_density()+
+   geom_vline(
+    aes(xintercept=mean(cc_scores$HALLMARK_G2M_CHECKPOINT) + sd(cc_scores$HALLMARK_G2M_CHECKPOINT) ,color="1 SD"),
+          linetype="dashed", size=1)+
+    geom_vline(
+    aes(xintercept=mean(cc_scores$HALLMARK_G2M_CHECKPOINT) + 2*sd(cc_scores$HALLMARK_G2M_CHECKPOINT) ,color="2 SD"),
+          linetype="dashed", size=1)
+
+print_tab(plt = plt,title = "dist")
+
+# Plot assignment 
+
+cc_scores = cc_scores %>% mutate(is_cycling = if_else(condition = 
+                                          HALLMARK_G2M_CHECKPOINT > mean(HALLMARK_G2M_CHECKPOINT) 
+                                          +sd(HALLMARK_G2M_CHECKPOINT),
+                                        true = "cycling",
+                                        false = "non_cycling"))
+xeno = AddMetaData(object = xeno,metadata = cc_scores$is_cycling,col.name = "is_cycling")
+print_tab(plt = DimPlot(object = xeno,group.by = "is_cycling") , title = "assignment 1 sd")
+
+
+# cc_scores = cc_scores %>% mutate(is_cycling = if_else(condition = 
+#                                           HALLMARK_G2M_CHECKPOINT > mean(HALLMARK_G2M_CHECKPOINT) + 2*sd(cc_scores$HALLMARK_G2M_CHECKPOINT),
+#                                         true = "cycling",
+#                                         false = "non_cycling"))
+# xeno = AddMetaData(object = xeno,metadata = cc_scores$is_cycling,col.name = "is_cycling")
+# print_tab(plt = DimPlot(object = xeno,group.by = "is_cycling") , title = "assignment 2 sd")
+
+
+```
+
+
+
+
+```{r echo=TRUE, results='asis'}
+ df  = FetchData(object = xeno,vars = c("is_cycling","treatment")) %>% 
+    filter (treatment %in% c("NT","OSI")) %>% 
+    droplevels() 
+  test = fisher.test(table(df))
+    
+  library(ggstatsplot)
+
+    plt = ggbarstats(
+    df, is_cycling, treatment,
+    results.subtitle = FALSE,
+    subtitle = paste0(
+      "Fisher's exact test", ", p-value = ",
+       round(test$p.value,13))
+    )
+  
+print_tab(plt = plt,title = "fisher")
+```
+## correlation to nmf program
+```{r}
+cor_res = cor(xeno$Cell_cycle,xeno[[hallmark_name]])
+print(paste("correlation of TNFa program to", hallmark_name,":", cor_res))
+
+cor_res = cor(xeno$Cell_cycle,xeno[[paste0(hallmark_name,"_sipsic")]])
+print(paste("correlation of Cell_cycle program to", paste0(hallmark_name,"_sipsic"),":", cor_res))
+```
+
+
+# TNFa signature  {.tabset}
+
+```{r results='asis'}
+hallmark_name = "HALLMARK_TNFA_SIGNALING_VIA_NFKB"
+annotation = plot_genes_cor(dataset = xeno,hallmark_name = hallmark_name,num_of_clusters = 6)
+
+
+```
+
+
+```{r echo=TRUE, results='asis'}
+chosen_clusters = c(1,5)
+print (paste("chosen_clusters = ", chosen_clusters %>% toString()))
+
+#UMAP expression of signature
+chosen_genes = annotation[["myannotation"]] %>% dplyr::filter(cluster %in% chosen_clusters) %>% rownames() #take relevant genes
+score <- apply(xeno@assays$RNA@data[chosen_genes,],2,mean)
+xeno=AddMetaData(xeno,score,hallmark_name)
+scoresAndIndices <- getPathwayScores(xeno@assays$RNA@data, chosen_genes)
+xeno=AddMetaData(xeno,scoresAndIndices$pathwayScores,paste0(hallmark_name,"_sipsic"))
+print_tab(FeaturePlot(object = xeno, features = paste0(hallmark_name,"_sipsic")),title = "Expression")
+print_tab(FeaturePlot(object = xeno, features = hallmark_name),title = "Expression")
+```
+## correlation to nmf program
+
+```{r}
+cor_res = cor(xeno$TNFa,xeno[[hallmark_name]])
+print(paste("correlation of TNFa program to", hallmark_name,":", cor_res))
+
+cor_res = cor(xeno$TNFa,xeno[[paste0(hallmark_name,"_sipsic")]])
+print(paste("correlation of TNFa program to", paste0(hallmark_name,"_sipsic"),":", cor_res))
+```
+
+```{r echo=TRUE, results='asis'}
+cc_scores = FetchData(object = xeno,vars = hallmark_name)
+
+plt  =  ggplot(cc_scores, aes(x=HALLMARK_TNFA_SIGNALING_VIA_NFKB)) +
+  geom_density()+
+   geom_vline(
+    aes(xintercept=mean(HALLMARK_TNFA_SIGNALING_VIA_NFKB) + sd(HALLMARK_TNFA_SIGNALING_VIA_NFKB) ,color="1 SD"),
+          linetype="dashed", size=1)+
+    geom_vline(
+    aes(xintercept=mean(HALLMARK_TNFA_SIGNALING_VIA_NFKB) + 2*sd(HALLMARK_TNFA_SIGNALING_VIA_NFKB) ,color="2 SD"),
+          linetype="dashed", size=1)+
+    geom_vline(
+    aes(xintercept=mean(HALLMARK_TNFA_SIGNALING_VIA_NFKB) ,color="mean"),
+          linetype="dashed", size=1)
+
+print_tab(plt = plt,title = "dist")
+```
+
+
+
+# weighted ks test   {.tabset}
+```{r ,results='asis'}
+
+  
+ranked_list1 = gep_scores %>% select(1) %>% as_vector() %>% setNames(rownames(gep_scores)) %>% sort(decreasing = TRUE) 
+ranked_list2 = gep_scores %>% select(2) %>% as_vector() %>% setNames(rownames(gep_scores)) %>% sort(decreasing = TRUE) 
+ranked_list3 = gep_scores %>% select(3) %>% as_vector() %>% setNames(rownames(gep_scores)) %>% sort(decreasing = TRUE) 
+
+
+
+ranked_list = list("gep1" = ranked_list1, "gep2" = ranked_list2,"gep3" = ranked_list3)
+hyp_obj <- hypeR(ranked_list2, genesets_env, test="kstest", fdr=0.05, plotting=F,background = rownames(gep_scores))
+plots = hyp_dots(hyp_obj,size_by = "none")
+print_tab(plt = plots[[1]],title = "GEP 1")
+print_tab(plt = plots[[2]],title = "GEP 2")
+print_tab(plt = plots[[3]],title = "GEP 3")
+
+```
+
+```{r}
+mhyp_obj <- fgsea.wrapper(ranked_list, genesets)
+hyp_dots(mhyp_obj)
+```
+
+# APC signature  {.tabset}
+
+```{r results='asis'}
+hallmark_name = "KEGG_ANTIGEN_PROCESSING_AND_PRESENTATION"
+annotation = plot_genes_cor(dataset = xeno,hallmark_name = hallmark_name,num_of_clusters = 4,canocical = T)
+```
+
+
+```{r echo=TRUE, results='asis'}
+chosen_clusters = c(1,3)
+print (paste("chosen_clusters = ", chosen_clusters %>% toString()))
+
+#UMAP expression of signature
+chosen_genes = annotation[["myannotation"]] %>% dplyr::filter(cluster %in% chosen_clusters) %>% rownames() #take relevant genes
+score <- apply(xeno@assays$RNA@data[chosen_genes,],2,mean)
+xeno=AddMetaData(xeno,score,hallmark_name)
+scoresAndIndices <- getPathwayScores(xeno@assays$RNA@data, chosen_genes)
+xeno=AddMetaData(xeno,scoresAndIndices$pathwayScores,paste0(hallmark_name,"_sipsic"))
+print_tab(FeaturePlot(object = xeno, features = paste0(hallmark_name,"_sipsic")),title = "Expression")
+print_tab(FeaturePlot(object = xeno, features = hallmark_name),title = "Expression")
+```
+
+## correlatino to nmf
+```{r}
+cor_res = cor(xeno$TNFa,xeno[[hallmark_name]])
+print(paste("correlation of TNFa program to", hallmark_name,":", cor_res))
+
+cor_res = cor(xeno$TNFa,xeno[[paste0(hallmark_name,"_sipsic")]])
+print(paste("correlation of TNFa program to", paste0(hallmark_name,"_sipsic"),":", cor_res))
+```
+
+# Signatures regulation {.tabset}
+```{r echo=TRUE, results='asis'}
+metagenes_mean_compare(dataset = xeno,time.point_var = "treatment",prefix = "model",patient.ident_var = "orig.ident",pre_on = c("NT","OSI","res"),programs = c("TNFa","HALLMARK_TNFA_SIGNALING_VIA_NFKB","KEGG_ANTIGEN_PROCESSING_AND_PRESENTATION"))
+
+```
+   
+# intersection {.tabset}
+
+```{r results='asis'}
+top_ot = gep_scores3[order(gep_scores3[,2],decreasing = T),2,drop = F]%>% head(200) %>% rownames()
+hallmark_name = "KEGG_ANTIGEN_PROCESSING_AND_PRESENTATION"
+geneIds= genesets[[hallmark_name]]
+chosen_genes = intersect(geneIds,top_ot)
+print(chosen_genes)
+score <- apply(xeno@assays$RNA@data[chosen_genes,],2,mean)
+xeno=AddMetaData(xeno,score,paste0(hallmark_name,"intersected"))
+scoresAndIndices <- getPathwayScores(xeno@assays$RNA@data, chosen_genes)
+xeno=AddMetaData(xeno,scoresAndIndices$pathwayScores,paste0(hallmark_name,"_intersected_sipsic"))
+print_tab(FeaturePlot(object = xeno, features = paste0(hallmark_name,"_intersected_sipsic")),title = "Expression")
+print_tab(FeaturePlot(object = xeno, features = paste0(hallmark_name,"intersected")),title = "Expression")
+```
+
+```{r}
+cor_res = cor(xeno$TNFa,xeno[[paste0(hallmark_name,"intersected")]])
+print(paste("correlation of TNFa program to", paste0(hallmark_name,"intersected"),":", cor_res))
+
+```
+
+```{r}
+top_ot = gep_scores3[order(gep_scores3[,2],decreasing = T),2,drop = F]%>% head(200) %>% rownames()
+hallmark_name = "HALLMARK_TNFA_SIGNALING_VIA_NFKB"
+geneIds= genesets[[hallmark_name]]
+chosen_genes = intersect(geneIds,top_ot)
+print(chosen_genes)
+score <- apply(xeno@assays$RNA@data[chosen_genes,],2,mean)
+xeno=AddMetaData(xeno,score,paste0(hallmark_name,"intersected"))
+scoresAndIndices <- getPathwayScores(xeno@assays$RNA@data, chosen_genes)
+xeno=AddMetaData(xeno,scoresAndIndices$pathwayScores,paste0(hallmark_name,"_intersected_sipsic"))
+print_tab(FeaturePlot(object = xeno, features = paste0(hallmark_name,"_intersected_sipsic")),title = "Expression")
+print_tab(FeaturePlot(object = xeno, features = paste0(hallmark_name,"intersected")),title = "Expression")
+```
+```{r}
+cor_res = cor(xeno$TNFa,xeno[[paste0(hallmark_name,"intersected")]])
+print(paste("correlation of TNFa program to", paste0(hallmark_name,"intersected"),":", cor_res))
+
+```
+#  Norm pathways  {.tabset}
+```{r fig.width=10}
+sum_scores= xeno$HIF_targets+xeno$KEGG_ANTIGEN_PROCESSING_AND_PRESENTATION+xeno$HALLMARK_G2M_CHECKPOINT
+
+new_score = xeno$KEGG_ANTIGEN_PROCESSING_AND_PRESENTATION/ sum_scores
+xeno %<>% AddMetaData(metadata = new_score,col.name = "KEGG_ANTIGEN_PROCESSING_AND_PRESENTATION_norm")
+
+new_score = (xeno$HIF_targets/ sum_scores)%>% replace(is.na(.), 0)
+xeno %<>% AddMetaData(metadata = new_score,col.name = "HIF_targets_norm")
+
+new_score = xeno$HALLMARK_G2M_CHECKPOINT/ sum_scores
+xeno %<>% AddMetaData(metadata = new_score,col.name = "HALLMARK_G2M_norm")
+FeaturePlot(object = xeno,features = c("HALLMARK_G2M_norm", "KEGG_ANTIGEN_PROCESSING_AND_PRESENTATION_norm","HIF_targets_norm"))
+```
+
+```{r echo=TRUE, results='asis'}
+metagenes_mean_compare(dataset = xeno,time.point_var = "treatment",prefix = "model",patient.ident_var = "orig.ident",pre_on = c("NT","OSI","res"),programs = c("TNFa","HALLMARK_TNFA_SIGNALING_VIA_NFKB","KEGG_ANTIGEN_PROCESSING_AND_PRESENTATION","KEGG_ANTIGEN_PROCESSING_AND_PRESENTATION_norm"))
+
+```
+
+# program 2 clustering
+```{r}
+num_of_clusters = 7
+annotation = plot_genes_cor(dataset = xeno,hallmark_name = NULL,num_of_clusters = num_of_clusters,geneIds = top_ot)
+```
+
+# all clusters expression {.tabset}
+```{r results='asis',fig.width=14}
+for (chosen_clusters in 1:num_of_clusters) {
+  chosen_genes = annotation[["myannotation"]] %>% dplyr::filter(cluster == chosen_clusters) %>% rownames() #take relevant genes
+  # print(chosen_genes)
+  hyp_obj <- hypeR(chosen_genes, genesets_env, test = "hypergeometric", fdr=1, plotting=F,background = rownames(gep_scores))
+
+   scoresAndIndices <- getPathwayScores(xeno@assays$RNA@data, chosen_genes)
+  xeno=AddMetaData(xeno,scoresAndIndices$pathwayScores,paste0("cluster",chosen_clusters))
+
+  
+  print_tab(plt = 
+              hyp_dots(hyp_obj,size_by = "none",title = paste0("cluster",chosen_clusters))+
+              FeaturePlot(object = xeno,features = paste0("cluster",chosen_clusters)),
+            title = chosen_clusters)
+  
+  cor_res = cor(xeno$TNFa,xeno[[paste0("cluster",chosen_clusters)]])
+# print(paste("correlation of TNFa program to", paste0("cluster",chosen_clusters),":", cor_res))
+
+
+}
+
+
+```
+# correlation of all clusters
+```{r ,fig.width=14}
+for (chosen_clusters in 1:num_of_clusters) {
+  chosen_genes = annotation[["myannotation"]] %>% dplyr::filter(cluster == chosen_clusters) %>% rownames() #take relevant genes
+  cor_res = cor(xeno$TNFa,xeno[[paste0("cluster",chosen_clusters)]])
+  print(paste("correlation of TNFa program to", paste0("cluster",chosen_clusters),":", cor_res))
+
+}
+
+
+```
+# clusters 4 and 5 
+```{r fig.width=14}
+chosen_clusters = c(4,5)
+  chosen_genes = annotation[["myannotation"]] %>% dplyr::filter(cluster %in% chosen_clusters) %>% rownames() #take relevant genes
+  
+  hyp_obj <- hypeR(chosen_genes, genesets_env, test = "hypergeometric", fdr=1, plotting=F,background = rownames(gep_scores))
+
+   scoresAndIndices <- getPathwayScores(xeno@assays$RNA@data, chosen_genes)
+   score_name = paste0("cluster_", paste0(chosen_clusters, collapse = "_"))
+  xeno=AddMetaData(xeno,scoresAndIndices$pathwayScores,score_name)
+
+  hyp_dots(hyp_obj,size_by = "none")+
+    FeaturePlot(object = xeno,features = score_name)
+
+  cor_res = cor(xeno$TNFa,xeno[[score_name]])
+print(paste("correlation of TNFa program to", score_name,":", cor_res))
+```
+
+
+
+
+# Title {.tabset}
+
+
+```{r results='asis'}
+library(biomaRt)
+ensembl = useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl")
+
+for (chosen_clusters in 1:num_of_clusters) {
+  chosen_genes = annotation[["myannotation"]] %>% dplyr::filter(cluster == chosen_clusters) %>% rownames() #take relevant genes
+  genedesc <- getBM(attributes=c('external_gene_name','wikigene_description',"interpro_description"), filters = 'external_gene_name', values = chosen_genes, mart =ensembl)  
+  print_tab(genedesc,title = chosen_clusters)
+}
+
+
+```
+
+# Programs regulation {.tabset}
+```{r echo=TRUE, results='asis'}
+metagenes_mean_compare(dataset = xeno,time.point_var = "treatment",prefix = "model",patient.ident_var = "orig.ident",pre_on = c("NT","OSI","res"),programs = c("TNFa","HALLMARK_TNFA_SIGNALING_VIA_NFKB","KEGG_ANTIGEN_PROCESSING_AND_PRESENTATION","KEGG_ANTIGEN_PROCESSING_AND_PRESENTATIONintersected","cluster_4_5","cluster7"))
+
+```
+
+# HIF_targets- Hypoxia correlation  {.tabset}
+```{r echo=TRUE, fig.height=8, fig.width=6, results='asis'}
+# plot correlation for every subset of hif targets
+for (genes in list(hif_targets,xeno_cluster_3_genes,xeno_cluster_3_2_genes)) {
+  hif_targets_by_tp = FetchData(object = xeno,vars = c(genes)) %>% rowSums() %>% as.data.frame() #mean expression
+  hif_targets_by_tp[,2] = xeno$Hypoxia
+  
+  names(hif_targets_by_tp) = c("hif_targets","hypoxia_program")
+  
+  
+  
+  p1 = ggplot(hif_targets_by_tp, aes(x=hif_targets, y=hypoxia_program)) + 
+      geom_point()+
+    geom_density_2d(aes(color = ..level..)) +
+    geom_smooth(method=lm) +
+    stat_cor(method = "pearson", label.x = 20, label.y = 1.1)+
+    scale_color_viridis_c()
+  
+  p2 = ggplot(hif_targets_by_tp, aes(x=hif_targets, y=hypoxia_program)) + 
+    geom_bin2d() +
+    theme_bw()+ scale_fill_gradientn(limits=c(0,1100), breaks=seq(0, 1100, by=200), colours=c("blue","yellow","red"))+ 
+    stat_cor(method = "pearson", label.x = 20, label.y = 1.1)+
+    geom_smooth(method=lm) 
+  
+  p = ggarrange(plotlist = list(p1,p2),nrow  = 2)  
+  
+  print_tab(plt = p,title = "geom_bin2d")
+}
+
+
+```
+
+# UMAPS
+```{r fig.height=7, fig.width=10}
+hif_targets_by_tp = FetchData(object = xeno,vars = c(hif_targets)) %>% rowSums() %>% as.data.frame() #mean expression
+hif_targets_by_tp[,2] = xeno$Hypoxia
+names(hif_targets_by_tp) = c("hif_targets","hypoxia_program")
+
+high_hif_low_hypoxia_cells = hif_targets_by_tp %>% filter(hif_targets>25 & hypoxia_program < 0.2) %>% rownames()
+low_hif_high_hypoxia_cells = hif_targets_by_tp %>% filter(hif_targets<15 & hypoxia_program > 0.6) %>% rownames()
+
+hif_targets_by_tp = FetchData(object = xeno,vars = c(hif_targets)) %>% rowSums() %>% as.data.frame() #mean expression
+xeno = AddMetaData(object = xeno, metadata = hif_targets_by_tp,col.name = "HIF_targets_score")
+cells_to_highlight =  list(high_hif_low_hypoxia_cells = high_hif_low_hypoxia_cells, low_hif_high_hypoxia_cells = low_hif_high_hypoxia_cells)
+
+DimPlot(object = xeno, cells.highlight = cells_to_highlight, cols.highlight = c("red","blue"), cols = "gray", order = TRUE)
+FeaturePlot(object = xeno,features = c( "HIF_targets_score","Hypoxia","Cell_cycle" ))
+
+```
+```{r fig.height=8, fig.width=10}
+hif_hypoxia_correlated_cells = colnames(xeno) [!colnames(xeno) %in% high_hif_low_hypoxia_cells & !colnames(xeno) %in% high_hif_low_hypoxia_cells]
+hif_targets_score = FetchData(object = xeno,vars = c(hif_targets)) %>% rowSums() %>% as.data.frame() #mean expression
+hif_targets_score[,2] = xeno$Hypoxia
+names(hif_targets_score) = c("hif_targets","hypoxia_program")
+hif_targets_score  = hif_targets_score %>% mutate(type = case_when(hif_targets>25 & hypoxia_program < 0.2 ~ "high_hif_low_hypoxia",
+                                                                   hif_targets<15 & hypoxia_program > 0.6 ~ "low_hif_high_hypoxia",
+                                                                   hif_targets>25 & hypoxia_program > 0.6 ~ "high_hif_high_hypoxia",
+                                                                   hif_targets<15 & hypoxia_program <0.2 ~ "high_hif_high_hypoxia",
+                                                                   TRUE ~ "other"))
+xeno = AddMetaData(object = xeno,metadata = hif_targets_score[,"type", drop = F],col.name = "score_correlation")
+xeno = SetIdent(object = xeno,value = "score_correlation")
+DimPlot(object = xeno,group.by = "score_correlation")
+markers = FindMarkers(object = xeno, ident.1 = "high_hif_low_hypoxia",ident.2 = "high_hif_high_hypoxia",densify = T)
+```
+```{r echo=TRUE, fig.height=8, fig.width=6, results='asis'}
+updeg = markers %>% filter(p_val_adj<0.05 & avg_log2FC>0) %>% rownames()
+
+new_hif_targets = hif_targets[!hif_targets %in% updeg]
+hif_targets_by_tp = FetchData(object = xeno,vars = c(new_hif_targets)) %>% rowSums() %>% as.data.frame() #mean expression
+  hif_targets_by_tp[,2] = xeno$Hypoxia
+  
+  names(hif_targets_by_tp) = c("hif_targets","hypoxia_program")
+  
+  
+  
+  p1 = ggplot(hif_targets_by_tp, aes(x=hif_targets, y=hypoxia_program)) + 
+      geom_point()+
+    geom_density_2d(aes(color = ..level..)) +
+    geom_smooth(method=lm) +
+    stat_cor(method = "pearson", label.x = 20, label.y = 1.1)+
+    scale_color_viridis_c()
+  
+  p2 = ggplot(hif_targets_by_tp, aes(x=hif_targets, y=hypoxia_program)) + 
+    geom_bin2d() +
+    theme_bw()+ scale_fill_gradientn(limits=c(0,1100), breaks=seq(0, 1100, by=200), colours=c("blue","yellow","red"))+ 
+    stat_cor(method = "pearson", label.x = 20, label.y = 1.1)+
+    geom_smooth(method=lm) 
+  
+  p = ggarrange(plotlist = list(p1,p2),nrow  = 2)  
+  
+  print_tab(plt = p,title = "geom_bin2d")
+
+
+```
+
+
+```{r}
+upreg_hif_targets = hif_targets[hif_targets %in% updeg]
+upreg_hif_targets_expr = FetchData(object = xeno,vars = c(upreg_hif_targets)) %>% rowSums() %>% as.data.frame() #mean expression
+xeno = AddMetaData(object = xeno, metadata = upreg_hif_targets_expr,col.name = "upreg_hif_targets_score")
+FeaturePlot(object = xeno,features = "upreg_hif_targets_score")
+```
+
+
+# Calculate usage without cc in sum to 1
+```{python}
+import numpy as np
+import scanpy as sc
+xeno_expression = r.xeno_expression
+xeno_vargenes = r.xeno_vargenes
+tpm =  compute_tpm(xeno_expression)
+usage_by_calc = get_usage_from_score(counts=xeno_expression,tpm=tpm,genes=xeno_vargenes, cnmf_obj=cnmf_obj,k=3,sumTo1=False)
+```
+
+```{r}
+all_metagenes_noSumTo1 = py$usage_by_calc
+tnf_and_hypoxia = all_metagenes_noSumTo1[,1:2]
+tnf_and_hypoxia = apply(X = tnf_and_hypoxia, MARGIN = 1, sum_2_one) %>% t() %>%  as.data.frame()
+tnf_and_hypoxia[is.na(tnf_and_hypoxia)] <- 0 #replace NAN's with 0.
+```
+
+```{r echo=TRUE, fig.height=8, fig.width=6, results='asis'}
+# plot correlation for every subset of hif targets
+for (genes in list(hif_targets,xeno_cluster_3_genes,xeno_cluster_3_2_genes)) {
+  hif_targets_by_tp = FetchData(object = xeno,vars = c(genes)) %>% rowSums() %>% as.data.frame() #mean expression
+  hif_targets_by_tp[,2] = tnf_and_hypoxia[,1]
+  # hif_targets_by_tp[,2] = xeno$Hypoxia
+  
+  names(hif_targets_by_tp) = c("hif_targets","hypoxia_program")
+  
+  
+  
+  p1 = ggplot(hif_targets_by_tp, aes(x=hif_targets, y=hypoxia_program)) + 
+      geom_point()+
+    geom_density_2d(aes(color = ..level..)) +
+    geom_smooth(method=lm) +
+    stat_cor(method = "pearson", label.x = 20, label.y = 1.1)+
+    scale_color_viridis_c()
+  
+  p2 = ggplot(hif_targets_by_tp, aes(x=hif_targets, y=hypoxia_program)) + 
+    geom_bin2d() +
+    theme_bw()+ scale_fill_gradientn(limits=c(0,1100), breaks=seq(0, 1100, by=200), colours=c("blue","yellow","red"))+ 
+    stat_cor(method = "pearson", label.x = 20, label.y = 1.1)+
+    geom_smooth(method=lm) 
+  
+  p = ggarrange(plotlist = list(p1,p2),nrow  = 2)  
+  
+  print_tab(plt = p,title = "geom_bin2d")
+}
+
+
+```
+
+# UMAPS
+```{r fig.height=6, fig.width=8}
+hif_targets_by_tp = FetchData(object = xeno,vars = c(hif_targets)) %>% rowSums() %>% as.data.frame() #mean expression
+hif_targets_by_tp[,2] = tnf_and_hypoxia[,1]
+names(hif_targets_by_tp) = c("hif_targets","hypoxia_program")
+
+high_hif_low_hypoxia_cells = hif_targets_by_tp %>% filter(hif_targets>25 & hypoxia_program < 0.2) %>% rownames()
+
+hif_targets_by_tp = FetchData(object = xeno,vars = c(hif_targets)) %>% rowSums() %>% as.data.frame() #mean expression
+xeno = AddMetaData(object = xeno, metadata = hif_targets_by_tp,col.name = "HIF_targets_score")
+xeno = AddMetaData(object = xeno, metadata = tnf_and_hypoxia[,1],col.name = "Hypoxia2")
+
+DimPlot(object = xeno, cells.highlight = high_hif_low_hypoxia_cells, cols.highlight = "red", cols = "gray", order = TRUE)
+FeaturePlot(object = xeno,features = c( "HIF_targets_score","Hypoxia2","Cell_cycle" ))
+FeaturePlot(object = xeno,features = c("Hypoxia2"))
+DimPlot(object = xeno,group.by = "orig.ident")
+
+```
+
+# Hypoxia raw
+```{r fig.height=8, fig.width=10}
+xeno = AddMetaData(object = xeno,metadata = all_metagenes_noSumTo1[,1],col.name = "hypoxia_raw")
+FeaturePlot(object = xeno,features = "hypoxia_raw") + scale_color_gradientn(colours = rainbow(5), limits = c(0, 3000))
+```
+
+
+
+<script src="https://hypothes.is/embed.js" async></script>

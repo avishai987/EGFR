@@ -1,0 +1,257 @@
+---
+title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: FALSE
+    number_sections: true
+    toc_depth: 1
+---
+
+
+
+# Functions
+
+```{r warning=FALSE}
+```
+
+# Data
+
+```{r}
+genesets <- msigdb_download("Homo sapiens",category="H") %>% append( msigdb_download("Homo sapiens",category="C2",subcategory = "CP:KEGG"))
+xeno_bulk = read.table(
+  file = "/sci/labs/yotamd/lab_share/avishai.wizel/R_projects/EGFR/Data/osiRoxa_bulk/Oct23/03.Result_X202SC23082844-Z01-F001_Homo_sapiens/Result_X202SC23082844-Z01-F001_Homo_sapiens/3.Quant/1.Count/gene_fpkm.xls",
+  sep = "\t",
+  header = TRUE
+)
+rownames(xeno_bulk) = make.unique(xeno_bulk[,"gene_name",drop=T])
+xeno_bulk = xeno_bulk[,26:37]
+
+```
+
+```{r}
+cell.labels = names(xeno_bulk)
+condition = str_extract(cell.labels, "osi|combo|ctrl|roxa")
+metadata = data.frame(condition = condition, row.names = colnames(xeno_bulk))
+```
+
+```{r}
+library(DESeq2)
+dds <- DESeqDataSetFromMatrix(countData = round(xeno_bulk),
+                              colData = metadata,
+                              design = ~condition)
+```
+
+
+# PCA
+```{r}
+nrow(dds)
+dds1 <- dds[ rowSums(counts(dds)) >= 3, ]
+nrow(dds1)
+```
+
+```{r}
+vst = vst(dds, blind=FALSE)
+```
+
+```{r}
+library("ggfortify")
+PCAdata <- prcomp(t(assay(vst)))
+autoplot(PCAdata, data = metadata,colour = "condition",label = FALSE, main="PCA") # Show dots
+
+```
+# DESeq
+```{r}
+dds <- DESeq(dds)
+dds_xeno = dds
+
+```
+```{r}
+dds = dds_xeno
+```
+
+
+
+# Top variable genes heatmap
+```{r}
+genes <- head(order(rowVars(assay(dds)), decreasing = TRUE), 1000)
+
+mat <- xeno_bulk[ genes, ]
+mat <- t(scale(t(mat)))
+anno <- as.data.frame(mat)
+
+library(ComplexHeatmap) 
+library(ggplot2) 
+Heatmap(mat, cluster_rows = T, cluster_columns = F, column_labels = colnames(anno), name = "fpkm Z-score",row_names_gp = gpar(fontsize = 0)) 
+```
+
+# DEG {.tabset}
+```{r}
+cpVSop <- results(dds,contrast = c("condition","combo","osi"))  %>% as.data.frame()
+roxaVSctrl <- results(dds,contrast = c("condition","roxa","ctrl"))  %>% as.data.frame()
+diff_genes = data.frame(row.names = rownames(cpVSop), cpVSop_FC = cpVSop$log2FoldChange,roxaVSctrl_FC = roxaVSctrl$log2FoldChange,  cpVSop_padj = cpVSop$padj)
+```
+
+```{r results='asis'}
+library(DT)
+combo_vs_ctrl = results(dds,contrast = c("condition","combo","ctrl"))  %>% as.data.frame()
+roxa_vs_ctrl = results(dds,contrast = c("condition","roxa","ctrl"))  %>% as.data.frame()
+osi_vs_ctrl = results(dds,contrast = c("condition","osi","ctrl"))  %>% as.data.frame()
+
+combo_vs_roxa = results(dds,contrast = c("condition","combo","roxa"))  %>% as.data.frame()
+osi_vs_roxa = results(dds,contrast = c("condition","osi","roxa"))  %>% as.data.frame()
+combo_vs_osi <- results(dds,contrast = c("condition","combo","osi"))  %>% as.data.frame()
+
+dt1 = datatable(roxa_vs_ctrl %>% filter(padj <0.1)  ,caption = "significant roxa VS ctrl")
+dt2= datatable(combo_vs_ctrl %>% filter(padj <0.1),caption = "significant combo vs ctrl")
+dt3 = datatable(osi_vs_ctrl %>% filter(padj <0.1),caption = "significant osi_vs_ctrl")
+dt4 =datatable(combo_vs_roxa %>% filter(padj <0.1),caption = "significant combo_vs_roxa")
+dt5 =datatable(osi_vs_roxa %>% filter(padj <0.1),caption = "significant osi_vs_roxa")
+dt6 =datatable(combo_vs_osi %>% filter(padj <0.1),caption = "significant combo VS osi")
+print_tab(plt = dt1,title = "significant roxa VS ctrl")
+print_tab(plt = dt2,title = "significant combo vs ctrl")
+print_tab(plt = dt3,title = "significant osi VS ctrl")
+print_tab(plt = dt4,title = "significant combo VS roxa")
+print_tab(plt = dt5,title = "significant osi VS roxa")
+print_tab(plt = dt6,title = "significant combo VS osi")
+roxa_vs_ctrl["C4orf3",]
+```
+
+
+# GSEA {.tabset}
+```{r fig.height=6, fig.width=13, results='asis'}
+plot_hyper <- function(genes_df,ident.1,ident.2) {
+  genes_df = genes_df[order(genes_df$log2FoldChange, genes_df$padj, decreasing = T), ] #order by FC, ties bt padj
+  ranked_vec = genes_df[, "log2FoldChange"] %>% setNames(rownames(genes_df)) %>% na.omit() # make named vector
+  
+  hyp_obj <- hypeR_fgsea(ranked_vec, genesets, up_only = F)
+  plt = hyp_dots(hyp_obj, merge = F)
+  plt1 = plt$up + aes(size = nes) + ggtitle(paste("up in" ,ident.1))
+  plt2 = plt$dn + aes(size = abs(nes)) + ggtitle(paste("up in" ,ident.2))
+ return(plt1+plt2)
+}
+
+plot_hyper(combo_vs_ctrl,ident.1 = "combo",ident.2 = "ctrl") %>%  print_tab(title = "combo VS ctrl")
+plot_hyper(osi_vs_ctrl,ident.1 = "osi",ident.2 = "ctrl")%>%  print_tab(title = "osi VS ctrl")
+plot_hyper(combo_vs_roxa,ident.1 = "combo",ident.2 = "roxa") %>%  print_tab(title = "combo VS roxa")
+plot_hyper(osi_vs_roxa,ident.1 = "osi",ident.2 = "roxa") %>%  print_tab(title = "osi VS roxa")
+
+```
+HALLMARK_HYPOXIA genes in combo_vs_ctrl_genes
+```{r}
+genesets$HALLMARK_HYPOXIA[genesets$HALLMARK_HYPOXIA %in% combo_vs_ctrl_genes] 
+```
+
+# DEG shrinked FC {.tabset}
+```{r}
+dds$condition = relevel(dds$condition, ref = "osi")
+dds <- nbinomWaldTest(dds)
+cpVSop <- lfcShrink(dds,coef = "condition_combo_vs_osi")  %>% as.data.frame()
+
+dds$condition = relevel(dds$condition, ref = "ctrl")
+dds <- nbinomWaldTest(dds)
+roxaVSctrl <- lfcShrink(dds,coef  = "condition_roxa_vs_ctrl")  %>% as.data.frame()
+
+
+diff_genes = data.frame(row.names = rownames(cpVSop), cpVSop_FC = cpVSop$log2FoldChange,roxaVSctrl_FC = roxaVSctrl$log2FoldChange,  cpVSop_padj = cpVSop$padj)
+
+```
+
+
+```{r fig.height=6, fig.width=13,results='asis'}
+ranked_vec = diff_genes[, 1] %>% setNames(rownames(diff_genes)) %>% sort(decreasing = TRUE)
+hyp_obj <- hypeR_fgsea(ranked_vec, genesets, up_only = F)
+plt = hyp_dots(hyp_obj,merge = F)
+plt1 = plt$up+ aes(size=nes)+ggtitle("up in comboPersistor") + theme(  axis.text.y = element_text(size=10))
+plt2 = plt$dn+ aes(size=abs(nes))+ggtitle("up in osiPersistors") + theme(axis.text.y = element_text(size=10))
+print_tab(plt1+plt2,title = "cpVSop")
+
+ranked_vec = diff_genes[, 2] %>% setNames(rownames(diff_genes)) %>% sort(decreasing = TRUE)
+hyp_obj <- hypeR_fgsea(ranked_vec, genesets, up_only = F)
+plt = hyp_dots(hyp_obj,merge = F)
+plt1 = plt$up+ aes(size=nes)+ggtitle("up in roxa")
+plt2 = plt$dn+ aes(size=abs(nes))+ggtitle("up in ctrl")
+print_tab(plt1+plt2,title = "cpVSop")
+
+```
+
+# DEG in comboVSosi but not in roxaVSctrl {.tabset}
+
+```{r results='asis'}
+cpVSop <- results(dds,contrast = c("condition","combo","osi"))  %>% as.data.frame()
+roxaVSctrl <- results(dds,contrast = c("condition","roxa","ctrl"))  %>% as.data.frame()
+diff_genes = data.frame(row.names = rownames(cpVSop), cpVSop_FC = 2**cpVSop$log2FoldChange,roxaVSctrl_FC = 2**roxaVSctrl$log2FoldChange,  cpVSop_padj = cpVSop$padj)
+up_genes_df =  diff_genes %>% filter(cpVSop_FC > 2 & roxaVSctrl_FC<1.2 & cpVSop_padj<0.05) 
+down_genes_df = diff_genes %>% filter(cpVSop_FC < 0.5 & roxaVSctrl_FC>0.8 & cpVSop_padj<0.05)
+up_genes = diff_genes %>% filter(cpVSop_FC > 2 & roxaVSctrl_FC<1.2 & cpVSop_padj<0.05) %>% rownames()
+down_genes = diff_genes %>% filter(cpVSop_FC < 0.5 & roxaVSctrl_FC>0.8 & cpVSop_padj<0.1)%>% rownames()
+
+print_tab(up_genes_df,title = "up")
+print_tab(down_genes_df,title = "down")
+```
+```{r}
+cpVSop <- results(dds,contrast = c("condition","roxa","osi"))  %>% as.data.frame() %>% filter(padj<0.05)
+```
+
+# Expression heatmap {.tabset}
+
+```{r}
+# select the 50 most differentially expressed genes 
+genes <- c("DUSP6")
+mat <- xeno_bulk[ genes, ]
+mat <- t(scale(t(mat)))
+anno <- as.data.frame(mat)
+
+library(ComplexHeatmap) 
+library(ggplot2) 
+Heatmap(mat, cluster_rows = F, cluster_columns = F, column_labels = colnames(anno), name = "fpkm Z-score") 
+
+genes <- hif_targets
+mat <- xeno_bulk[genes, ] %>% filter(rowSums(across(where(is.numeric)))!=0)
+mat <- t(scale(t(mat)))
+anno <- as.data.frame(mat)
+
+ 
+Heatmap(mat, cluster_rows = T, cluster_columns = F, column_labels = colnames(anno), name = "fpkm Z-score",column_title = "HIF targets",row_names_gp = gpar(fontsize = 8)) 
+
+
+genes <- genesets$HALLMARK_G2M_CHECKPOINT
+mat <- xeno_bulk[genes, ] %>% filter(rowSums(across(where(is.numeric)))!=0)
+mat <- t(scale(t(mat)))
+anno <- as.data.frame(mat)
+
+ 
+Heatmap(mat, cluster_rows = T, cluster_columns = F, column_labels = colnames(anno), name = "fpkm Z-score",column_title = "G2M targets",row_names_gp = gpar(fontsize = 0)) 
+
+genes <- genesets$HALLMARK_HYPOXIA
+mat <- xeno_bulk[genes, ] %>% filter(rowSums(across(where(is.numeric)))!=0)
+mat <- t(scale(t(mat)))
+anno <- as.data.frame(mat)
+
+ 
+Heatmap(mat, cluster_rows = T, cluster_columns = F, column_labels = colnames(anno), name = "fpkm Z-score",column_title = "Hallmark Hypoxia",row_names_gp = gpar(fontsize = 0)) 
+
+
+```
+
+
+```{r}
+vsd <- vst(dds, blind=FALSE)
+sampleDists <- dist(t(assay(vsd)))
+library("RColorBrewer")
+sampleDistMatrix <- as.matrix(sampleDists)
+colnames(sampleDistMatrix) <- NULL
+colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows=sampleDists,
+         clustering_distance_cols=sampleDists,
+         col=colors)
+```
+
+<script src="https://hypothes.is/embed.js" async></script>
+

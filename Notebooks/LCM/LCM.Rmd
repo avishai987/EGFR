@@ -1,0 +1,729 @@
+---
+title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+author: "Avishai Wizel"
+date: '`r Sys.Date()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: FALSE
+---
+
+```{r}
+egfr.tpm <- read.delim("../../../lung_sc/LCM/egf816_tpm.txt",skip=0,header=T,sep="\t",stringsAsFactors=F,row.names=1)
+```
+
+```{r}
+source(file = "./scripts/lcm_funs.R")
+egfr.tpm = remove_lines(egfr.tpm, omit_mt = TRUE)
+egfr.tpm = change_row_names (egfr.tpm)
+egfr.tpm_seurat = create_seurat (egfr.tpm, normalize = F, logTransform = T )
+```
+
+
+
+```{r}
+egfr.tpm_seurat_filtered4 <- subset(lcm, subset = nFeature_RNA > 10000 & percent.mt < 40)
+```
+
+
+```{r}
+lcm = FindVariableFeatures(object = lcm,nfeatures = 10000)
+lcm =  ScaleData(object = lcm,features = VariableFeatures(lcm),vars.to.regress = ("nCount_RNA"))
+```
+
+
+
+## Parameters
+
+```{r warning=FALSE}
+suffix = ""
+data_to_read = "./Data/egfr.tpm_seurat_filtered_V4.RDS"
+message(basename(data_to_read))
+```
+
+
+## functions
+
+```{r warning=FALSE}
+library(stringi)
+library(reticulate)
+source_from_github(repositoy = "DEG_functions",version = "0.2.24")
+source_from_github(repositoy = "cNMF_functions",version = "0.3.58",script_name = "cnmf_function_Harmony.R")
+```
+
+## Data
+
+```{r eval=FALSE, include=FALSE}
+lcm = readRDS(data_to_read)
+```
+
+```{r}
+lcm = subset(lcm, subset = cell.origin == "Tumor")
+```
+
+
+```{r}
+lcm <- FindVariableFeatures(lcm, selection.method = "vst", nfeatures = 10000,verbose = F)
+lcm <- ScaleData(lcm, features = VariableFeatures(lcm),vars.to.regress = c("percent.mt","nFeature_RNA"),verbose = F)
+```
+
+
+```{r}
+lcm <- RunPCA(lcm, features = VariableFeatures(object = lcm),verbose = F)
+ElbowPlot(lcm)
+```
+```{r}
+lcm@meta.data[["time.point"]] <- relevel(lcm@meta.data[["time.point"]], "pre-treatment") #change factor so pre will be 1
+```
+
+```{r}
+lcm <- RunUMAP(lcm, dims = 1:7,verbose = F)
+```
+
+```{r}
+DimPlot(lcm, reduction = "umap",group.by = "time.point")
+DimPlot(lcm, reduction = "umap",group.by = "patient.ident")
+```
+
+
+
+```{r}
+suffix = "2Kvargenes"
+```
+
+```{python}
+suffix = r.suffix
+import pickle
+from cnmf import cNMF
+f = open('./Data/cnmf/cnmf_objects/models_' + suffix + '_cnmf_obj.pckl', 'rb')
+cnmf_obj = pickle.load(f)
+f.close()
+```
+
+
+
+
+```{python}
+selected_k = 3
+density_threshold = 0.1
+# cnmf_obj.consensus(k=selected_k, density_threshold=density_threshold)
+usage_norm, gep_scores, gep_tpm, topgenes = cnmf_obj.load_results(K=selected_k, density_threshold=density_threshold)
+```
+
+
+# testing xeno geps
+```{r}
+gep_scores= py$gep_scores
+# gep_scores = apply(gep_scores, MARGIN = 2, FUN = min_max_normalize)%>% as.data.frame()
+nonneg <- function(x) {
+  x[x<0] = 0
+  x
+}
+gep_scores = apply(gep_scores, MARGIN = 2, FUN = nonneg)%>% as.data.frame()
+
+gep_scores = sum2one(gep_scores)
+# gep_scores = scale(gep_scores) %>% as.data.frame()
+all_metagenes = expression_mult(gep_scores = gep_scores,dataset = lcm,top_genes = T,max_genes = F,min_max  = F)
+```
+
+```{r fig.height=6, fig.width=8}
+#Make metagene names
+for (i in 1:ncol(all_metagenes)) {
+  colnames(all_metagenes)[i] = "metagene." %>% paste0(i)
+}
+
+#add each metagene to metadata
+for (i in 1:ncol(all_metagenes)) {
+  metage_metadata = all_metagenes %>% dplyr::select(i)
+  lcm = AddMetaData(object = lcm,metadata = metage_metadata)
+}
+
+FeaturePlot(object = lcm,features = colnames(all_metagenes))
+```
+
+
+```{r}
+larger_by = 1.2
+lcm = program_assignment(dataset = lcm,larger_by = larger_by,program_names = colnames(all_metagenes))
+```   
+
+```{r}
+cell_percentage(dataset = lcm,time.point_var = "time.point")
+```
+```{r}
+DimPlot(lcm,group.by = "program.assignment",cols = c("red","green","blue","grey"))
+```
+
+# LCM ORA 
+
+```{r}
+lcm = SetIdent(object = lcm,value = "time.point")
+features = filter_features(object = lcm,ident.1 = "pre-treatment",ident.2 = "on-treatment",min.pct = 0.1)
+# features = intersect(features,VariableFeatures(lcm)[1:2000])
+  deg_df = FindMarkers(object = lcm,ident.1 = "pre-treatment",ident.2 = "on-treatment",densify = T,features = features,logfc.threshold = 
+                         1.5) %>% mutate(fdr = p.adjust(p_val,method = "fdr"))
+  
+  #add first up genes vector and background:
+  down_deg_vector = deg_df%>%
+    filter(avg_log2FC>1 & fdr<0.1) %>% #filter significant
+    rownames() #get genes
+
+  #add second up genes vector and background:
+  up_deg_vector = deg_df %>% 
+    filter(avg_log2FC<(1) & fdr<0.1) %>% #filter significant
+    rownames() #get genes
+  
+  bg = features
+
+```
+
+
+```{r}
+require(gridExtra)
+downreg  = genes_vec_enrichment(genes = down_deg_vector,background = bg,homer = T,title = "downregulated during treatment",bar_color = "indianred2",return_all = T,silent = T)
+    upreg = genes_vec_enrichment(genes = up_deg_vector,background = bg,homer = T,title = "upregulated during treatment",return_all = T,silent = T)
+  grid.arrange(downreg$plt, upreg$plt, ncol=2)
+```
+
+```{r}
+xeno = readRDS("./Data/10x_xeno_1000.Rds")
+```
+
+```{r}
+pathways_list = c("HALLMARK_HYPOXIA","HALLMARK_TNFA_SIGNALING_VIA_NFKB","HALLMARK_G2M_CHECKPOINT","HALLMARK_DNA_REPAIR")
+for (pathway in pathways_list) {
+  genesets  =GSEABase::getGmt("./Data/h.all.v7.0.symbols.pluscc.gmt")
+  geneIds= genesets[[pathway]]@geneIds
+  geneIds = intersect(geneIds, VariableFeatures(xeno)[1:5000])
+    geneIds = intersect(geneIds, rownames(xeno))
+  score <- apply(xeno@assays$RNA@data[geneIds,],2,mean)
+  xeno=AddMetaData(xeno,score,pathway)
+}
+
+```
+## xeno pathways {.tabset}
+
+
+```{r results='asis',echo=TRUE}
+programs = c("HALLMARK_TNFA_SIGNALING_VIA_NFKB","HALLMARK_HYPOXIA","HALLMARK_G2M_CHECKPOINT","HALLMARK_DNA_REPAIR")
+for (i in programs) {
+  cat("### ",i," \n")
+  print(FeaturePlot(object = xeno,features = i))
+  cat(' \n\n')
+  plot.new()
+  dev.off()
+}
+
+```
+
+```{r}
+FeaturePlot(object = xeno,features = "nCount_RNA")
+```
+
+
+```{r}
+acc = read_rds("/sci/labs/yotamd/lab_share/avishai.wizel/R_projects/ACC_pathway_scores/Data/acc_tpm_nCount_mito_no146_15k_cancercells.rds")
+```
+
+```{r}
+pathways_list = c("HALLMARK_HYPOXIA","HALLMARK_TNFA_SIGNALING_VIA_NFKB","HALLMARK_G2M_CHECKPOINT","HALLMARK_DNA_REPAIR")
+for (pathway in pathways_list) {
+  genesets  =GSEABase::getGmt("./Data/h.all.v7.0.symbols.pluscc.gmt")
+  geneIds= genesets[[pathway]]@geneIds
+  geneIds = intersect(geneIds, VariableFeatures(acc)[1:5000])
+    geneIds = intersect(geneIds, rownames(acc))
+  score <- apply(acc@assays$RNA@data[geneIds,],2,mean)
+  acc=AddMetaData(acc,score,pathway)
+}
+
+```
+## lung pathways {.tabset}
+
+
+```{r results='asis',echo=TRUE}
+programs = c("HALLMARK_TNFA_SIGNALING_VIA_NFKB","HALLMARK_HYPOXIA","HALLMARK_G2M_CHECKPOINT","HALLMARK_DNA_REPAIR")
+for (i in programs) {
+  cat("### ",i," \n")
+  print(FeaturePlot(object = acc,features = i))
+  cat(' \n\n')
+  plot.new()
+  dev.off()
+}
+```
+
+
+```{r}
+FeaturePlot(object = acc,features = "nCount_RNA")
+```
+
+
+```{r}
+pathways_list = c("HALLMARK_HYPOXIA","HALLMARK_TNFA_SIGNALING_VIA_NFKB","HALLMARK_G2M_CHECKPOINT")
+for (pathway in pathways_list) {
+  genesets  =GSEABase::getGmt("./Data/h.all.v7.0.symbols.pluscc.gmt")
+  geneIds= genesets[[pathway]]@geneIds
+  geneIds = intersect(geneIds, VariableFeatures(lcm)[1:5000])
+    geneIds = intersect(geneIds, rownames(lcm))
+  score <- apply(lcm@assays$RNA@data[geneIds,],2,mean)
+  lcm=AddMetaData(lcm,score,pathway)
+}
+
+```
+## lung pathways {.tabset}
+
+
+```{r results='asis',echo=TRUE}
+programs = c("HALLMARK_TNFA_SIGNALING_VIA_NFKB","HALLMARK_HYPOXIA","HALLMARK_G2M_CHECKPOINT")
+for (i in programs) {
+  cat("### ",i," \n")
+  print(FeaturePlot(object = lcm,features = i))
+  cat(' \n\n')
+  plot.new()
+  dev.off()
+}
+
+```
+
+
+
+```{r}
+cc_genes = c("TOP2A","MKI67","MCM6","PCNA")
+FeaturePlot(object = lung,features = cc_genes)
+```
+```{r}
+cc_genes = c("TOP2A","MKI67","MCM6","PCNA")
+FeaturePlot(object = lcm,features = cc_genes)
+```
+
+```{r}
+FeaturePlot(object = xeno,features = cc_genes)
+
+```
+
+```{r}
+tpm <- function(x) {
+	x <- x/sum(x)
+	x <- x *1e6
+	x
+}
+counts = 2**(lcm@assays[["RNA"]]@counts %>% as.matrix())-1
+counts = apply(counts, MARGIN  = 2, FUN = tpm)
+lcm_tpm_orig = CreateSeuratObject(counts = counts)
+lcm_tpm_orig = NormalizeData(lcm_tpm_orig, scale.factor = 1e6)
+lcm_tpm_orig$percent.mt = lcm$percent.mt
+lcm_tpm_orig$time.point = lcm$time.point
+lcm_tpm_orig$patient.ident = lcm$patient.ident
+```
+
+```{r}
+lcm_tpm_orig <- FindVariableFeatures(lcm_tpm_orig, selection.method = "vst", nfeatures = 15000,verbose = F)
+lcm_tpm_orig <- ScaleData(lcm_tpm_orig, features = VariableFeatures(lcm_tpm_orig),vars.to.regress = c("percent.mt","nFeature_RNA"),verbose = T)
+```
+
+
+```{r}
+lcm_tpm_orig <- RunPCA(lcm_tpm_orig, features = VariableFeatures(object = lcm_tpm_orig),verbose = F)
+ElbowPlot(lcm_tpm_orig)
+```
+```{r}
+lcm_tpm_orig@meta.data[["time.point"]] <- relevel(lcm_tpm_orig@meta.data[["time.point"]], "pre-treatment") #change factor so pre will be 1
+
+```
+
+```{r}
+lcm_tpm_orig <- RunUMAP(lcm_tpm_orig, dims = 1:7,verbose = F)
+```
+
+```{r}
+DimPlot(lcm_tpm_orig, reduction = "umap",group.by = "time.point")
+DimPlot(lcm_tpm_orig, reduction = "umap",group.by = "patient.ident")
+```
+
+
+```{r}
+pathways_list = c("HALLMARK_HYPOXIA","HALLMARK_TNFA_SIGNALING_VIA_NFKB","HALLMARK_G2M_CHECKPOINT")
+for (pathway in pathways_list) {
+  genesets  =GSEABase::getGmt("./Data/h.all.v7.0.symbols.pluscc.gmt")
+  geneIds= genesets[[pathway]]@geneIds
+  # geneIds = intersect(geneIds, VariableFeatures(lcm_tpm_orig)[1:10000])
+  
+  geneIds = intersect(geneIds, rownames(lcm_tpm_orig))
+
+  score <- apply(lcm_tpm_orig@assays$RNA@data[geneIds,],2,mean)
+  lcm_tpm_orig=AddMetaData(lcm_tpm_orig,score,pathway)
+}
+
+```
+## lung pathways {.tabset}
+
+
+```{r results='asis',echo=TRUE}
+programs = c("HALLMARK_TNFA_SIGNALING_VIA_NFKB","HALLMARK_HYPOXIA","HALLMARK_G2M_CHECKPOINT")
+for (i in programs) {
+  cat("### ",i," \n")
+  print(FeaturePlot(object = lcm_tpm_orig,features = i))
+  cat(' \n\n')
+  plot.new()
+  dev.off()
+}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+lcm = SetIdent(lcm,value = "time.point") 
+all.markers <- FindAllMarkers(object = lcm,densify = T,only.pos = TRUE)
+ all.markers %>% dplyr::group_by(cluster) %>%  dplyr::top_n(n = 10,wt =  avg_log2FC) ->top20
+```
+
+
+```{r}
+DoHeatmap(object = lcm,group.by = "time.point",features =  top20$gene)
+```
+```{r}
+gep_scores= py$gep_scores
+gep_scores = apply(gep_scores, MARGIN = 2, FUN = min_max_normalize)%>% as.data.frame()
+nonneg <- function(x) {
+  x[x<0] = 0
+  x
+}
+# gep_scores = apply(gep_scores, MARGIN = 2, FUN = nonneg)%>% as.data.frame()
+
+gep_scores = sum2one(gep_scores)
+# gep_scores = scale(gep_scores) %>% as.data.frame()
+all_metagenes = expression_mult(gep_scores = gep_scores,dataset = lcm_tpm_orig,top_genes = T,max_genes = F,min_max  = F)
+```
+
+```{r fig.height=6, fig.width=8}
+#Make metagene names
+for (i in 1:ncol(all_metagenes)) {
+  colnames(all_metagenes)[i] = "metagene." %>% paste0(i)
+}
+
+#add each metagene to metadata
+for (i in 1:ncol(all_metagenes)) {
+  metage_metadata = all_metagenes %>% dplyr::select(i)
+  lcm_tpm_orig = AddMetaData(object = lcm_tpm_orig,metadata = metage_metadata)
+}
+
+FeaturePlot(object = lcm_tpm_orig,features = colnames(all_metagenes))
+```
+
+```{r}
+larger_by = 1.2
+lcm_tpm_orig = program_assignment(dataset = lcm_tpm_orig,larger_by = larger_by,program_names = colnames(all_metagenes))
+```   
+
+```{r}
+cell_percentage(dataset = lcm_tpm_orig,time.point_var = "time.point")
+```
+
+
+```{r}
+DimPlot(lcm_tpm_orig,group.by = "program.assignment",cols = c("red","green","blue","grey"))
+```
+```{r}
+lcm_tpm_orig2 = lcm_tpm_orig
+lcm_tpm_orig$cell.origin = lcm$cell.origin
+lcm_tpm_orig = subset(lcm_tpm_orig, subset = cell.origin == "Tumor")
+```
+
+```{r}
+lcm_tpm_orig = SetIdent(object = lcm_tpm_orig,value = "time.point")
+features = filter_features(object = lcm_tpm_orig,ident.1 = "pre-treatment",ident.2 = "on-treatment",min.pct = 0.1)
+# features = intersect(features,VariableFeatures(lcm_tpm_orig)[1:30000])
+  deg_df = FindMarkers(object = lcm_tpm_orig,ident.1 = "pre-treatment",ident.2 = "on-treatment",densify = T,features = features,logfc.threshold = 
+                         0.25) %>% mutate(fdr = p.adjust(p_val,method = "fdr"))
+  
+  #add first up genes vector and background:
+  down_deg_vector = deg_df%>%
+    filter(avg_log2FC>1 & fdr<0.1) %>% #filter significant
+    rownames() #get genes
+
+  #add second up genes vector and background:
+  up_deg_vector = deg_df %>% 
+    filter(avg_log2FC<(-1) & fdr<0.1) %>% #filter significant
+    rownames() #get genes
+  
+  bg = features
+
+```
+
+
+```{r}
+require(gridExtra)
+downreg  = genes_vec_enrichment(genes = down_deg_vector,background = bg,homer = T,title = "downregulated during treatment",bar_color = "indianred2",return_all = T,silent = T)
+    upreg = genes_vec_enrichment(genes = up_deg_vector,background = bg,homer = T,title = "upregulated during treatment",return_all = T,silent = T)
+  grid.arrange(downreg$plt, upreg$plt, ncol=2)
+```
+
+```{r}
+tpm <- function(x) {
+	x <- x/sum(x)
+	x <- x *1e6
+	x
+}
+counts = 2**(lung@assays[["RNA"]]@counts %>% as.matrix())-1
+counts = apply(counts, MARGIN  = 2, FUN = tpm)
+lung_tpm_orig = CreateSeuratObject(counts = counts)
+lung_tpm_orig = NormalizeData(lung_tpm_orig)
+lung_tpm_orig$percent.mt = lung$percent.mt
+lung_tpm_orig$time.point = lung$time.point
+lung_tpm_orig$patient.ident = lung$patient.ident
+```
+
+```{r}
+lung_tpm_orig <- FindVariableFeatures(lung_tpm_orig, selection.method = "vst", nfeatures = 2000,verbose = F)
+lung_tpm_orig <- ScaleData(lung_tpm_orig, features = VariableFeatures(lung_tpm_orig),vars.to.regress = c("percent.mt","nFeature_RNA"),verbose = T)
+```
+
+
+```{r}
+lung_tpm_orig <- RunPCA(lung_tpm_orig, features = VariableFeatures(object = lung_tpm_orig),verbose = F)
+ElbowPlot(lung_tpm_orig)
+```
+
+```{r}
+lung_tpm_orig <- RunUMAP(lung_tpm_orig, dims = 1:20,verbose = F)
+```
+
+```{r}
+DimPlot(lung_tpm_orig, reduction = "umap",group.by = "time.point")
+DimPlot(lung_tpm_orig, reduction = "umap",group.by = "patient.ident")
+
+```
+
+
+```{r results='asis',echo=TRUE}
+counts = 2**(lcm@assays[["RNA"]]@counts %>% as.matrix())-1
+
+lcm_tpm = CreateSeuratObject(counts = 2**(lcm@assays[["RNA"]]@counts %>% as.matrix())-1)
+lcm_tpm$percent.mt = lcm$percent.mt
+lcm_tpm$time.point = lcm$time.point
+lcm_tpm@meta.data[["time.point"]] <- relevel(lcm_tpm@meta.data[["time.point"]], "pre-treatment") #change factor so pre will be 1
+
+lcm_tpm <- SCTransform(lcm_tpm, vars.to.regress = c("percent.mt","nCount_RNA"), verbose = T)
+```
+
+```{r}
+lcm_tpm <- RunPCA(lcm_tpm, verbose = FALSE,assay = "SCT",reduction.name = "PCA_SCT",features = VariableFeatures(lcm)[1:2000])
+ElbowPlot(lcm_tpm,reduction = "PCA_SCT")
+
+```
+```{r}
+lcm_tpm <- RunUMAP(lcm_tpm, dims = 1:10, verbose = FALSE,,assay = "SCT",reduction = "PCA_SCT")
+
+```
+
+```{r}
+DimPlot(lcm_tpm,group.by = "time.point")
+```
+```{r}
+gep_scores= py$gep_scores
+gep_scores = apply(gep_scores, MARGIN = 2, FUN = min_max_normalize)%>% as.data.frame()
+nonneg <- function(x) {
+  x[x<0] = 0
+  x
+}
+# gep_scores = apply(gep_scores, MARGIN = 2, FUN = nonneg)%>% as.data.frame()
+
+gep_scores = sum2one(gep_scores)
+# gep_scores = scale(gep_scores) %>% as.data.frame()
+all_metagenes = expression_mult2(gep_scores = gep_scores,dataset = lcm_tpm,top_genes = T,max_genes = F,min_max  = F)
+```
+
+```{r fig.height=6, fig.width=8}
+#Make metagene names
+for (i in 1:ncol(all_metagenes)) {
+  colnames(all_metagenes)[i] = "metagene." %>% paste0(i)
+}
+
+#add each metagene to metadata
+for (i in 1:ncol(all_metagenes)) {
+  metage_metadata = all_metagenes %>% dplyr::select(i)
+  lcm_tpm = AddMetaData(object = lcm_tpm,metadata = metage_metadata)
+}
+
+FeaturePlot(object = lcm_tpm,features = colnames(all_metagenes))
+```
+```{r}
+larger_by = 1.5
+lcm = program_assignment(dataset = lcm_tpm,larger_by = larger_by,program_names = colnames(all_metagenes))
+```   
+
+```{r}
+cell_percentage(dataset = lcm_tpm,time.point_var = "time.point")
+```
+```{r}
+DimPlot(lcm_tpm,group.by = "program.assignment",cols = c("red","green","blue","grey"))
+```
+
+
+```{r}
+expression_mult2<-function(gep_scores,dataset, top_genes = F,max_genes = F, z_score = F,min_max = F,sum2one = F) {
+  if (top_genes){ #for every metagene ,multiple only the top genes
+    cell_usage = data.frame(row.names =colnames(dataset)) #create empty df to store results
+    for (col_num in 1:ncol(gep_scores)) {
+      top_200 = gep_scores %>% select(col_num) %>%  arrange(desc(gep_scores[col_num])) %>% head(200)  #take top 200 rows
+      top_200 = top_200 %>% t() %>%  as.matrix()
+      expression = dataset@assays$SCT@data %>% as.matrix()
+      expression = expression[rownames(expression) %in% colnames(top_200),,drop=F]  #remove rows not in top_genes
+      top_200= top_200[,colnames(top_200) %in% rownames(expression),drop=F] #remove rows not in expression
+      expression = expression[match(colnames(top_200), rownames(expression)),] #order expression rows like gep
+      expression = 2**expression #convert from log(tpm+1) to tpm
+      expression = expression-1
+      
+      my_usage = top_200%*%expression
+      metagene = my_usage %>% t() %>% as.data.frame()
+      cell_usage = cbind(cell_usage,metagene)
+    }
+    cell_usage = cell_usage %>% setNames(colnames(gep_scores)) 
+    
+  }else if(max_genes){
+    require(NMF,quietly = T)
+    top_features = extractFeatures(object = gep_scores %>% data.matrix(),method ="max")
+    for (i in 1:length(top_features)) {
+      top_features[[i]]= rownames(gep_scores)[top_features[[i]]]
+    }
+    
+    cell_usage = data.frame(row.names =colnames(dataset)) #create empty df to store results
+    for (i in 1:ncol(gep_scores)) {
+      top = top_features[i] %>% unlist()
+      expression = dataset@assays$SCT@data %>% as.matrix()
+      top_df = gep_scores[rownames(gep_scores) %in% top,i,drop=F] %>% t() %>%  as.matrix()
+      
+      expression = expression[rownames(expression) %in% colnames(top_df),,drop=F]  #remove rows not in top_genes
+      top_df= top_df[,colnames(top_df) %in% rownames(expression),drop=F] #remove rows not in expression
+      
+      expression = expression[match(colnames(top_df), rownames(expression)),] #order expression rows like gep
+      my_usage = top_df%*%expression
+      metagene = my_usage %>% t() %>% as.data.frame()
+      cell_usage = cbind(cell_usage,metagene)
+    }
+    cell_usage = cell_usage %>% setNames(colnames(gep_scores)) 
+    
+    
+  }else{
+    gep_scores = gep_scores  %>% t() %>%  as.matrix()
+    expression = dataset@assays$SCT@data %>% as.matrix()
+    expression = expression[rownames(expression) %in% colnames(gep_scores),] #remove rows not in gep_scores
+    gep_scores= gep_scores[,colnames(gep_scores) %in% rownames(expression)] #remove rows not in expression
+    expression = expression[match(colnames(gep_scores), rownames(expression)),] #order expression rows like gep
+    
+    cell_usage = gep_scores%*%expression #multiply 
+    cell_usage = cell_usage %>% t() %>% as.data.frame()
+  }
+  #normalize:
+  if (z_score) {
+    cell_usage = scale (cell_usage) %>% as.data.frame()
+  }
+  else if(min_max){
+    cell_usage = apply(cell_usage, MARGIN = 2, FUN = min_max_normalize)%>% as.data.frame()
+  }
+  else if(sum2one){
+    cell_usage = sum2one(cell_usage)
+  }
+  
+  return(cell_usage)
+}
+
+```
+
+```{r results='asis',echo=TRUE}
+# lung@assays[["RNA"]]@counts = (2**(lung@assays[["RNA"]]@counts %>% as.matrix()))-1 #not working
+
+lung_sc <- SCTransform(lung, vars.to.regress = c("percent.mt","nCount_RNA"), verbose = T)
+```
+
+```{r}
+lung_sc <- RunPCA(lung_sc, verbose = FALSE,assay = "SCT")
+ElbowPlot(lung_sc)
+```
+```{r}
+lung_sc <- RunUMAP(lung_sc, dims = 1:30, verbose = FALSE,assay = "SCT")
+```
+
+```{r}
+DimPlot(lung_sc,group.by = "time.point")
+DimPlot(lung_sc,group.by = "patient.ident")
+```
+```{r}
+gep_scores= py$gep_scores
+gep_scores = apply(gep_scores, MARGIN = 2, FUN = min_max_normalize)%>% as.data.frame()
+gep_scores = sum2one(gep_scores)
+# gep_scores = scale(gep_scores) %>% as.data.frame()
+all_metagenes = expression_mult2(gep_scores = gep_scores,dataset = lung,top_genes = T,max_genes = F,min_max  = F)
+```
+
+```{r fig.height=6, fig.width=8}
+#Make metagene names
+for (i in 1:ncol(all_metagenes)) {
+  colnames(all_metagenes)[i] = "metagene." %>% paste0(i)
+}
+
+#add each metagene to metadata
+for (i in 1:ncol(all_metagenes)) {
+  metage_metadata = all_metagenes %>% dplyr::select(i)
+  lung = AddMetaData(object = lung,metadata = metage_metadata)
+}
+
+FeaturePlot(object = lung,features = colnames(all_metagenes))
+```
+```{r}
+pathways_list = names(genesets)
+pathways_list = pathways_list[!pathways_list %in% c("HALLMARK_WNT_BETA_CATENIN_SIGNALING","HALLMARK_MYC_TARGETS_V1")]
+for (pathway in pathways_list) {
+  genesets  =GSEABase::getGmt("./Data/h.all.v7.0.symbols.pluscc.gmt")
+  geneIds= genesets[[pathway]]@geneIds
+  geneIds = intersect(geneIds, VariableFeatures(lung))
+  score <- apply(lung@assays$RNA@data[geneIds,],2,mean)
+  lung=AddMetaData(lung,score,pathway)
+}
+
+```
+
+
+
+## lung pathways {.tabset}
+
+
+```{r results='asis',echo=TRUE}
+programs = c("HALLMARK_TNFA_SIGNALING_VIA_NFKB","HALLMARK_HYPOXIA","HALLMARK_G2M_CHECKPOINT")
+for (i in programs) {
+  cat("### ",i," \n")
+  print(FeaturePlot(object = lung,features = i))
+  cat(' \n\n')
+  plot.new()
+  dev.off()
+}
+```
+
+```{r}
+pathway = "HALLMARK_HYPOXIA"
+genesets  =GSEABase::getGmt("./Data/h.all.v7.0.symbols.pluscc.gmt")
+  geneIds= genesets[[pathway]]@geneIds
+  
+cd_features <- list(geneIds)
+lung <- AddModuleScore(
+  object = lung,
+  features = cd_features,
+  name = 'CD_Features'
+)
+```
+
+```{r}
+FeaturePlot(object = lung,features = "CD_Features1")
+```
+

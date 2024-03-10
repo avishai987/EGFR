@@ -1,0 +1,377 @@
+---
+title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: FALSE
+    number_sections: true
+    toc_depth: 1
+---
+
+<style type="text/css">
+.main-container {
+  max-width: 85% !important;
+  margin: auto;
+}
+</style>
+
+# Functions
+
+```{r warning=FALSE}
+```
+
+# Data
+
+```{r}
+HCC827Jun23 = read.table(
+  file = "/sci/labs/yotamd/lab_share/lung_sc/bulk/RoxaOsi/Jun23/02.Bam/all_noMTGLKI_tpm.txt",
+  sep = "\t",
+  header = TRUE
+)
+rownames(HCC827Jun23) = make.unique(HCC827Jun23[,"gene_name",drop=T]) #set genes names
+HCC827Jun23 = HCC827Jun23[,8:37]
+
+
+names (HCC827Jun23) = gsub(x = names(HCC827Jun23),pattern = "op",replacement = "osiPersistors")%>% gsub(pattern = "cp",replacement = "comboPersistors") %>% gsub(pattern = ".bam",replacement = "")
+
+HCC827Jun23 = HCC827Jun23[,16:ncol(HCC827Jun23)] #take only HCC827
+
+samples_order = c("HCC827ctrl1", "HCC827ctrl2", "HCC827ctrl3", "HCC827roxa1", 
+"HCC827roxa2", "HCC827roxa3", "HCC827osi1", "HCC827osi2", "HCC827osi3", "HCC827osiPersistors1", "HCC827osiPersistors2", 
+"HCC827osiPersistors3", 
+"HCC827comboPersistors1", "HCC827comboPersistors2", "HCC827comboPersistors3"
+)
+HCC827Jun23 = HCC827Jun23[,samples_order]
+```
+
+
+```{r}
+# create metadata
+cell.labels = names(HCC827Jun23)
+condition = str_extract(cell.labels, "osiPersistors|comboPersistors|osi|ctrl|roxa")
+metadata = data.frame(condition = condition, row.names = colnames(HCC827Jun23))
+```
+
+```{r}
+library(DESeq2)
+dds <- DESeqDataSetFromMatrix(countData = round(HCC827Jun23),
+                              colData = metadata,
+                              design = ~condition)
+```
+# PCA
+```{r}
+nrow(dds)
+dds1 <- dds[ rowSums(counts(dds)) >= 3, ]
+nrow(dds1)
+```
+
+```{r}
+vst = vst(dds1, blind=FALSE)
+```
+
+```{r}
+library("ggfortify")
+PCAdata <- prcomp(t(assay(vst)))
+autoplot(PCAdata, data = metadata,colour = "condition",label = FALSE, main="PCA") # Show dots
+
+```
+#DESeq
+```{r}
+dds <- DESeq(dds)
+dds_HCC827_JUN23_TPM = dds
+```
+
+```{r}
+dds = dds_HCC827_JUN23_TPM
+```
+
+# Top variable genes heatmap
+```{r fig.height=7}
+genes <- head(order(rowVars(assay(dds)), decreasing = TRUE), 1250)
+
+mat <- HCC827Jun23[ genes, ]
+mat <- t(scale(t(mat)))
+anno <- as.data.frame(mat)
+
+library(ComplexHeatmap) 
+library(ggplot2) 
+
+split = data.frame( cluster = cutree(hclust(dist(mat)), k = 8))
+ha = rowAnnotation(cluster = as.character(split$cluster),col = list(cluster = structure(rainbow(n = 8), names=unique(split$cluster))))
+
+Heatmap(mat, cluster_rows = T, cluster_columns = F, column_labels = colnames(anno), name = "fpkm Z-score",row_names_gp = gpar(fontsize = 0),show_row_dend = T,right_annotation = ha) 
+```
+
+
+# DEG FC {.tabset}
+```{r}
+cpVSop <- results(dds,contrast = c("condition","comboPersistors","osiPersistors"))  %>% as.data.frame()
+roxaVSctrl <- results(dds,contrast = c("condition","roxa","ctrl"))  %>% as.data.frame()
+diff_genes = data.frame(row.names = rownames(cpVSop), cpVSop_FC = cpVSop$log2FoldChange,roxaVSctrl_FC = roxaVSctrl$log2FoldChange,  cpVSop_padj = cpVSop$padj)
+```
+
+
+
+```{r fig.height=6, fig.width=13, results='asis'}
+cpVSop = cpVSop[order(cpVSop$log2FoldChange, cpVSop$padj,decreasing = T),] #order by FC, ties bt padj
+ranked_vec = cpVSop[,"log2FoldChange"]%>% setNames(rownames(cpVSop)) %>% na.omit() # make named vector
+
+hyp_obj <- hypeR_fgsea(ranked_vec, genesets, up_only = F)
+plt = hyp_dots(hyp_obj,merge = F)
+plt1 = plt$up+ aes(size=nes)+ggtitle("up in comboPersistor")
+plt2 = plt$dn+ aes(size=abs(nes))+ggtitle("up in osiPersistors")
+print_tab(plt1+plt2,title = "cpVSop")
+
+
+roxaVSctrl = roxaVSctrl[order(roxaVSctrl$log2FoldChange, roxaVSctrl$padj,decreasing = T),] #order by FC, ties bt padj
+ranked_vec = roxaVSctrl[,"log2FoldChange"]%>% setNames(rownames(roxaVSctrl)) %>% na.omit()  # make named vector
+
+hyp_obj <- hypeR_fgsea(ranked_vec, genesets, up_only = F)
+plt = hyp_dots(hyp_obj,merge = F)
+plt1 = plt$up+ aes(size=nes)+ggtitle("up in roxa")
+plt2 = plt$dn+ aes(size=abs(nes))+ggtitle("up in ctrl")
+print_tab(plt1+plt2,title = "roxaVSctrl")
+```
+
+
+# DEG shrinked FC {.tabset}
+```{r}
+dds$condition = relevel(dds$condition, ref = "osiPersistors")
+dds <- nbinomWaldTest(dds)
+cpVSop <- lfcShrink(dds,coef = "condition_comboPersistors_vs_osiPersistors")  %>% as.data.frame()
+
+dds$condition = relevel(dds$condition, ref = "ctrl")
+dds <- nbinomWaldTest(dds)
+roxaVSctrl <- lfcShrink(dds,coef  = "condition_roxa_vs_ctrl")  %>% as.data.frame()
+
+
+diff_genes = data.frame(row.names = rownames(cpVSop), cpVSop_FC = cpVSop$log2FoldChange,roxaVSctrl_FC = roxaVSctrl$log2FoldChange,  cpVSop_padj = cpVSop$padj)
+
+```
+
+
+```{r fig.height=6, fig.width=13,results='asis'}
+ranked_vec = diff_genes[, 1] %>% setNames(rownames(diff_genes)) %>% sort(decreasing = TRUE)
+hyp_obj <- hypeR_fgsea(ranked_vec, genesets, up_only = F)
+plt = hyp_dots(hyp_obj,merge = F)
+plt1 = plt$up+ aes(size=nes)+ggtitle("up in comboPersistor") + theme(  axis.text.y = element_text(size=10))
+plt2 = plt$dn+ aes(size=abs(nes))+ggtitle("up in osiPersistors") + theme(axis.text.y = element_text(size=10))
+print_tab(plt1+plt2,title = "cpVSop")
+
+ranked_vec = diff_genes[, 2] %>% setNames(rownames(diff_genes)) %>% sort(decreasing = TRUE)
+hyp_obj <- hypeR_fgsea(ranked_vec, genesets, up_only = F)
+plt = hyp_dots(hyp_obj,merge = F)
+plt1 = plt$up+ aes(size=nes)+ggtitle("up in roxa")
+plt2 = plt$dn+ aes(size=abs(nes))+ggtitle("up in ctrl")
+print_tab(plt1+plt2,title = "cpVSop")
+
+```
+
+# DEG in comboVSosi but not in roxaVSctrl {.tabset}
+
+```{r}
+cpVSop <- results(dds,contrast = c("condition","comboPersistors","osiPersistors"))  %>% as.data.frame()
+roxaVSctrl <- results(dds,contrast = c("condition","roxa","ctrl"))  %>% as.data.frame()
+diff_genes = data.frame(row.names = rownames(cpVSop), cpVSop_FC = 2**cpVSop$log2FoldChange,roxaVSctrl_FC = 2**roxaVSctrl$log2FoldChange,  cpVSop_padj = cpVSop$padj)
+```
+
+```{r results='asis'}
+up_genes_df =  diff_genes %>% filter(cpVSop_FC > 2 & roxaVSctrl_FC<1.2 & cpVSop_padj<0.05) 
+down_genes_df = diff_genes %>% filter(cpVSop_FC < 0.5 & roxaVSctrl_FC>0.8 & cpVSop_padj<0.05)
+up_genes = diff_genes %>% filter(cpVSop_FC > 2 & roxaVSctrl_FC<1.2 & cpVSop_padj<0.05) %>% rownames()
+down_genes = diff_genes %>% filter(cpVSop_FC < 0.5 & roxaVSctrl_FC>0.8 & cpVSop_padj<0.1)%>% rownames()
+
+print_tab(up_genes_df,title = "up")
+print_tab(down_genes_df,title = "down")
+
+
+```
+# {-}
+
+```{r fig.height=6, fig.width=13,results='asis'}
+hyp_obj <- hypeR(up_genes, genesets, test = "hypergeometric", fdr=1, plotting=F,background = rownames(H1975Oct23))
+plt1 = hyp_dots(hyp_obj,title = "up in comboVSosi but not in roxaVSctrl")
+ 
+
+hyp_obj <- hypeR(down_genes, genesets, test = "hypergeometric", fdr=1, plotting=F,background = rownames(H1975Oct23))
+plt2 = hyp_dots(hyp_obj,title = "down in comboVSosi but not in roxaVSctrl")
+
+plt1 + plt2
+```
+```{r results='asis'}
+print_tab(data.frame(),title = "up genes in GLYCOLYSIS")
+up_genes_glyco = up_genes[up_genes %in% genesets$HALLMARK_GLYCOLYSIS]
+genes <- up_genes_glyco
+mat <- HCC827Jun23[ genes, ] %>%
+  relocate(
+    starts_with(c('HCC827ctr','HCC827roxa','HCC827osi','HCC827comboPersistors','HCC827comboPersistors')))
+mat <- t(scale(t(mat)))
+anno <- as.data.frame(mat)
+
+library(ComplexHeatmap)
+library(ggplot2)
+p = Heatmap(mat, cluster_rows = F, cluster_columns = F, column_labels = colnames(anno), name = "fpkm Z-score")
+print_tab(plt = p,title = "markers")
+```
+# Intersection HCC827 and H1975 DEG
+```{r}
+HCC827_up_genes = up_genes
+HCC827_down_genes = down_genes
+
+```
+```{r}
+intersect(HCC827_up_genes,H1975_up_genes)
+intersect(HCC827_down_genes,H1975_down_genes)
+
+```
+
+```{r}
+genes = diff_genes %>% filter(cpVSop_FC>1) %>% 
+  mutate(greater_than = ifelse(cpVSop_FC > 2*roxaVSctrl_FC, TRUE, FALSE))%>% filter(greater_than == T & cpVSop_padj<0.05) %>% rownames()
+
+mat <- HCC827Jun23[rownames(HCC827Jun23) %in% genes, ]
+mat <- t(scale(t(mat)))
+anno <- as.data.frame(mat)
+
+library(ComplexHeatmap) 
+library(ggplot2) 
+split = data.frame( cluster = cutree(hclust(dist(mat)), k = 2))
+ha = rowAnnotation(cluster = as.character(split$cluster),col = list(cluster = structure(rainbow(n = 2), names=unique(split$cluster))))
+p = Heatmap(mat, cluster_rows = T, cluster_columns = F, column_labels = colnames(anno), name = "fpkm Z-score",column_title = "up in cpVSop but not in roxaVSctrl",row_names_gp =gpar(fontsize = 0),right_annotation = ha)
+p
+```
+```{r}
+HCC827_up_genes_FC = split %>% filter(cluster == 2) %>% rownames()
+```
+
+```{r}
+intersect(HCC827_up_genes_FC, H1975_up_genes_FC)
+```
+
+# Expression heatmap {.tabset}
+
+```{r fig.height=6, results='asis'}
+genes <- c("DUSP6","MKI67","EGFR","IL11")
+mat <- HCC827Jun23[rownames(HCC827Jun23) %in%  genes, ]
+mat <- t(scale(t(mat)))
+anno <- as.data.frame(mat)
+
+library(ComplexHeatmap)
+library(ggplot2)
+p = Heatmap(mat, cluster_rows = F, cluster_columns = F, column_labels = colnames(anno), name = "fpkm Z-score")
+print_tab(plt = p,title = "markers")
+
+genes <- hif_targets
+mat <- HCC827Jun23[genes, ] %>% filter(rowSums(across(where(is.numeric)))!=0)
+mat <- t(scale(t(mat)))
+anno <- as.data.frame(mat)
+
+ 
+p = Heatmap(mat, cluster_rows = T, cluster_columns = F, column_labels = colnames(anno), name = "fpkm Z-score",column_title = "HIF targets",row_names_gp = gpar(fontsize = 8))
+
+print_tab(plt = p,title = "HIF targets")
+
+genes <- genesets$HALLMARK_G2M_CHECKPOINT
+mat <- HCC827Jun23[rownames(HCC827Jun23) %in%  genes, ] %>% filter(rowSums(across(where(is.numeric)))!=0)
+mat <- t(scale(t(mat)))
+anno <- as.data.frame(mat)
+
+ 
+p = Heatmap(mat, cluster_rows = T, cluster_columns = F, column_labels = colnames(anno), name = "fpkm Z-score",column_title = "HALLMARK_G2M_CHECKPOINT",row_names_gp =gpar(fontsize = 0)) 
+
+print_tab(plt = p,title = "HALLMARK_G2M_CHECKPOINT")
+
+genes <- genesets$HALLMARK_HYPOXIA
+mat <- HCC827Jun23[rownames(HCC827Jun23) %in% genes, ] %>% filter(rowSums(across(where(is.numeric)))!=0)
+mat <- t(scale(t(mat)))
+anno <- as.data.frame(mat)
+
+ 
+p = Heatmap(mat, cluster_rows = T, cluster_columns = F, column_labels = colnames(anno), name = "fpkm Z-score",column_title = "HALLMARK_HYPOXIA",row_names_gp =gpar(fontsize = 0)) 
+
+print_tab(plt = p,title = "HALLMARK_HYPOXIA")
+
+```
+
+# G2M heatmap
+```{r fig.height=6, results='asis'}
+genes <- genesets$HALLMARK_G2M_CHECKPOINT
+mat <- HCC827Jun23[genes, ] %>% filter(rowSums(across(where(is.numeric)))!=0)
+mat <- t(scale(t(mat)))
+anno <- as.data.frame(mat)
+
+split = data.frame( cluster = cutree(hclust(dist(mat)), k = 3))
+ha = rowAnnotation(cluster = as.character(split$cluster),col = list(cluster = structure(rainbow(n = 3), names=unique(split$cluster))))
+p = Heatmap(mat, cluster_rows = T, cluster_columns = F, column_labels = colnames(anno), name = "fpkm Z-score",column_title = "HALLMARK_G2M_CHECKPOINT",row_names_gp =gpar(fontsize = 0),right_annotation = ha)
+
+print_tab(plt = p,title = "HALLMARK_G2M_CHECKPOINT")
+
+```
+
+
+
+# Enrichment analysis {.tabset}
+```{r fig.height=7,results='asis'}
+chosen_genes = split %>% dplyr::filter(cluster == 2) %>% rownames() #take relevant genes
+hyp_obj <- hypeR(chosen_genes, genesets_wikipathways, test = "hypergeometric", fdr=1, plotting=F,background = rownames(H1975Oct23))
+p1 = hyp_dots(hyp_obj,size_by = "none",title = "cluster 2")
+chosen_genes = split %>% dplyr::filter(cluster == 3) %>% rownames() #take relevant genes
+hyp_obj <- hypeR(chosen_genes, genesets_wikipathways, test = "hypergeometric", fdr=1, plotting=F,background = rownames(H1975Oct23))
+p2 = hyp_dots(hyp_obj,size_by = "none",title = "cluster 3")
+
+wiki_p = (p1/p2)
+print_tab(plt = wiki_p,title = "wikipathways")
+
+
+chosen_genes = split %>% dplyr::filter(cluster == 2) %>% rownames() #take relevant genes
+hyp_obj <- hypeR(chosen_genes, genesets_biocarta, test = "hypergeometric", fdr=1, plotting=F,background = rownames(H1975Oct23))
+p1 = hyp_dots(hyp_obj,size_by = "none",title = "cluster 2")
+chosen_genes = split %>% dplyr::filter(cluster == 3) %>% rownames() #take relevant genes
+hyp_obj <- hypeR(chosen_genes, genesets_biocarta, test = "hypergeometric", fdr=1, plotting=F,background = rownames(H1975Oct23))
+p2 = hyp_dots(hyp_obj,size_by = "none",title = "cluster 3")
+
+wiki_p = (p1/p2)
+print_tab(plt = wiki_p,title = "biocarta")
+
+chosen_genes = split %>% dplyr::filter(cluster == 2) %>% rownames() #take relevant genes
+hyp_obj <- hypeR(chosen_genes, genesets_pid, test = "hypergeometric", fdr=1, plotting=F,background = rownames(H1975Oct23))
+p1 = hyp_dots(hyp_obj,size_by = "none",title = "cluster 2")
+chosen_genes = split %>% dplyr::filter(cluster == 3) %>% rownames() #take relevant genes
+hyp_obj <- hypeR(chosen_genes, genesets_pid, test = "hypergeometric", fdr=1, plotting=F,background = rownames(H1975Oct23))
+p2 = hyp_dots(hyp_obj,size_by = "none",title = "cluster 3")
+
+wiki_p = (p1/p2)
+print_tab(plt = wiki_p,title = "pid")
+
+chosen_genes = split %>% dplyr::filter(cluster == 2) %>% rownames() #take relevant genes
+hyp_obj <- hypeR(chosen_genes, genesets_REACTOME, test = "hypergeometric", fdr=1, plotting=F,background = rownames(H1975Oct23))
+p1 = hyp_dots(hyp_obj,size_by = "none",title = "cluster 2")
+chosen_genes = split %>% dplyr::filter(cluster == 3) %>% rownames() #take relevant genes
+hyp_obj <- hypeR(chosen_genes, genesets_REACTOME, test = "hypergeometric", fdr=1, plotting=F,background = rownames(H1975Oct23))
+p2 = hyp_dots(hyp_obj,size_by = "none",title = "cluster 3")
+
+wiki_p = (p1/p2)
+print_tab(plt = wiki_p,title = "REACTOME")
+
+```
+# Distance plot
+
+```{r}
+vsd <- vst(dds, blind=FALSE)
+sampleDists <- dist(t(assay(vsd)))
+library("RColorBrewer")
+sampleDistMatrix <- as.matrix(sampleDists)
+colnames(sampleDistMatrix) <- NULL
+colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows=sampleDists,
+         clustering_distance_cols=sampleDists,
+         col=colors)
+```
+<script src="https://hypothes.is/embed.js" async></script>
+
