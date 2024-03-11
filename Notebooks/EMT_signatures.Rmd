@@ -96,7 +96,7 @@ x_names[2] = "GSE17708\n72H_UP"
 
 
 ```{r}
-openxlsx::write.xlsx(gene_list, "../Data/EMT_pathways/pathway_genes.xlsx")
+openxlsx::write.xlsx(gene_list, "./Data/EMT_pathways/pathway_genes.xlsx")
   
 ```
 
