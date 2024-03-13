@@ -8,6 +8,10 @@ output:
 ---
 
 
+```{python}
+import scanpy as sc
+adata = sc.read("/sci/labs/yotamd/lab_share/avishai.wizel/R_projects/EGFR/Data/cnmf/xeno_Harmony_NoNeg_2Kvargenes.h5ad")
+```
 
 ## Data
 ```{r}
@@ -42,11 +46,7 @@ suffix ="2Kvargenes_normalize_total"
 print(suffix)
 print(genes_from)
 ```
-```{r}
-grid.newpage()
-draw.pairwise.venn(area1=20, area2=45,cross.area=10,
-                   category=c("Mango","Banana"),fill=c("Red","Yellow"))
-```
+
 
 ```{r}
 genes_from_list = F
@@ -83,12 +83,27 @@ gene_expression = t(as.matrix(GetAssayData(xeno,slot='counts')))
 
 
 adata <- sc$AnnData(
-  X   = gene_expression, 
+  X   = gene_expression,
   obs = xeno[[]],
   var = GetAssay(xeno)[[]]
 )
 rm(gene_expression)
 ```
+
+```{python}
+# import scanpy as sc
+# adata = r.adata
+# adata.var['highly_variable'] = adata.var['vst.variable']
+# adata.write_h5ad("./Data/xeno_counts.h5ad")
+```
+
+```{python}
+import scanpy as sc
+adata = sc.read_h5ad('./Data/xeno_counts.h5ad')
+
+```
+
+
 
 ```{python}
 # %matplotlib inline
@@ -126,7 +141,7 @@ def moe_correct_ridge(Z_orig, Z_cos, Z_corr, R, W, K, Phi_Rk, Phi_moe, lamb):
 adata = r.adata
 
 # sc.pp.normalize_per_cell(adata) 
-sc.pp.normalize_total(adata, target_sum=1e4)
+# sc.pp.normalize_total(adata, target_sum=1e4)
 adata.var['highly_variable'] = adata.var['vst.variable']
 if (not genes_from_list):
   adata = adata[:,adata.var['highly_variable']].copy()
@@ -165,6 +180,10 @@ X_corr_nonneg[X_corr_nonneg<0]= 0
 adata_corr_nonneg = adata_corr.copy()
 adata_corr_nonneg.X = X_corr_nonneg
 ```
+```{python}
+# sc.write('./Data/cnmf/xeno_Harmony_NoNeg_' + suffix +'.h5ad', adata_corr_nonneg)
+```
+
 
 ```{python}
 import scipy
@@ -172,6 +191,7 @@ import matplotlib.pyplot as plt
 import scanpy as sc
 adata_corr_nonneg = sc.read_h5ad('/sci/labs/yotamd/lab_share/avishai.wizel/R_projects/EGFR/Data/cnmf/xeno_Harmony_NoNeg_2Kvargenes.h5ad')
 ```
+
 
 ## import to seurat for plotting UMAP
 ```{r}
@@ -197,7 +217,7 @@ ElbowPlot(xeno_corr_nonneg)
 ```
 ## Run dim reduction
 ```{r results='hide',include=FALSE}
-pc2use = 1:5
+pc2use = 1:10
 xeno_corr_nonneg <- FindNeighbors(xeno_corr_nonneg, dims = pc2use)
 xeno_corr_nonneg <- FindClusters(xeno_corr_nonneg, resolution = 0.5)
 xeno_corr_nonneg <- RunUMAP(xeno_corr_nonneg, dims = pc2use)
@@ -205,18 +225,48 @@ xeno_corr_nonneg <- RunUMAP(xeno_corr_nonneg, dims = pc2use)
 ```
 
 ## UMAP after correction
+
 ```{r fig.height=4, fig.width=10}
 DimPlot(xeno_corr_nonneg, reduction = "umap",group.by = "orig.ident",shuffle = T)+
   DimPlot(xeno_corr_nonneg, reduction = "umap",group.by = "treatment",shuffle = T)
+```
+
+
+```{r fig.height=4, fig.width=10}
+DimPlot(xeno_corr_nonneg, reduction = "umap",group.by = "orig.ident",shuffle = T)+
+  DimPlot(xeno_corr_nonneg, reduction = "umap",group.by = "treatment",shuffle = T)
+```
+
+```{r fig.height=4, fig.width=10}
+DimPlot(xeno_corr_nonneg, reduction = "umap",group.by = "orig.ident",shuffle = T)+
+  DimPlot(xeno_corr_nonneg, reduction = "umap",group.by = "treatment",shuffle = T)
+```
+```{r}
+xeno_corr_nonneg <- FindClusters(xeno_corr_nonneg, resolution = 0.1)
+
+```
+
+```{r fig.height=4, fig.width=10}
+
+DimPlot(xeno_corr_nonneg, reduction = "umap",group.by = "seurat_clusters",shuffle = T)
+
+DimPlot(xeno_corr_nonneg, reduction = "umap",group.by = "orig.ident",shuffle = T)+
+  DimPlot(xeno_corr_nonneg, reduction = "umap",group.by = "treatment",shuffle = T)
+```
+
+```{r}
+ FetchData(object = xeno_corr_nonneg,vars = c("seurat_clusters","treatment"))  %>%
+  group_by(seurat_clusters, treatment) %>%
+  summarise(n = n()) %>%
+  mutate(freq = n / sum(n))
+
 ```
 
 ```{python}
 suffix
 ```
 
-```{python}
-sc.write('./Data/cnmf/xeno_Harmony_NoNeg_' + suffix +'.h5ad', adata_corr_nonneg)
-```
+
 
 cNMF:
 

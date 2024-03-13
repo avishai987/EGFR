@@ -44,7 +44,7 @@ DimPlot(xeno,group.by = "orig.ident")+ DimPlot(xeno,group.by = "treatment",shuff
 ```{python}
 from cnmf import cNMF
 import pickle
-f = open('./Data/cnmf/cnmf_objects/models_2Kvargenes_all_K_cnmf_obj.pckl', 'rb')
+f = open('/sci/labs/yotamd/lab_share/avishai.wizel/R_projects/EGFR/Data/cnmf/cnmf_objects/models_2Kvargenes_corrected_cnmf_obj.pckl', 'rb')
 cnmf_obj = pickle.load(f)
 f.close()
 ```
@@ -56,24 +56,24 @@ knitr::include_graphics(plot_path)
 ```
 
 ```{python}
-k = 5
+k = 3
 density_threshold = 0.1 
 cnmf_obj.consensus(k=k, density_threshold=density_threshold,show_clustering=True)
 usage_norm, gep_scores, _, _ = cnmf_obj.load_results(K=k, density_threshold=density_threshold)
 ```
 
 ```{r}
-usage_norm5_xeno  = py$usage_norm
-gep_scores5_xeno = py$gep_scores
+usage_norm5_xeno_corrected  = py$usage_norm
+gep_scores5_xeno_corrected = py$gep_scores
 ```
 
 ```{r}
-gep_scores = gep_scores5_xeno
-usage_norm = usage_norm5_xeno
+gep_scores = gep_scores5_xeno_corrected
+usage_norm = usage_norm5_xeno_corrected
 ```
 
 # NMF usage
-```{r fig.height=8, fig.width=12, results='asis'}
+```{r fig.height=4, fig.width=12, results='asis'}
   for (i in 1:ncol(usage_norm)) {
     metage_metadata = usage_norm %>% dplyr::select(i)
     xeno = AddMetaData(object = xeno,metadata = metage_metadata,col.name = paste0("gep",i))
@@ -91,8 +91,6 @@ usage_norm = usage_norm5_xeno
      hyp_obj <- hypeR_fgsea(ranked_vec, genesets)
        print_tab(hyp_dots(hyp_obj,title = paste("program",col))+ aes(size=nes),title = paste0("gep",col))
   }
-
-
 
 ```
 
@@ -121,16 +119,16 @@ usage_by_calc = get_usage_from_score(counts=xeno_expression,tpm=tpm,genes=xeno_v
 
 ```{r}
 xeno_5_metagenes = py$usage_by_calc
+all_metagenes = xeno_5_metagenes
 ```
 
 ```{r}
-all_metagenes = xeno_5_metagenes
-colnames(all_metagenes) = c("IFNa","immune_response", "hypoxia","cell_cycle","unknown")
+colnames(all_metagenes) = c("hypoxia","on_treatment","cell_cycle")
 
 ```
 
 # programs expression
-```{r echo=TRUE, fig.height=7, fig.width=12, results='asis'}
+```{r echo=TRUE, fig.height=4, fig.width=12, results='asis'}
 
 #add each metagene to metadata
 for (i  in 1:ncol(all_metagenes)) {
@@ -139,46 +137,77 @@ for (i  in 1:ncol(all_metagenes)) {
 }
 
 FeaturePlot(object = xeno,features = colnames(all_metagenes),ncol = 3)
-
+DimPlot(xeno,group.by = "treatment")
 
 ```
+
 # Programs dotplot
-```{r fig.width=8}
+```{r fig.width=10}
 DotPlot.2(object = xeno, features =  colnames(all_metagenes),group.by  = 'treatment',scale = T)+
   guides(size = guide_legend(title = "Cells expressing (%)"),color = guide_colorbar(title = "Average Score"))
+VlnPlot(xeno,features = colnames(all_metagenes),group.by = "orig.ident",pt.size = 0,split.by = "treatment")
 ```
-
 
 
 ```{r}
-all_pathways = list()
-for (pathway in colnames(all_metagenes)) {
-  data = FetchData(object = xeno,vars = c(pathway, "treatment", "orig.ident"))
-  all_patients = list()
-  for (patient in unique(xeno$orig.ident)) {
-    mean1 = data %>% filter(orig.ident == patient, treatment == "NT") %>% pull(1) %>% mean()
-    mean2 = data %>% filter(orig.ident == patient, treatment == "OSI") %>% pull(1) %>% mean()
-    fc =(mean1+1) / (mean2+1)
-    all_patients[[patient]] = fc
+metagenes_mean_compare.2 = function(dataset,time.point_var,prefix = "",patient.ident_var,pre_on = c("OSI","NT"),axis.text.x = 11,test = "t.test", programs = c("Hypoxia","TNFa","Cell_cycle"), with_split = T, without_split = T){
+  
+  for (metegene in programs) {
+    #create data:
+    genes_by_tp = FetchData(object = dataset,vars =  c(patient.ident_var,time.point_var,metegene)) %>% filter(treatment != "res")  %>% as.data.frame() #mean expression
+    names(genes_by_tp)[3] = "Metagene_mean"
+
+    fm <- as.formula(paste("Metagene_mean", "~", time.point_var)) #make formula to plot
+    
+    #plot and split by patient:   
+    stat.test = compare_means(formula = fm ,data = genes_by_tp,method = test,group.by = patient.ident_var,p.adjust.method = "fdr")%>% # Add pairwise comparisons p-value
+      dplyr::filter(group1 == pre_on[1] & group2 == pre_on[2])  #filter for pre vs on treatment only
+    
+    # plt = ggboxplot(genes_by_tp_forPlot, x = time.point_var, y = "Metagene_mean", color = time.point_var) + #plot
+      plt = ggplot(genes_by_tp, aes(x = orig.ident, y = Metagene_mean, fill=treatment)) +geom_split_violin(scale = 'width')+ylab(metegene)+ 
+  geom_boxplot(width = 0.25, notch = FALSE, notchwidth = .4, outlier.shape = NA, coef=0) 
+    
+    print_tab(plt = plt,title = c(metegene,"per patient")) 
+    
+  
+    
   }
-  all_pathways[[pathway]] = all_patients
 }
 
+metagenes_mean_compare.3 = function(dataset,time.point_var,prefix = "",patient.ident_var,pre_on = c("OSI","NT"),axis.text.x = 11,test = "t.test", programs = c("Hypoxia","TNFa","Cell_cycle"), with_split = T, without_split = T){
+  
+  for (metegene in programs) {
+    #create data:
+    genes_by_tp = FetchData(object = dataset,vars =  c(patient.ident_var,time.point_var,metegene)) %>% filter(treatment != "res")  %>% as.data.frame() #mean expression
+    names(genes_by_tp)[3] = "Metagene_mean"
 
-mat = as.data.frame(lapply(all_pathways, unlist))
-mat = log2(t(mat) %>% as.data.frame())
-breaks <- c(seq(-1,1,by=0.1))
-colors_for_plot <- colorRampPalette(colors = c("blue", "white", "red"))(n = length(breaks))
+    fm <- as.formula(paste("Metagene_mean", "~", time.point_var)) #make formula to plot
+    
+    #plot and split by patient:   
+    stat.test = compare_means(formula = fm ,data = genes_by_tp,method = test,group.by = patient.ident_var,p.adjust.method = "fdr")%>% # Add pairwise comparisons p-value
+      dplyr::filter(group1 == pre_on[1] & group2 == pre_on[2])  #filter for pre vs on treatment only
+    
+    # plt = ggboxplot(genes_by_tp_forPlot, x = time.point_var, y = "Metagene_mean", color = time.point_var) + #plot
+    # plt = ggplot(genes_by_tp, aes(x = orig.ident, y = Metagene_mean, fill=treatment)) +geom_split_violin(scale = 'width')+ylab(metegene)
+      plt = BiocompR::ggcraviola(data = genes_by_tp)+ylab(metegene)
 
-pheatmap::pheatmap(mat,color = colors_for_plot,breaks = breaks,display_numbers = T,main = "log2(FC) pre/on")
-
+    print_tab(plt = plt,title = c(metegene,"per patient")) 
+    
+  
+    
+  }
+}
 ```
 
 
 # NMF programs regulation  {.tabset}
 
-```{r echo=TRUE,  results='asis'}
-metagenes_mean_compare(dataset = xeno,time.point_var = "treatment",prefix = "model",patient.ident_var = "orig.ident",pre_on = c("NT","OSI"),test = "wilcox.test",programs = colnames(all_metagenes)[1:4],without_split = F)
+```{r}
+metagenes_mean_compare(dataset = xeno,time.point_var = "treatment",prefix = "model",patient.ident_var = "orig.ident",pre_on = c("NT","OSI"),test = "wilcox.test",programs = colnames(all_metagenes),without_split = F)
+```
+
+```{r echo=TRUE, fig.height=4, fig.width=7, results='asis'}
+metagenes_mean_compare.2(dataset = xeno,time.point_var = "treatment",prefix = "model",patient.ident_var = "orig.ident",pre_on = c("NT","OSI"),test = "wilcox.test",programs = colnames(all_metagenes),without_split = F)
 ```
 
 

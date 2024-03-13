@@ -27,6 +27,8 @@ newDef[146] = "        plot <- plot + scale_color_distiller(palette = cols,  dir
 DotPlot.2 <- eval(parse(text=newDef))
 ```
 
+
+
 # Data
 
 ```{r}
