@@ -80,6 +80,13 @@ usage_norm = usage_norm5_xeno
   }
   
   FeaturePlot(object = xeno,features = paste0("gep",1:ncol(usage_norm)),ncol = 3)
+  
+  for (i in 1:ncol(usage_norm)) {
+    metage_metadata = usage_norm %>% dplyr::select(i)
+    xeno_corr_nonneg = AddMetaData(object = xeno_corr_nonneg,metadata = metage_metadata,col.name = paste0("gep",i))
+  }
+  
+  FeaturePlot(object = xeno_corr_nonneg,features = paste0("gep",1:ncol(usage_norm)),ncol = 3)
 ```
 
 
@@ -125,7 +132,7 @@ xeno_5_metagenes = py$usage_by_calc
 
 ```{r}
 all_metagenes = xeno_5_metagenes
-colnames(all_metagenes) = c("IFNa","immune_response", "hypoxia","cell_cycle","unknown")
+colnames(all_metagenes) = c("IFNa_nmf","immune_response_nmf", "hypoxia_nmf","cell_cycle_nmf","unknown")
 
 ```
 
@@ -143,47 +150,39 @@ FeaturePlot(object = xeno,features = colnames(all_metagenes),ncol = 3)
 
 ```
 # Programs dotplot
-```{r fig.width=8}
+```{r fig.height=4, fig.width=10}
 DotPlot.2(object = xeno, features =  colnames(all_metagenes),group.by  = 'treatment',scale = T)+
   guides(size = guide_legend(title = "Cells expressing (%)"),color = guide_colorbar(title = "Average Score"))
 ```
 
 
 
-```{r}
-all_pathways = list()
-for (pathway in colnames(all_metagenes)) {
-  data = FetchData(object = xeno,vars = c(pathway, "treatment", "orig.ident"))
-  all_patients = list()
-  for (patient in unique(xeno$orig.ident)) {
-    mean1 = data %>% filter(orig.ident == patient, treatment == "NT") %>% pull(1) %>% mean()
-    mean2 = data %>% filter(orig.ident == patient, treatment == "OSI") %>% pull(1) %>% mean()
-    fc =(mean1+1) / (mean2+1)
-    all_patients[[patient]] = fc
-  }
-  all_pathways[[pathway]] = all_patients
-}
-
-
-mat = as.data.frame(lapply(all_pathways, unlist))
-mat = log2(t(mat) %>% as.data.frame())
-breaks <- c(seq(-1,1,by=0.1))
-colors_for_plot <- colorRampPalette(colors = c("blue", "white", "red"))(n = length(breaks))
-
-pheatmap::pheatmap(mat,color = colors_for_plot,breaks = breaks,display_numbers = T,main = "log2(FC) pre/on")
-
-```
 
 
 # NMF programs regulation  {.tabset}
 
 ```{r echo=TRUE,  results='asis'}
-metagenes_mean_compare(dataset = xeno,time.point_var = "treatment",prefix = "model",patient.ident_var = "orig.ident",pre_on = c("NT","OSI"),test = "wilcox.test",programs = colnames(all_metagenes)[1:4],without_split = F)
+metagenes_mean_compare(dataset = xeno,time.point_var = "treatment",prefix = "model",patient.ident_var = "orig.ident",pre_on = c("NT","OSI"),test = "wilcox.test",programs = colnames(all_metagenes)[1:4],without_split = T)
 ```
 
 
+```{r echo=TRUE, fig.height=4, fig.width=7, results='asis'}
+# debugonce(metagenes_mean_compare.2)
 
-# known genes score
+metagenes_mean_compare.2(dataset = xeno,time.point_var = "treatment",prefix = "model",patient.ident_var = "orig.ident",pre_on = c("NT","OSI"),test = "wilcox.test",programs = colnames(all_metagenes)[3], return_list = F)
+
+
+```
+
+
+```{r fig.height=5, fig.width=11}
+# for sup:
+plt_list = metagenes_mean_compare.2(dataset = xeno,time.point_var = "treatment",prefix = "model",patient.ident_var = "orig.ident",pre_on = c("NT","OSI"),test = "wilcox.test",programs = colnames(all_metagenes)[-c(3)],return_list =  T)
+
+ggarrange(plotlist = plt_list,common.legend = T)
+```
+
+# known genes score 
 ```{r}
 
 ranked_vec = gep_scores[,1] %>% setNames(rownames(gep_scores)) %>% sort(decreasing = TRUE) 
@@ -212,64 +211,68 @@ for (i in seq_along(gene_list)) {
 }
 
 
-
-
-
-```
-
-```{r}
-cor(xeno$immune_response, xeno$gep2_top)
-cor(xeno$immune_response, xeno$TNFa_genes)
-cor(xeno$immune_response, xeno$TNFa_le)
-cat ("\n")
-
-cor(xeno$hypoxia, xeno$hif_targets)
-cor(xeno$hypoxia, xeno$hif_le)
 ```
 
 
 
 
-
-```{r}
-
-p = DotPlot(object = xeno, features =  names(gene_list),group.by  = 'treatment',scale = T)+
-  guides(size = guide_legend(title = "Cells expressing (%)"),color = guide_colorbar(title = "Average Score"))
- p+scale_radius()
-```
+```{r }
+# scale by patient
 
 
-```{r}
+patient_var = "orig.ident"
 
-all_pathways = list()
-for (pathway in names(gene_list)) {
-  data = FetchData(object = xeno,vars = c(pathway, "treatment", "orig.ident"))
-  all_patients = list()
-  for (patient in unique(xeno$orig.ident)) {
-    mean1 = data %>% filter(orig.ident == patient, treatment == "NT") %>% pull(1) %>% mean()
-    mean2 = data %>% filter(orig.ident == patient, treatment == "OSI") %>% pull(1) %>% mean()
-    fc =(mean1+1) / (mean2+1)
-    all_patients[[patient]] = fc
-  }
-  all_pathways[[pathway]] = all_patients
+xeno = ScaleData(object = xeno,features = unlist(gene_list))
+for (i in seq_along(gene_list)) {
+  genes = gene_list[[i]]
+  genes = genes[genes %in% rownames(xeno)]
+  name = names(gene_list)[i]
+  scores = FetchData(object = xeno,vars = c(genes,patient_var))
+  scores = scores %>% mutate(r = rowMeans(dplyr::select_at(scores,vars(-contains(patient_var))))) %>% 
+    group_by_at(patient_var) %>% summarise(r = scale(r)) %>% pull(r) %>% as.data.frame()
+  xeno %<>% AddMetaData(metadata = scores,col.name = name)
+  
 }
 
 
-a = as.data.frame(lapply(all_pathways, unlist))
-a = log2(t(a) %>% as.data.frame())
-breaks <- c(seq(-1,1,by=0.05))
-colors_for_plot <- colorRampPalette(colors = c("blue", "white", "red"))(n = length(breaks)-1); colors_for_plot[20:21] = "white"
-pheatmap::pheatmap(a,color = colors_for_plot,breaks = breaks,display_numbers = T,main = "log2(FC) pre/on")
+
+```
+
+```{r fig.height=5, fig.width=11}
+plt_list = metagenes_mean_compare.2(dataset = xeno,time.point_var = "treatment",prefix = "model",patient.ident_var = "orig.ident",pre_on = c("NT","OSI"),test = "wilcox.test",programs = names(gene_list)[1:3],return_list = T)
+
+ggarrange(plotlist = plt_list,common.legend = T)
 
 ```
 
 
 
 
-```{r}
-metagenes_mean_compare(dataset = xeno,time.point_var = "treatment",prefix = "model",patient.ident_var = "orig.ident",pre_on = c("NT","OSI"),test = "wilcox.test",programs = "hif_le",without_split = F)
+# Calculate usage by counts before Harmony
+```{r echo=TRUE, results='asis'}
+# get expression with genes in cnmf input
+genes = rownames(gep_scores)
+genes = genes [genes %in% rownames(lung)]
+lung_expression = t(as.matrix(GetAssayData(lung,slot='data'))) 
+lung_expression = 2**lung_expression #convert from log2(tpm+1) to tpm
+lung_expression = lung_expression-1
+lung_expression = lung_expression[,genes] %>% as.data.frame()
+
+all_0_genes = colnames(lung_expression)[colSums(lung_expression==0, na.rm=TRUE)==nrow(lung_expression)] #delete rows that have all 0
+genes = genes[!genes %in% all_0_genes]
+lung_expression = lung_expression[,!colnames(lung_expression) %in% all_0_genes]
+gc(verbose = F)
 ```
 
+
+```{python}
+lung_expression = r.lung_expression
+genes = r.genes
+usage_by_calc = get_usage_from_score(counts=lung_expression,tpm=lung_expression,genes=genes,cnmf_obj=cnmf_obj,k=5,sumTo1=True)
+
+```
+
+sad
 
 ```{r fig.height=4, fig.width=12}
 for (model in unique(xeno$orig.ident)) {
