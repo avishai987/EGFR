@@ -58,7 +58,6 @@ lung = readRDS("./Data/lung_cancercells_withTP_onlyPatients.rds")
 lung_patients = lung$patient.ident %>% unique() %>% as.character()
 lung_patients_filtered = lung_patients[!(lung_patients %in% c("X1055new","X1099"))] # remove patients with less than 100 malignant cells
 lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
-xeno = readRDS("./Data/10x_xeno_1000.Rds")
 
 
 genesets <- msigdb_download("Homo sapiens",category="H") 
@@ -268,6 +267,7 @@ for (pathway_name in names(scoresAndIndices_xeno_TPM)) {
 ```
 
 
+
 # Xeno log2(TPM)
 ```{r}
 
@@ -347,6 +347,35 @@ breaks <- c(seq(-300,300,by=1))
 undebug(sig_heatmap)
 colors_for_plot = c(colors_for_plot1,colors_for_plot3,colors_for_plot2)
 sig_heatmap(all_patients_result  = t(final_df) %>% as.data.frame(),title = "Blue: log10(pval) up pathways during treatment in Xeno\n Red:-log10(pval) down pathways during treatment in Xeno",sign_matrix = a_sign,breaks = breaks, color = colors_for_plot)
+```
+# DE pathways
+
+```{r}
+calculatePathwayScores <- function(pathwayToScore, countsMatrix)
+{
+  pathwayName <- pathwayToScore@setName
+  print(pathwayName)
+  pathwayGenes <- pathwayToScore@geneIds
+  pathwayScoresObject <- getPathwayScores(countsMatrix, pathwayGenes) 
+  suppressWarnings(
+    if(is.na(pathwayScoresObject)){return (NA)}
+  )
+  return(pathwayScoresObject$pathwayScores)
+}
+```
+
+```{r}
+genesets <- getGmt("./Data/msigdb_pathways/h.all.v7.0.symbols.pluscc.gmt")
+genesets_cp <- getGmt("./Data/msigdb_pathways/c2.cp.v2023.2.Hs.symbols.gmt")
+genesets_h_cp = GeneSetCollection(c(genesets,genesets_cp))
+```
+
+```{r}
+# xeno = readRDS("./Data/10x_xeno_1000.Rds")
+
+pathwayScoreLists <- lapply(X = genesets_h_cp@.Data, calculatePathwayScores, xeno@assays$RNA@data%>% expm1())
+pathwayScoreLists <- pathwayScoreLists[!is.na(pathwayScoreLists)] #remove NA pathways
+pathwayScoresMatrix <- as.data.frame(do.call("rbind", pathwayScoreLists))
 ```
 
 

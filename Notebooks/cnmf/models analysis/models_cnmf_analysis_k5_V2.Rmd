@@ -19,7 +19,7 @@ output:
 
 
 ```{r warning=FALSE}
-
+xeno = readRDS("./Data/10x_xeno_1000.Rds")
 library(stringi)
 library(reticulate)
 source_from_github(repositoy = "DEG_functions",version = "0.2.53")

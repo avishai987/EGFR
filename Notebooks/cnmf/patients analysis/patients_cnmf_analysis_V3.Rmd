@@ -161,6 +161,41 @@ FeaturePlot(object = lung,features = colnames(usage_by_calc),ncol = 3)
 ```{r results='asis'}
 metagenes_mean_compare(dataset = lung,time.point_var = "time.point",prefix = "patient",patient.ident_var = "patient.ident",pre_on = c("pre-treatment","on-treatment"),test = "wilcox.test",programs = colnames(usage_by_calc)[1:5],without_split = F)
 ```
+
+```{r results='asis'}
+metagenes_mean_compare(dataset = lung,time.point_var = "time.point",prefix = "patient",patient.ident_var = "patient.ident",pre_on = c("pre-treatment","on-treatment"),test = "wilcox.test",programs = colnames(usage_by_calc)[1:5],without_split = F)
+```
+
+
+```{r }
+
+
+
+patient_var = "patient.ident"
+
+lung = ScaleData(object = lung,features = unlist(gene_list))
+for (i in seq_along(gene_list)) {
+  genes = gene_list[[i]]
+  genes = genes[genes %in% rownames(lung)]
+  name = names(gene_list)[i]
+  scores = FetchData(object = lung,vars = c(genes,patient_var))
+  scores = scores %>% mutate(r = rowMeans(dplyr::select_at(scores,vars(-contains(patient_var))))) %>% 
+    group_by_at(patient_var) %>% summarise(r = scale(r)) %>% pull(r) %>% as.data.frame()
+  lung %<>% AddMetaData(metadata = scores,col.name = name)
+  
+}
+
+
+
+
+```
+
+
+```{r results='asis'}
+metagenes_mean_compare(dataset = lung,time.point_var = "time.point",prefix = "patient",patient.ident_var = "patient.ident",pre_on = c("pre-treatment","on-treatment"),test = "wilcox.test",programs = names(gene_list),without_split = F)
+```
+
+
 ```{r fig.width=8}
 DotPlot.2(object = lung, features =  colnames(usage_by_calc)[1:5],group.by  = 'time.point',scale = T)+
   guides(size = guide_legend(title = "Cells expressing (%)"),color = guide_colorbar(title = "Average Score"))
