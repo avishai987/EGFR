@@ -30,6 +30,16 @@ source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_
 
 
 # Data
+```{r}
+lung = readRDS("./Data/lung_cancercells_withTP_onlyPatients.rds")
+lung_patients = lung$patient.ident %>% unique() %>% as.character()
+lung_patients_filtered = lung_patients[!(lung_patients %in% c("X1055new","X1099"))] # remove patients with less than 100 malignant cells
+lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
+lung$treatment = lung$time.point
+lung$orig.ident = lung$patient.ident
+
+```
+
 
 ```{r}
 genesets <- msigdb_download("Homo sapiens",category="H") %>% append( msigdb_download("Homo sapiens",category="C2",subcategory = "CP:KEGG"))
@@ -92,14 +102,16 @@ usage_norm = usage_norm5_xeno
 
 # Programs GSEA {.tabset}
 
-```{r results='asis'}
+```{r fig.height=8, fig.width=20, results='asis'}
+plt_list = list()
   for (col in seq_along(gep_scores)) {
      ranked_vec = gep_scores[,col] %>% setNames(rownames(gep_scores)) %>% sort(decreasing = TRUE) 
      hyp_obj <- hypeR_fgsea(ranked_vec, genesets)
-       print_tab(hyp_dots(hyp_obj,title = paste("program",col))+ aes(size=nes),title = paste0("gep",col))
+     p = hyp_dots(hyp_obj,title = paste("program",col))+ aes(size=nes)
+     plt_list[[col]] = p
   }
 
-
+ggarrange(plotlist = plt_list)
 
 ```
 
@@ -161,15 +173,11 @@ DotPlot.2(object = xeno, features =  colnames(all_metagenes),group.by  = 'treatm
 
 # NMF programs regulation  {.tabset}
 
-```{r echo=TRUE,  results='asis'}
-metagenes_mean_compare(dataset = xeno,time.point_var = "treatment",prefix = "model",patient.ident_var = "orig.ident",pre_on = c("NT","OSI"),test = "wilcox.test",programs = colnames(all_metagenes)[1:4],without_split = T)
-```
 
 
 ```{r echo=TRUE, fig.height=4, fig.width=7, results='asis'}
 # debugonce(metagenes_mean_compare.2)
-
-metagenes_mean_compare.2(dataset = xeno,time.point_var = "treatment",prefix = "model",patient.ident_var = "orig.ident",pre_on = c("NT","OSI"),test = "wilcox.test",programs = colnames(all_metagenes)[3], return_list = F)
+metagenes_mean_compare.2(dataset = xeno,prefix = "model",pre_on = c("NT","OSI"),test = "wilcox.test",programs = colnames(all_metagenes)[3], return_list = F)
 
 
 ```
@@ -177,7 +185,7 @@ metagenes_mean_compare.2(dataset = xeno,time.point_var = "treatment",prefix = "m
 
 ```{r fig.height=5, fig.width=11}
 # for sup:
-plt_list = metagenes_mean_compare.2(dataset = xeno,time.point_var = "treatment",prefix = "model",patient.ident_var = "orig.ident",pre_on = c("NT","OSI"),test = "wilcox.test",programs = colnames(all_metagenes)[-c(3)],return_list =  T)
+plt_list = metagenes_mean_compare.2(dataset = xeno,prefix = "model",pre_on = c("NT","OSI"),test = "wilcox.test",programs = colnames(all_metagenes)[-c(3)],return_list =  T)
 
 ggarrange(plotlist = plt_list,common.legend = T)
 ```
@@ -198,27 +206,11 @@ hyp_obj <- hypeR_fgsea(ranked_vec, genesets)
 le_genes_hif =  hyp_obj$data %>% filter(label == "HIF_targets") %>% pull("le") %>% strsplit(",") %>% unlist()
 
 
-gene_list = list(IFNa_genes = genesets$HALLMARK_INTERFERON_ALPHA_RESPONSE, TNFa_genes = genesets$HALLMARK_TNFA_SIGNALING_VIA_NFKB, hif_targets = hif_targets,E2F_genes = genesets$HALLMARK_E2F_TARGETS,gep2_top = gep_scores  %>%  arrange(desc(gep_scores[2])) %>% rownames() %>% head(200),TNFa_le = le_genes_tnfa,hif_le = le_genes_hif,IFNa_le  = le_genes_ifna)
-# xeno = ScaleData(object = xeno,features = unlist(gene_list))
-for (i in seq_along(gene_list)) {
-  genes = gene_list[[i]]
-  name = names(gene_list)[i]
-  scores = FetchData(object = xeno,vars = genes,slot = "data")  %>%  expm1()  %>%  rowMeans() #use  TPM
-    # scores = FetchData(object = xeno,vars = genes,slot = "data")  %>%  rowMeans() #use  TPM
-
-  xeno %<>% AddMetaData(metadata = scores,col.name = name)
-
-}
-
-
+gene_list = list(IFNa_genes = genesets$HALLMARK_INTERFERON_ALPHA_RESPONSE, TNFa_genes = genesets$HALLMARK_TNFA_SIGNALING_VIA_NFKB, hif_targets = hif_targets,E2F_genes = genesets$HALLMARK_E2F_TARGETS,gep2_top = gep_scores  %>%  arrange(desc(gep_scores[2])) %>% rownames() %>% head(200),IFNa_le  = le_genes_ifna,TNFa_le = le_genes_tnfa,hif_le = le_genes_hif)
 ```
-
-
-
 
 ```{r }
 # scale by patient
-
 
 patient_var = "orig.ident"
 
@@ -228,8 +220,8 @@ for (i in seq_along(gene_list)) {
   genes = genes[genes %in% rownames(xeno)]
   name = names(gene_list)[i]
   scores = FetchData(object = xeno,vars = c(genes,patient_var))
-  scores = scores %>% mutate(r = rowMeans(dplyr::select_at(scores,vars(-contains(patient_var))))) %>% 
-    group_by_at(patient_var) %>% summarise(r = scale(r)) %>% pull(r) %>% as.data.frame()
+  scores = scores %>% mutate(r = rowMeans(dplyr::select_at(scores,vars(-contains(patient_var))))) %>% # z score every patient separately 
+    group_by_at(patient_var) %>% summarise(r = scale(r)) %>% pull(r) %>% as.data.frame() 
   xeno %<>% AddMetaData(metadata = scores,col.name = name)
   
 }
@@ -237,13 +229,17 @@ for (i in seq_along(gene_list)) {
 
 
 ```
-
 ```{r fig.height=5, fig.width=11}
-plt_list = metagenes_mean_compare.2(dataset = xeno,time.point_var = "treatment",prefix = "model",patient.ident_var = "orig.ident",pre_on = c("NT","OSI"),test = "wilcox.test",programs = names(gene_list)[1:3],return_list = T)
+plt_list = metagenes_mean_compare.2(dataset = xeno,prefix = "model",pre_on = c("NT","OSI"),test = "wilcox.test",programs = names(gene_list)[1:3],return_list = T)
 
-ggarrange(plotlist = plt_list,common.legend = T)
+ggarrange(plotlist = plt_list,common.legend = T) + ggtitle("curated signatures")
 
+plt_list = metagenes_mean_compare.2(dataset = xeno,prefix = "model",pre_on = c("NT","OSI"),test = "wilcox.test",programs = names(gene_list)[6:8],return_list = T)
+
+ggarrange(plotlist = plt_list,common.legend = T)+ ggtitle("GSEA LE genes")
 ```
+
+
 
 
 
@@ -272,8 +268,38 @@ usage_by_calc = get_usage_from_score(counts=lung_expression,tpm=lung_expression,
 
 ```
 
+# known genes
+
+```{r }
+# scale by patient
+
+patient_var = "patient.ident"
+
+lung = ScaleData(object = lung,features = unlist(gene_list))
+for (i in seq_along(gene_list)) {
+  genes = gene_list[[i]]
+  genes = genes[genes %in% rownames(lung)]
+  name = names(gene_list)[i]
+  scores = FetchData(object = lung,vars = c(genes,patient_var))
+  scores = scores %>% mutate(r = rowMeans(dplyr::select_at(scores,vars(-contains(patient_var))))) %>% # z score every patient separately 
+    group_by_at(patient_var) %>% summarise(r = scale(r)) %>% pull(r) %>% as.data.frame() 
+  lung %<>% AddMetaData(metadata = scores,col.name = name)
+  
+}
 
 
+
+```
+
+```{r fig.height=5, fig.width=11}
+plt_list = metagenes_mean_compare.2(dataset = lung,,prefix = "patient",pre_on = c("pre-treatment","on-treatment"),test = "wilcox.test",programs = names(gene_list)[1:3],return_list = T)
+
+ggarrange(plotlist = plt_list,common.legend = T) + ggtitle("curated signatures")
+
+plt_list = metagenes_mean_compare.2(dataset = lung,,prefix = "patient",pre_on = c("pre-treatment","on-treatment"),test = "wilcox.test",programs = names(gene_list)[6:8],return_list = T)
+
+ggarrange(plotlist = plt_list,common.legend = T)+ ggtitle("GSEA LE genes")
+```
 <script src="https://hypothes.is/embed.js" async></script>
 
 
