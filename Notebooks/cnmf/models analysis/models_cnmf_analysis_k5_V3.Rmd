@@ -174,29 +174,7 @@ metagenes_mean_compare.2 = function(dataset,time.point_var,prefix = "",patient.i
   }
 }
 
-metagenes_mean_compare.3 = function(dataset,time.point_var,prefix = "",patient.ident_var,pre_on = c("OSI","NT"),axis.text.x = 11,test = "t.test", programs = c("Hypoxia","TNFa","Cell_cycle"), with_split = T, without_split = T){
-  
-  for (metegene in programs) {
-    #create data:
-    genes_by_tp = FetchData(object = dataset,vars =  c(patient.ident_var,time.point_var,metegene)) %>% filter(treatment != "res")  %>% as.data.frame() #mean expression
-    names(genes_by_tp)[3] = "Metagene_mean"
 
-    fm <- as.formula(paste("Metagene_mean", "~", time.point_var)) #make formula to plot
-    
-    #plot and split by patient:   
-    stat.test = compare_means(formula = fm ,data = genes_by_tp,method = test,group.by = patient.ident_var,p.adjust.method = "fdr")%>% # Add pairwise comparisons p-value
-      dplyr::filter(group1 == pre_on[1] & group2 == pre_on[2])  #filter for pre vs on treatment only
-    
-    # plt = ggboxplot(genes_by_tp_forPlot, x = time.point_var, y = "Metagene_mean", color = time.point_var) + #plot
-    # plt = ggplot(genes_by_tp, aes(x = orig.ident, y = Metagene_mean, fill=treatment)) +geom_split_violin(scale = 'width')+ylab(metegene)
-      plt = BiocompR::ggcraviola(data = genes_by_tp)+ylab(metegene)
-
-    print_tab(plt = plt,title = c(metegene,"per patient")) 
-    
-  
-    
-  }
-}
 ```
 
 
