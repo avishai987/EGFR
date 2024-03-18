@@ -382,44 +382,55 @@ rownames(pathwayScoresMatrix) = names(genesets_h_cp)
 xeno[["sipsic"]] = CreateAssayObject(counts = pathwayScoresMatrix)
 
 ```
+
 ```{r}
-xeno = SetIdent(xeno,value = "treatment")
-pathways_names = gsub(names(genesets),pattern = "_",replacement = "-")
+trace(Seurat:::FindMarkers.default,edit = T)
+untrace(Seurat:::FindMarkers.default)
+
+```
+
+```{r}
+xeno = SetIdent(xeno, value = "treatment")
+pathways_names = gsub(names(genesets), pattern = "_", replacement = "-")
 
 
 logFC_df = data.frame(row.names = pathways_names)
 fdr_df = data.frame(row.names = pathways_names)
 
 for (model in unique(xeno$orig.ident)) {
-model_data = subset(xeno,subset = orig.ident == model)
-pathway_markers = FindMarkers(object = model_data,ident.1 = "NT",ident.2 = "OSI",assay = "sipsic",slot = "counts",logfc.threshold = 0,densify = T,pseudocount.use = 0.001,features = pathways_names)
-pathway_markers$fdr<-p.adjust(p = as.vector(pathway_markers$p_val) ,method = "fdr" )
-avg_log2FC = pathway_markers[pathways_names,"avg_log2FC",drop=F]; colnames(avg_log2FC) = model
-fdr = pathway_markers[pathways_names,"fdr",drop=F]; colnames(fdr) = model
-
-logFC_df = cbind(logFC_df, avg_log2FC)
-fdr_df = cbind(fdr_df,fdr)
+  model_data = subset(xeno, subset = orig.ident == model)
+  pathway_markers = FindMarkers(
+    object = model_data,
+    ident.1 = "OSI",
+    ident.2 = "NT",
+    assay = "sipsic",
+    slot = "counts",
+    logfc.threshold = 0,
+    densify = T,
+    pseudocount.use = 0.001,
+    features = pathways_names
+  )
+  avg_log2FC = pathway_markers[pathways_names, "avg_log2FC", drop = F]
+  colnames(avg_log2FC) = model
+  pathway_markers  %<>%  dplyr::rename(fdr = p_val_adj)
+  fdr = pathway_markers[pathways_names, "fdr", drop = F]
+  colnames(fdr) = model
+  
+  logFC_df = cbind(logFC_df, avg_log2FC)
+  fdr_df = cbind(fdr_df, fdr)
 }
 
-a = apply(fdr_df, MARGIN = 2, gtools::stars.pval) %>% as.data.frame()
+fdr_df = apply(fdr_df, 1:2, \(x) format(x, digits=1)) %>% as.data.frame() #round p values 
+fdr_df[fdr_df == 0] = paste0("<",format(.Machine$double.xmin,digits = 1)) # replace p=0 with p<min float
 ```
 
 
 ```{r fig.height=7, fig.width=8}
-col_fun = circlize::colorRamp2(c(-1, 0, 1), c("green", "white", "red"))
-ComplexHeatmap::Heatmap(logFC_df, name = "mat", col = col_fun,
+col_fun = circlize::colorRamp2(c(-1, 0, 1), c("blue", "white", "red"))
+ComplexHeatmap::Heatmap(logFC_df, name = "log2FC on/pre", col = col_fun,
     cell_fun = function(j, i, x, y, width, height, fill) {
-        grid.text(signif(fdr_df[i, j],digits = 1), x, y, gp = gpar(fontsize = 8))
-}, row_names_gp = gpar(fontsize = 8))
-```
-
-
-
-
-```{r fig.height=7}
-xeno = ScaleData(object = xeno,features = pathways_names,verbose = F,assay = "sipsic")
-xeno = CombineIdent(xeno, "res.0.8", "orig.ident")
-DoHeatmap(object = xeno,assay = "sipsic",features = pathways_names,group.by = c("treatment","orig.ident"))
+        grid.text(fdr_df[i, j], x, y, gp = gpar(fontsize = 8))
+}, row_names_gp = gpar(fontsize = 8), clustering_method_rows = "average", clustering_distance_rows = "euclidean")
 ```
 
 
