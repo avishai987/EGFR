@@ -1,0 +1,196 @@
+---
+title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: FALSE
+    number_sections: true
+    toc_depth: 1
+---
+
+
+
+# Functions
+
+```{r warning=FALSE}
+library(stringi)
+library(reticulate)
+source_from_github(repositoy = "DEG_functions",version = "0.2.53")
+source_from_github(repositoy = "cNMF_functions",version = "0.4.11",script_name = "cnmf_functions_V3.R")
+source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_name = "functions.R")
+
+```
+
+# Data
+
+```{r}
+load("./Data/Bivona_scRNAseq/NI04_tumor_seurat_object.RData")
+tiss_subset_tumor2 = UpdateSeuratObject(tiss_subset_tumor2)
+tiss_subset_tumor2$treatment = tiss_subset_tumor2$analysis
+tiss_subset_tumor2@meta.data[["analysis"]] = factor(tiss_subset_tumor2$analysis, levels = c("naive", "grouped_pr","grouped_pd"))
+```
+
+```{r}
+tiss_subset_tumor2
+```
+
+calculate nmf metagenes
+```{python}
+from cnmf import cNMF
+import pickle
+f = open('./Data/cnmf/cnmf_objects/models_2Kvargenes_all_K_cnmf_obj.pckl', 'rb')
+cnmf_obj = pickle.load(f)
+f.close()
+```
+
+```{python}
+k = 5
+density_threshold = 0.1 
+_, gep_scores, _, _ = cnmf_obj.load_results(K=k, density_threshold=density_threshold)
+```
+
+# Calculate usage by counts before Harmony
+```{r echo=TRUE, results='asis'}
+# get expression with genes in cnmf input
+genes = rownames(py$gep_scores)
+genes = genes [genes %in% rownames(tiss_subset_tumor2)]
+bivona_expression = t(as.matrix(GetAssayData(tiss_subset_tumor2,slot='data'))) 
+bivona_expression = 2**bivona_expression #convert from log2(tpm+1) to tpm
+bivona_expression = bivona_expression-1
+bivona_expression = bivona_expression[,genes] %>% as.data.frame()
+
+all_0_genes = colnames(bivona_expression)[colSums(bivona_expression==0, na.rm=TRUE)==nrow(bivona_expression)] #delete rows that have all 0
+genes = genes[!genes %in% all_0_genes]
+bivona_expression = bivona_expression[,!colnames(bivona_expression) %in% all_0_genes]
+gc(verbose = F)
+```
+
+
+```{python}
+bivona_expression = r.bivona_expression
+genes = r.genes
+usage_by_calc = get_usage_from_score(counts=bivona_expression,tpm=bivona_expression,genes=genes,cnmf_obj=cnmf_obj,k=5,sumTo1=True)
+
+```
+
+```{r}
+bivona_5_metagenes = py$usage_by_calc
+```
+
+```{r}
+all_metagenes = bivona_5_metagenes
+colnames(all_metagenes) = c("IFNa_nmf","immune_response_nmf", "hypoxia_nmf","cell_cycle_nmf","unknown")
+
+```
+
+# programs expression
+```{r echo=TRUE, fig.height=7, fig.width=12, results='asis'}
+
+#add each metagene to metadata
+for (i  in 1:ncol(all_metagenes)) {
+  metagene_metadata = all_metagenes[,i,drop=F]
+  tiss_subset_tumor2 = AddMetaData(object = tiss_subset_tumor2,metadata = metagene_metadata,col.name = names(all_metagenes)[i])
+}
+
+FeaturePlot(object = tiss_subset_tumor2,features = colnames(all_metagenes),ncol = 3)+DimPlot(object = tiss_subset_tumor2,group.by = "analysis")
+
+
+```
+
+
+
+```{r}
+metagenes_violin_compare.2 = function(dataset,prefix = "",pre_on = c("OSI","NT"),axis.text.x = 11,test = "t.test", programs = c("Hypoxia","TNFa","Cell_cycle"),return_list = F,combine_patients = F){
+  plt.lst = list()
+  if(combine_patients){
+    genes_by_tp = FetchData(object = dataset,vars =  c("analysis",programs)) %>% filter(analysis %in% pre_on)  %>% as.data.frame() #mean expression
+    formula <- as.formula( paste("c(", paste(programs, collapse = ","), ")~ analysis ") )
+    
+    #plot and split by patient:   
+    stat.test = compare_means(formula = formula ,data = genes_by_tp,method = test,p.adjust.method = "fdr")%>% # Add pairwise comparisons p-value
+      dplyr::filter(group1 == pre_on[1] & group2 == pre_on[2])  #filter for pre vs on analysis only
+    
+    stat.test$p.format =stat.test$p.adj #modift 0 pvalue to be lowest possible float
+    stat.test$p.format[!stat.test$p.format == 0 ] <- paste("=",stat.test$p.format[!stat.test$p.format == 0 ])
+    stat.test$p.format[stat.test$p.format == 0 ] <- paste("<",.Machine$double.xmin %>% signif(digits = 3))
+    
+    
+    genes_by_tp = reshape2::melt(genes_by_tp, id.vars = c("analysis"),value.name = "score")
+    plt = ggplot(genes_by_tp, aes(x = variable, y = score,fill = analysis)) + geom_split_violin(scale = 'width')+ 
+      geom_boxplot(width = 0.25, notch = FALSE, notchwidth = .4, outlier.shape = NA, coef=0)+
+      ylim(min(genes_by_tp$score),max(genes_by_tp$score)*1.25)
+    plt = plt +stat_pvalue_manual(stat.test, label = "p {p.format}",  #add p value
+                                  y.position = max(genes_by_tp$score)*1.08,inherit.aes = F,size = 3.3,x = ".y.") # set position at the top value
+    return(plt)
+  }
+  
+  for (metegene in programs) {
+    #create data:
+    genes_by_tp = FetchData(object = dataset,vars =  c("orig.ident","treatment",metegene)) %>% filter(treatment %in% pre_on)  %>% as.data.frame() #mean expression
+    names(genes_by_tp)[3] = "Metagene_mean"
+    
+    fm <- as.formula(paste("Metagene_mean", "~", "treatment")) #make formula to plot
+    
+    #plot and split by patient:   
+    stat.test = compare_means(formula = fm ,data = genes_by_tp,method = test,group.by = "orig.ident",p.adjust.method = "fdr")%>% # Add pairwise comparisons p-value
+      dplyr::filter(group1 == pre_on[1] & group2 == pre_on[2])  #filter for pre vs on treatment only
+    
+    stat.test$p.format =stat.test$p.adj #modift 0 pvalue to be lowest possible float
+    stat.test$p.format[!stat.test$p.format == 0 ] <- paste("=",stat.test$p.format[!stat.test$p.format == 0 ])
+    stat.test$p.format[stat.test$p.format == 0 ] <- paste("<",.Machine$double.xmin %>% signif(digits = 3))
+    
+    plt = ggplot(genes_by_tp, aes(x = orig.ident, y = Metagene_mean,fill = treatment)) + geom_split_violin(scale = 'width')+ylab(metegene)+ 
+      geom_boxplot(width = 0.25, notch = FALSE, notchwidth = .4, outlier.shape = NA, coef=0)+
+      ylim(min(genes_by_tp$Metagene_mean),max(genes_by_tp$Metagene_mean)*1.25)
+    plt = plt +stat_pvalue_manual(stat.test, label = "p {p.format}",  #add p value
+                                  y.position = max(genes_by_tp$Metagene_mean)*1.08,x = "orig.ident",inherit.aes = F,size = 3.3) # set position at the top value
+    
+    plt.lst[[metegene]] = plt
+    if (!return_list) {
+      print(plt)
+    }
+  }
+  
+  
+  
+  
+  if (return_list) {
+    return(plt.lst)
+  }
+}
+```
+
+# NMF programs
+```{r}
+metagenes_violin_compare.2(dataset = tiss_subset_tumor2,prefix = "patient",pre_on = c("naive","grouped_pr"),test = "wilcox.test",programs = colnames(all_metagenes)[1:3], return_list = F,combine_patients = T)
+```
+```{r}
+genesets <- msigdb_download("Homo sapiens",category="H") 
+gene_list = list(IFNa_genes = genesets$HALLMARK_INTERFERON_ALPHA_RESPONSE, TNFa_genes = genesets$HALLMARK_TNFA_SIGNALING_VIA_NFKB, hif_targets = hif_targets,E2F_genes = genesets$HALLMARK_E2F_TARGETS)
+
+for (i in seq_along(gene_list)) {
+  genes = gene_list[[i]]
+  genes = genes[genes %in% rownames(tiss_subset_tumor2)]
+  name = names(gene_list)[i]
+  scores = FetchData(object = tiss_subset_tumor2,vars = c(genes))
+  scores = scores %>% rowMeans() %>% as.data.frame()
+  tiss_subset_tumor2 %<>% AddMetaData(metadata = scores,col.name = name)
+  
+}
+```
+
+# Signatures
+
+```{r}
+metagenes_violin_compare.2(dataset = tiss_subset_tumor2,prefix = "patient",pre_on = c("naive","grouped_pr"),test = "wilcox.test",programs = names(gene_list), return_list = F,combine_patients = T)
+```
+# metadata
+```{r}
+tiss_subset_tumor2@meta.data
+```
+
