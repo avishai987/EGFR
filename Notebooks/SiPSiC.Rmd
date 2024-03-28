@@ -108,7 +108,7 @@ xeno[["sipsic"]] = CreateAssayObject(counts = pathwayScoresMatrix)
 ```
 
 ```{r}
-trace(Seurat:::FindMarkers.default,edit = T)
+trace(Seurat:::FindMarkers.default,edit = T) #replace "bonferroni" with "FDR"
 untrace(Seurat:::FindMarkers.default)
 
 ```

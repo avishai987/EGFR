@@ -1,0 +1,120 @@
+---
+title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: FALSE
+    number_sections: true
+    toc_depth: 1
+---
+
+
+
+# Functions
+
+```{r warning=FALSE}
+```
+
+# Data
+
+```{r}
+cell_lines_data = read.table(
+  file = "./Data/cell_lines/cell_lines_noMTGLKI_tpm.txt",
+  sep = "\t",
+  header = TRUE
+)
+rownames(cell_lines_data) = make.unique(cell_lines_data[,"gene_name",drop=T]) #set genes names
+cell_lines_data = cell_lines_data[,8:ncol(cell_lines_data)] #remove genes info
+names(cell_lines_data) %<>% gsub(pattern = paste0("(S\\d).*$"),replacement = "\\1") # remove redundant info 
+
+```
+
+```{r}
+# create metadata
+cell.labels = names(cell_lines_data)
+cell_type = strsplit(x = cell.labels,split = "_") %>%
+  purrr::map(1) %>% # take every first element
+  unlist() 
+  
+
+condition = strsplit(x = cell.labels,split = "_") %>%
+  purrr::map(function(x) paste(c(x[[2]], x[[3]]),collapse = "_")) %>% # take every 2 and 3 elements
+  unlist() %>% gsub(pattern = "\\..*$",replacement = "")
+
+metadata = data.frame(condition = condition,cell_type = cell_type, row.names = colnames(cell_lines_data))
+```
+
+```{r}
+library(DESeq2)
+dds <- DESeqDataSetFromMatrix(countData = round(cell_lines_data),
+                              colData = metadata,
+                              design = ~cell_type+condition)
+```
+# PCA
+```{r}
+nrow(dds)
+dds1 <- dds[ rowSums(counts(dds)) >= 3, ]
+nrow(dds1)
+```
+
+```{r}
+vst = vst(dds1, blind=FALSE)
+```
+
+```{r}
+library(pals)
+pcaData <- plotPCA(vst, intgroup=c("condition", "cell_type"), returnData=TRUE)
+percentVar <- round(100 * attr(pcaData, "percentVar"))
+ggplot(pcaData, aes(PC1, PC2, color=cell_type, shape=condition)) +
+  geom_point(size=3) +
+  xlab(paste0("PC1: ",percentVar[1],"% variance")) +
+  ylab(paste0("PC2: ",percentVar[2],"% variance")) + 
+  coord_fixed()+ scale_color_manual(values=as.vector(polychrome(length(unique(cell_type))))) + theme_minimal()
+```
+```{r}
+hif_score = cell_lines_data[hif_targets,] %>% colMeans() %>% as.data.frame() %>% `colnames<-` ("HIF_TPM_mean")
+hif_score$cell_type =  strsplit(x = rownames(hif_score),split = "_") %>%
+  purrr::map(1) %>% # take every first element
+  unlist() 
+hif_score$condition = strsplit(x = rownames(hif_score),split = "_") %>%
+  purrr::map(function(x) paste(c(x[[2]], x[[3]]),collapse = "_")) %>% # take every 2 and 3 elements
+  unlist() %>% gsub(pattern = "\\..*$",replacement = "")
+```
+
+```{r fig.height=6, fig.width=8}
+hif_score$condition <- factor(hif_score$condition, levels = c("Day1_NT", "Day1_OSI","Day14_OSI"))
+
+
+ggbarplot(
+  hif_score, x = "condition", y = "HIF_TPM_mean", facet.by = "cell_type", color = "condition",  position = position_dodge(), add = c("mean_se", "jitter"), palette = c("#00AFBB", "#E7B800","red"),label = T,lab.nb.digits = 1,lab.vjust =-0.6,lab.size = 3,ggtheme = theme_bw())+ylim(0,370) + 
+    theme(axis.text=element_text(size=8))
+```
+
+
+```{r}
+hif_targets_dana = c("CITED2","EDN1","VEGFA","BNIP3L","CD99","FN1","PLAUR","SERPINE1","ADM","EGLN3","HK2","IGFBP3","PDK1","DDIT4","SLC2A1","PFKFB3","BNIP3","PGK1","LDHA","GPI")
+```
+
+```{r}
+hif_score = cell_lines_data[hif_targets_dana,] %>% colMeans() %>% as.data.frame() %>% `colnames<-` ("dana_HIF_TPM_mean")
+hif_score$cell_type =  strsplit(x = rownames(hif_score),split = "_") %>%
+  purrr::map(1) %>% # take every first element
+  unlist() 
+hif_score$condition = strsplit(x = rownames(hif_score),split = "_") %>%
+  purrr::map(function(x) paste(c(x[[2]], x[[3]]),collapse = "_")) %>% # take every 2 and 3 elements
+  unlist() %>% gsub(pattern = "\\..*$",replacement = "")
+```
+
+
+```{r fig.height=6, fig.width=8}
+hif_score$condition <- factor(hif_score$condition, levels = c("Day1_NT", "Day1_OSI","Day14_OSI"))
+
+ggbarplot(
+  hif_score, x = "condition", y = "dana_HIF_TPM_mean", facet.by = "cell_type", color = "condition",  position = position_dodge(), add = c("mean_se", "jitter"), palette = c("#00AFBB", "#E7B800","red"),label = T,lab.nb.digits = 1,lab.vjust =-0.6,lab.size = 3,ggtheme = theme_bw())+ylim(0,1000) + 
+    theme(axis.text=element_text(size=8))
+```

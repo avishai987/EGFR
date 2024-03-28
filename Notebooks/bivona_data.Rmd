@@ -31,12 +31,17 @@ source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_
 ```{r}
 load("./Data/Bivona_scRNAseq/NI04_tumor_seurat_object.RData")
 tiss_subset_tumor2 = UpdateSeuratObject(tiss_subset_tumor2)
-tiss_subset_tumor2$treatment = tiss_subset_tumor2$analysis
-tiss_subset_tumor2@meta.data[["analysis"]] = factor(tiss_subset_tumor2$analysis, levels = c("naive", "grouped_pr","grouped_pd"))
+tiss_subset_tumor2$treatment = NULL
+tiss_subset_tumor2@meta.data[["treatment"]] = factor(tiss_subset_tumor2$analysis, levels = c("naive", "grouped_pr","grouped_pd"))
 ```
 
 ```{r}
 tiss_subset_tumor2
+table(tiss_subset_tumor2$analysis)
+tiss_subset_tumor2$sample_name %>% unique %>% length()
+tiss_subset_tumor2@meta.data[,c("sample_name","analysis")] %>% filter(analysis == "grouped_pr") %>% pull(sample_name) %>% unique() %>% length()
+tiss_subset_tumor2@meta.data[,c("sample_name","analysis")] %>% filter(analysis == "grouped_pd") %>% pull(sample_name) %>% unique() %>% length()
+
 ```
 
 calculate nmf metagenes
@@ -60,8 +65,8 @@ _, gep_scores, _, _ = cnmf_obj.load_results(K=k, density_threshold=density_thres
 genes = rownames(py$gep_scores)
 genes = genes [genes %in% rownames(tiss_subset_tumor2)]
 bivona_expression = t(as.matrix(GetAssayData(tiss_subset_tumor2,slot='data'))) 
-bivona_expression = 2**bivona_expression #convert from log2(tpm+1) to tpm
-bivona_expression = bivona_expression-1
+# bivona_expression = 2**bivona_expression #convert from log2(tpm+1) to tpm
+# bivona_expression = bivona_expression-1
 bivona_expression = bivona_expression[,genes] %>% as.data.frame()
 
 all_0_genes = colnames(bivona_expression)[colSums(bivona_expression==0, na.rm=TRUE)==nrow(bivona_expression)] #delete rows that have all 0
@@ -89,6 +94,7 @@ colnames(all_metagenes) = c("IFNa_nmf","immune_response_nmf", "hypoxia_nmf","cel
 ```
 
 # programs expression
+
 ```{r echo=TRUE, fig.height=7, fig.width=12, results='asis'}
 
 #add each metagene to metadata
@@ -97,10 +103,13 @@ for (i  in 1:ncol(all_metagenes)) {
   tiss_subset_tumor2 = AddMetaData(object = tiss_subset_tumor2,metadata = metagene_metadata,col.name = names(all_metagenes)[i])
 }
 
-FeaturePlot(object = tiss_subset_tumor2,features = colnames(all_metagenes),ncol = 3)+DimPlot(object = tiss_subset_tumor2,group.by = "analysis")
+FeaturePlot(object = tiss_subset_tumor2,features = colnames(all_metagenes),ncol = 3)+DimPlot(object = tiss_subset_tumor2,group.by = "treatment")
 
 
 ```
+
+
+
 
 
 
@@ -108,20 +117,20 @@ FeaturePlot(object = tiss_subset_tumor2,features = colnames(all_metagenes),ncol 
 metagenes_violin_compare.2 = function(dataset,prefix = "",pre_on = c("OSI","NT"),axis.text.x = 11,test = "t.test", programs = c("Hypoxia","TNFa","Cell_cycle"),return_list = F,combine_patients = F){
   plt.lst = list()
   if(combine_patients){
-    genes_by_tp = FetchData(object = dataset,vars =  c("analysis",programs)) %>% filter(analysis %in% pre_on)  %>% as.data.frame() #mean expression
-    formula <- as.formula( paste("c(", paste(programs, collapse = ","), ")~ analysis ") )
+    genes_by_tp = FetchData(object = dataset,vars =  c("treatment",programs)) %>% filter(treatment %in% pre_on)  %>% as.data.frame() #mean expression
+    formula <- as.formula( paste("c(", paste(programs, collapse = ","), ")~ treatment ") )
     
     #plot and split by patient:   
     stat.test = compare_means(formula = formula ,data = genes_by_tp,method = test,p.adjust.method = "fdr")%>% # Add pairwise comparisons p-value
-      dplyr::filter(group1 == pre_on[1] & group2 == pre_on[2])  #filter for pre vs on analysis only
+      dplyr::filter(group1 == pre_on[1] & group2 == pre_on[2])  #filter for pre vs on treatment only
     
     stat.test$p.format =stat.test$p.adj #modift 0 pvalue to be lowest possible float
     stat.test$p.format[!stat.test$p.format == 0 ] <- paste("=",stat.test$p.format[!stat.test$p.format == 0 ])
     stat.test$p.format[stat.test$p.format == 0 ] <- paste("<",.Machine$double.xmin %>% signif(digits = 3))
     
     
-    genes_by_tp = reshape2::melt(genes_by_tp, id.vars = c("analysis"),value.name = "score")
-    plt = ggplot(genes_by_tp, aes(x = variable, y = score,fill = analysis)) + geom_split_violin(scale = 'width')+ 
+    genes_by_tp = reshape2::melt(genes_by_tp, id.vars = c("treatment"),value.name = "score")
+    plt = ggplot(genes_by_tp, aes(x = variable, y = score,fill = treatment)) + geom_split_violin(scale = 'width')+ 
       geom_boxplot(width = 0.25, notch = FALSE, notchwidth = .4, outlier.shape = NA, coef=0)+
       ylim(min(genes_by_tp$score),max(genes_by_tp$score)*1.25)
     plt = plt +stat_pvalue_manual(stat.test, label = "p {p.format}",  #add p value
@@ -166,9 +175,13 @@ metagenes_violin_compare.2 = function(dataset,prefix = "",pre_on = c("OSI","NT")
 ```
 
 # NMF programs
+
 ```{r}
 metagenes_violin_compare.2(dataset = tiss_subset_tumor2,prefix = "patient",pre_on = c("naive","grouped_pr"),test = "wilcox.test",programs = colnames(all_metagenes)[1:3], return_list = F,combine_patients = T)
 ```
+
+
+
 ```{r}
 genesets <- msigdb_download("Homo sapiens",category="H") 
 gene_list = list(IFNa_genes = genesets$HALLMARK_INTERFERON_ALPHA_RESPONSE, TNFa_genes = genesets$HALLMARK_TNFA_SIGNALING_VIA_NFKB, hif_targets = hif_targets,E2F_genes = genesets$HALLMARK_E2F_TARGETS)
@@ -194,3 +207,19 @@ metagenes_violin_compare.2(dataset = tiss_subset_tumor2,prefix = "patient",pre_o
 tiss_subset_tumor2@meta.data
 ```
 
+# only primary cancer cells
+
+```{r}
+tiss_subset_tumor2_pri = subset(tiss_subset_tumor2, subset = primary_or_metastaic == "Primary")
+tiss_subset_tumor2_pri
+table(tiss_subset_tumor2_pri$analysis)
+
+```
+
+
+```{r}
+metagenes_violin_compare.2(dataset = tiss_subset_tumor2_pri,prefix = "patient",pre_on = c("naive","grouped_pr"),test = "wilcox.test",programs = colnames(all_metagenes)[1:3], return_list = F,combine_patients = T)
+```
+```{r}
+metagenes_violin_compare.2(dataset = tiss_subset_tumor2_pri,prefix = "patient",pre_on = c("naive","grouped_pr"),test = "wilcox.test",programs = names(gene_list), return_list = F,combine_patients = T)
+```
