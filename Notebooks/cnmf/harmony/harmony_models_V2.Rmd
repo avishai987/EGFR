@@ -99,8 +99,8 @@ rm(gene_expression)
 
 ```{python}
 import scanpy as sc
-adata = sc.read_h5ad('./Data/xeno_counts.h5ad')
-
+# adata = sc.read_h5ad('./Data/xeno_counts.h5ad')
+adata = sc.read_h5ad('/sci/labs/yotamd/lab_share/avishai.wizel/R_projects/EGFR/Data/xeno_counts.h5ad')
 ```
 
 
@@ -140,7 +140,7 @@ def moe_correct_ridge(Z_orig, Z_cos, Z_corr, R, W, K, Phi_Rk, Phi_moe, lamb):
 ```{python}
 adata = r.adata
 
-# sc.pp.normalize_per_cell(adata) 
+sc.pp.normalize_per_cell(adata)
 # sc.pp.normalize_total(adata, target_sum=1e4)
 adata.var['highly_variable'] = adata.var['vst.variable']
 if (not genes_from_list):

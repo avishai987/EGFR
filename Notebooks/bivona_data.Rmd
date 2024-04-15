@@ -15,6 +15,7 @@ output:
 
 
 
+
 # Functions
 
 ```{r warning=FALSE}
@@ -115,6 +116,7 @@ FeaturePlot(object = tiss_subset_tumor2,features = colnames(all_metagenes),ncol 
 
 ```{r}
 metagenes_violin_compare.2 = function(dataset,prefix = "",pre_on = c("OSI","NT"),axis.text.x = 11,test = "t.test", programs = c("Hypoxia","TNFa","Cell_cycle"),return_list = F,combine_patients = F){
+  require(facefuns)
   plt.lst = list()
   if(combine_patients){
     genes_by_tp = FetchData(object = dataset,vars =  c("treatment",programs)) %>% filter(treatment %in% pre_on)  %>% as.data.frame() #mean expression
