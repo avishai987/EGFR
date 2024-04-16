@@ -32,31 +32,32 @@ source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_
 # Data
 
 ```{r}
+xeno = readRDS("./Data/10x_xeno_1000.Rds")
 genesets <- msigdb_download("Homo sapiens",category="H") %>% append( msigdb_download("Homo sapiens",category="C2",subcategory = "CP:KEGG"))
 genesets[["HIF_targets"]] = hif_targets
 ```
 
 ```{r fig.height=5, fig.width=12}
-DimPlot(xeno,group.by = "orig.ident")+ DimPlot(xeno,group.by = "treatment",shuffle = T)
+DimPlot(xeno,group.by = "orig.ident") + DimPlot(xeno,group.by = "treatment",shuffle = T)
 ```
 
 
 ```{python}
 from cnmf import cNMF
 import pickle
-f = open('/sci/labs/yotamd/lab_share/avishai.wizel/R_projects/EGFR/Data/cnmf/cnmf_objects/models_2Kvargenes_corrected_cnmf_obj.pckl', 'rb')
+f = open('./Data/cnmf_V2/noTPM/models_2Kvargenes_corrected_noTPM_cnmf_obj.pckl', 'rb')
 cnmf_obj = pickle.load(f)
 f.close()
 ```
 
 # K selection plot
 ```{r fig.height=2, fig.width=2}
-plot_path = paste0("/sci/labs/yotamd/lab_share/avishai.wizel/R_projects/EGFR/Data/cNMF/cNMF_models_Varnorm_Harmony_2Kvargenes_all_K/cNMF_models_Varnorm_Harmony_2Kvargenes_all_K.k_selection.png")
+plot_path = paste0("/sci/labs/yotamd/lab_share/avishai.wizel/R_projects/EGFR/Data/cnmf_V2/BatchCorrected_cnmf/cnmf_tmp/")
 knitr::include_graphics(plot_path)
 ```
 
 ```{python}
-k = 3
+k = 5
 density_threshold = 0.1 
 cnmf_obj.consensus(k=k, density_threshold=density_threshold,show_clustering=True)
 usage_norm, gep_scores, _, _ = cnmf_obj.load_results(K=k, density_threshold=density_threshold)
@@ -73,7 +74,7 @@ usage_norm = usage_norm5_xeno_corrected
 ```
 
 # NMF usage
-```{r fig.height=4, fig.width=12, results='asis'}
+```{r fig.height=7, fig.width=12, results='asis'}
   for (i in 1:ncol(usage_norm)) {
     metage_metadata = usage_norm %>% dplyr::select(i)
     xeno = AddMetaData(object = xeno,metadata = metage_metadata,col.name = paste0("gep",i))
@@ -85,14 +86,33 @@ usage_norm = usage_norm5_xeno_corrected
 
 # Programs GSEA {.tabset}
 
-```{r results='asis'}
-  for (col in seq_along(gep_scores)) {
-     ranked_vec = gep_scores[,col] %>% setNames(rownames(gep_scores)) %>% sort(decreasing = TRUE) 
-     hyp_obj <- hypeR_fgsea(ranked_vec, genesets)
-       print_tab(hyp_dots(hyp_obj,title = paste("program",col))+ aes(size=nes),title = paste0("gep",col))
-  }
+```{r fig.height=8, fig.width=10}
+library(hypeR)
+plotlist = list()
+for (i in 1:ncol(gep_scores)) {
+  ranked_vec = gep_scores %>% pull(i) %>%  setNames(rownames(gep_scores))
+  hyp_obj <-hypeR_fgsea(signature = ranked_vec,genesets = (genesets),up_only = T)
+
+  plt = hyp_dots(hyp_obj,merge = F,fdr = 0.2)+ aes(size=nes)+ggtitle(paste("program", i))+ 
+  guides(
+    size = guide_legend(title="NES",reverse=T))+scale_x_discrete(expand = expansion(add = c(1,2)))
+  plotlist[[i]] = plt
+}
+plotlist = plotlist[1:4]
+plotlist[[2]] = plotlist[[2]] +scale_x_discrete(expand = expansion(add = c(1,2)))
+p = ggarrange(plotlist = plotlist,ncol = 2,nrow = 2,common.legend = T)
 
 ```
+
+```{r fig.height=8, fig.width=12}
+p
+```
+
+```{r fig.height=8, fig.width=12}
+p
+```
+
+
 
 
 
