@@ -23,8 +23,8 @@ data_to_read = ""
 
 ```{r warning=FALSE}
 library(stringi)
-source_from_github(repositoy = "DEG_functions",version = "0.2.24")
-```
+source_from_github(repositoy = "DEG_functions",version = "0.2.54")
+  ```
 
 ## Data
 
@@ -77,10 +77,7 @@ for (patient in patients_list) {
 }
 ```
 
-```{r}
-DimPlot(lung,group.by = "patient.ident")
-DimPlot(lung,group.by = "time.point")
-```
+
 
 ## Xeno DEG
 
@@ -88,12 +85,13 @@ DimPlot(lung,group.by = "time.point")
 patients_list = xeno$orig.ident %>% unique()
 xeno = SetIdent(object = xeno,value = "treatment")
 
-first_up = list() #all first group up genes
-second_up = list() #all second group up genes
 for (patient in patients_list) {
   patient_data = subset(x = xeno,subset = orig.ident == patient)
-  features = filter_features(object = patient_data,ident.1 = "NT",ident.2 = "OSI",min.pct = 0.1 )
-  deg_df = FindMarkers(object = patient_data,ident.1 = "NT",ident.2 = "OSI",densify = T,features = features)
+  deg_df = FindMarkers(object = patient_data,ident.1 = "NT",ident.2 = "OSI",densify = T,mean.fxn = function(x) {
+    return(log(x = rowMeans(x = x) + 1, base = 2))
+  })
+  volcano_plot(deg_df,top_genes_text = 5,ident1 = "NT",ident2 = "OSI")
+  
   
   #add first up genes vector and background:
   deg_vector = deg_df %>% mutate(fdr = p.adjust(p_val,method = "fdr"))%>% #add fdr
@@ -123,17 +121,8 @@ for (patient in patients_list) {
 }
 ```
 
-```{r}
-DimPlot(xeno,group.by = "orig.ident")
-DimPlot(xeno,group.by = "treatment")
-```
 
-```{r}
-patient_data = subset(x = lung,subset = patient.ident == "X1071")
-DimPlot(patient_data,group.by = "orig.ident")
-DimPlot(patient_data,group.by = "time.point")
 
-```
 
 
 

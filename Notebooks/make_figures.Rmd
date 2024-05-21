@@ -17,27 +17,22 @@ output:
 
 # Figure 1
 
-```{r fig.height=12, fig.width=6}
-
-library(png)
-library(grid)
-library(gridExtra)
-
-plot1 <- rasterGrob(readPNG("./Figures/xeno_treatment_umap.png"))
-plot2 <- rasterGrob(readPNG("./Figures/xeno_patient_umap.png"))
-```
 
 ```{r}
-pdf(file = "./Figures/fig1",height = 12,width = 6)
-grid.arrange(plot1,plot2)
+a = readRDS("./Figures/xeno_patient_umap.rds")
+b = readRDS("./Figures/xeno_treatment_umap.rds")
+```
+
+
+```{r fig.height=4, fig.width=10}
+p = cowplot::plot_grid(NULL, a,NULL, b, labels = "AUTO")
+p
+```
+
+
+```{r}
+svg(filename  = "./test.svg",width = 10,height = 4)
+cowplot::plot_grid(a,b, labels = c('A', 'B'))
 dev.off()
 ```
-
-
-```{r fig.height=3, fig.width=10}
-grid.arrange(plot1)
-```
-
-
-
 
