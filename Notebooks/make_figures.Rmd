@@ -1,0 +1,43 @@
+---
+title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: FALSE
+    number_sections: true
+    toc_depth: 1
+---
+
+
+
+# Figure 1
+
+```{r fig.height=12, fig.width=6}
+
+library(png)
+library(grid)
+library(gridExtra)
+
+plot1 <- rasterGrob(readPNG("./Figures/xeno_treatment_umap.png"))
+plot2 <- rasterGrob(readPNG("./Figures/xeno_patient_umap.png"))
+```
+
+```{r}
+pdf(file = "./Figures/fig1",height = 12,width = 6)
+grid.arrange(plot1,plot2)
+dev.off()
+```
+
+
+```{r fig.height=3, fig.width=10}
+grid.arrange(plot1)
+```
+
+
+
+

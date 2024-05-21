@@ -37,6 +37,7 @@ lung_patients_filtered = lung_patients[!(lung_patients %in% c("X1055new","X1099"
 lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
 lung$treatment = lung$time.point
 lung$orig.ident = lung$patient.ident
+hif_targets = scan("./Data/HIF_targets_Lombardi_PMC9869179.txt", character(), quote = "")
 
 ```
 
@@ -91,13 +92,9 @@ usage_norm = usage_norm5_xeno
   
   FeaturePlot(object = xeno,features = paste0("gep",1:ncol(usage_norm)),ncol = 3)
   
-  for (i in 1:ncol(usage_norm)) {
-    metage_metadata = usage_norm %>% dplyr::select(i)
-    xeno_corr_nonneg = AddMetaData(object = xeno_corr_nonneg,metadata = metage_metadata,col.name = paste0("gep",i))
-  }
-  
-  FeaturePlot(object = xeno_corr_nonneg,features = paste0("gep",1:ncol(usage_norm)),ncol = 3)
 ```
+
+
 
 
 # Programs GSEA {.tabset}
@@ -114,6 +111,7 @@ plt_list = list()
 ggarrange(plotlist = plt_list)
 
 ```
+
 
 
 
@@ -138,14 +136,16 @@ tpm =  compute_tpm(xeno_expression)
 usage_by_calc = get_usage_from_score(counts=xeno_expression,tpm=tpm,genes=xeno_vargenes, cnmf_obj=cnmf_obj,k=k)
 ```
 
+
+
 ```{r}
 xeno_5_metagenes = py$usage_by_calc
 ```
 
 ```{r}
 all_metagenes = xeno_5_metagenes
-colnames(all_metagenes) = c("IFNa_nmf","immune_response_nmf", "hypoxia_nmf","cell_cycle_nmf","unknown")
-
+# colnames(all_metagenes) = c("IFNa_nmf","immune_response_nmf", "hypoxia_nmf","cell_cycle_nmf","unknown")
+colnames(all_metagenes) = paste0("Program.",1:5)
 ```
 
 # programs expression
@@ -159,12 +159,72 @@ for (i  in 1:ncol(all_metagenes)) {
 
 FeaturePlot(object = xeno,features = colnames(all_metagenes),ncol = 3)
 
+  p = FeaturePlot(object = xeno,features = colnames(all_metagenes),ncol = 3,combine = F)
+  p[[6]] = DimPlot(object = xeno,group.by = "treatment",shuffle = T)
+```
+
+```{r fig.height=10, fig.width=13, results='asis'}
+  ggarrange(plotlist = p)
 
 ```
+
+```{r fig.height=10}
+all_programs_top_genes = c()
+for (i in 1:(ncol(gep_scores)-1)) {
+  top_genes = gep_scores  %>%  arrange(desc(gep_scores[i])) #sort by score a
+  top = head(rownames(top_genes), 20) #take top top_genes_num
+  all_programs_top_genes = c(all_programs_top_genes,top)
+}
+
+data = FetchData(object = xeno, vars = all_programs_top_genes) %>% scale() %>% t()
+
+annotation_data = FetchData(object = xeno, vars =names(all_metagenes)[1:4])
+annotation_data = annotation_data
+col_dend = as.dendrogram(hclust(dist(annotation_data),method = "complete"))
+
+col_fun = circlize::colorRamp2(c(0, 1), c("white", "red"))
+column_ha = HeatmapAnnotation(df = annotation_data, col = list(Program.1 = col_fun,Program.2 = col_fun,Program.3 = col_fun,Program.4 = col_fun,unknown = col_fun))
+row_annotation_data = data.frame(row.names = all_programs_top_genes,gep_genes = as.character(rep(c(1,2,3,4), each=20)))
+row_ha = rowAnnotation(df = row_annotation_data)
+
+p = ComplexHeatmap::Heatmap(
+  data,
+  show_column_names = F,
+  row_names_gp = grid::gpar(fontsize = 7),
+  cluster_rows = F,
+  top_annotation =
+    column_ha,
+  name = "Z-score expression",use_raster = T,cluster_columns = col_dend,right_annotation = row_ha
+)
+  
+p
+```
+
+
+```{r}
+pdf(file = "nmf_heatmap_2.pdf",width  = 10)
+p
+dev.off()
+```
+
+
 # Programs dotplot
-```{r fig.height=4, fig.width=10}
-DotPlot.2(object = xeno, features =  colnames(all_metagenes),group.by  = 'treatment',scale = T)+
-  guides(size = guide_legend(title = "Cells expressing (%)"),color = guide_colorbar(title = "Average Score"))
+
+```{r}
+# scale metagene and add to metadata
+for (i  in 1:ncol(all_metagenes)) {
+  metagene_metadata = all_metagenes[,i,drop=F] %>% scale()
+  xeno = AddMetaData(object = xeno,metadata = metagene_metadata,col.name = paste0(names(all_metagenes)[i],"_scaled"))
+}
+```
+
+
+```{r fig.height=4, fig.width=11}
+
+p = DotPlot.2(object = xeno, features =  paste0(names(all_metagenes),"_scaled"),group.by  = 'treatment',scale = F)+
+  guides(size = guide_legend(title = "Cells above average (%)"),color = guide_colorbar(title = "Average Score"))
+p+ scale_x_discrete(labels= paste0(names(all_metagenes),"\n(",c("IFNa","TNFa-NFKb","HYPOXIA","Cell_Cycle"),")"))
+
 ```
 
 
@@ -291,10 +351,11 @@ for (i in seq_along(gene_list)) {
 
 ```
 
+
 ```{r fig.height=5, fig.width=11}
 plt_list = metagenes_mean_compare.2(dataset = lung,,prefix = "patient",pre_on = c("pre-treatment","on-treatment"),test = "wilcox.test",programs = names(gene_list)[1:3],return_list = T)
 
-ggarrange(plotlist = plt_list,common.legend = T) + ggtitle("curated signatures")
+ggarrange(plotlist = plt_list,common.legend = T) + ggtitle("curated signatures") + guides(fill=guide_legend(title="New Legend Title"))
 
 plt_list = metagenes_mean_compare.2(dataset = lung,,prefix = "patient",pre_on = c("pre-treatment","on-treatment"),test = "wilcox.test",programs = names(gene_list)[6:8],return_list = T)
 
