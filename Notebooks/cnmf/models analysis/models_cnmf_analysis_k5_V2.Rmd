@@ -14,6 +14,10 @@ output:
 ---
 
 
+```{r}
+# to run cnmf, set interperter to be :
+# /sci/labs/yotamd/lab_share/avishai.wizel/python_envs/miniconda/envs/cnmf_env_6/bin/python3.7
+```
 
 # Functions
 
@@ -48,8 +52,13 @@ genesets[["HIF_targets"]] = hif_targets
 ```
 
 ```{r fig.height=5, fig.width=12}
-DimPlot(xeno,group.by = "orig.ident")+ DimPlot(xeno,group.by = "treatment",shuffle = T)
+p1  = DimPlot(xeno,group.by = "orig.ident")
+p2  =  DimPlot(xeno,group.by = "treatment")
+p1+p2
 ```
+
+
+
 
 
 ```{python}
@@ -161,6 +170,7 @@ FeaturePlot(object = xeno,features = colnames(all_metagenes),ncol = 3)
 
   p = FeaturePlot(object = xeno,features = colnames(all_metagenes),ncol = 3,combine = F)
   p[[6]] = DimPlot(object = xeno,group.by = "treatment",shuffle = T)
+  
 ```
 
 ```{r fig.height=10, fig.width=13, results='asis'}

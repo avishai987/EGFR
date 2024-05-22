@@ -23,8 +23,9 @@ data_to_read = ""
 
 ```{r warning=FALSE}
 library(stringi)
+library(ggplotify)
 source_from_github(repositoy = "DEG_functions",version = "0.2.54")
-  ```
+```
 
 ## Data
 
@@ -36,90 +37,56 @@ lung_patients_filtered = lung_patients[!(lung_patients %in% c("X1055new","X1099"
 lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
 ```
 
-## Patients DEG
-```{r}
-patients_list = lung$patient.ident %>% unique()
-lung = SetIdent(object = lung,value = "time.point")
-
-first_up = list() #all first group up genes
-second_up = list() #all second group up genes
-for (patient in patients_list) {
-  patient_data = subset(x = lung,subset = patient.ident == patient)
-  features = filter_features(object = patient_data,ident.1 = "pre-treatment",ident.2 = "on-treatment",min.pct = 0.1)
-  deg_df = FindMarkers(object = patient_data,ident.1 = "pre-treatment",ident.2 = "on-treatment",densify = T,features = features)
-  
-  #add first up genes vector and background:
-  deg_vector = deg_df %>% mutate(fdr = p.adjust(p_val,method = "fdr"))%>% #add fdr
-    filter(avg_log2FC>1.5 & fdr<0.05) %>% #filter significant
-    rownames() #get genes
-  bg = features
-  first_up[[patient]] =  list(deg = deg_vector, bg = bg)
-  
-  #add second up genes vector and background:
-  deg_vector = deg_df %>% mutate(fdr = p.adjust(p_val,method = "fdr"))%>% #add fdr
-    filter(avg_log2FC<(-1.5) & fdr<0.05) %>% #filter significant
-    rownames() #get genes
-  bg = features
-  second_up[[patient]] =  list(deg = deg_vector, bg = bg)
-
-
-}
-```
-
-```{r fig.height=4, fig.width=10}
-require(gridExtra)
-
-for (patient in patients_list) {
-  downreg  = genes_vec_enrichment(genes = first_up[[patient]]$deg,background = first_up[[patient]]$bg,homer = T,title = paste(patient,"downregulated during treatment"),bar_color = "indianred2",return_all = T,silent = T)
-    upreg = genes_vec_enrichment(genes = second_up[[patient]]$deg,background = second_up[[patient]]$bg,homer = T,title = paste(patient,"upregulated during treatment"),return_all = T,silent = T)
-  grid.arrange(downreg$plt, upreg$plt, ncol=2)
-
-}
-```
-
 
 
 ## Xeno DEG
 
 ```{r}
+xeno = FindVariableFeatures(object = xeno,nfeatures = 5000)
+deg_df = FindMarkers(object = xeno,ident.1 = "NT",ident.2 = "OSI",densify = T,mean.fxn = function(x) {
+  return(log(x = rowMeans(x = x) + 1, base = 2))
+},features = VariableFeatures(xeno), logfc.threshold=0, min.pct=0)
+
+p = volcano_plot(deg_df,top_genes_text = 5,ident1 = "NT",ident2 = "OSI",fc_cutoff = 1.5)+coord_cartesian(clip = "off")
+p
+```
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/xeno_DEG.rds")
+```
+
+
+## Xeno DEG per patient
+
+```{r fig.height=8, fig.width=14}
 patients_list = xeno$orig.ident %>% unique()
 xeno = SetIdent(object = xeno,value = "treatment")
-
+p_list = list()
 for (patient in patients_list) {
   patient_data = subset(x = xeno,subset = orig.ident == patient)
+  patient_data = FindVariableFeatures(object = patient_data,nfeatures = 5000)
   deg_df = FindMarkers(object = patient_data,ident.1 = "NT",ident.2 = "OSI",densify = T,mean.fxn = function(x) {
     return(log(x = rowMeans(x = x) + 1, base = 2))
-  })
-  volcano_plot(deg_df,top_genes_text = 5,ident1 = "NT",ident2 = "OSI")
+  },features = VariableFeatures(patient_data), logfc.threshold=0, min.pct=0)
   
-  
-  #add first up genes vector and background:
-  deg_vector = deg_df %>% mutate(fdr = p.adjust(p_val,method = "fdr"))%>% #add fdr
-    filter(avg_log2FC>1.5 & fdr<0.05) %>% #filter significant
-    rownames() #get genes
-  bg = features
-  first_up[[patient]] =  list(deg = deg_vector, bg = bg)
-  
-  #add second up genes vector and background:
-  deg_vector = deg_df %>% mutate(fdr = p.adjust(p_val,method = "fdr"))%>% #add fdr
-    filter(avg_log2FC<(-1.5) & fdr<0.05) %>% #filter significant
-    rownames() #get genes
-  bg = features
-  second_up[[patient]] =  list(deg = deg_vector, bg = bg)
-
-
+  p = volcano_plot(deg_df,top_genes_text = 5,ident1 = "NT",ident2 = "OSI",fc_cutoff = 1.5,title = paste("Model",patient))
+  p_list[[patient]] = p
 }
-```
-```{r fig.height=4, fig.width=10}
-require(gridExtra)
 
-for (patient in patients_list) {
-  downreg  = genes_vec_enrichment(genes = first_up[[patient]]$deg,background = first_up[[patient]]$bg,homer = T,title = paste(patient,"downregulated during treatment"),bar_color = "indianred2",return_all = T,silent = T)
-    upreg = genes_vec_enrichment(genes = second_up[[patient]]$deg,background = second_up[[patient]]$bg,homer = T,title = paste(patient,"upregulated during treatment"),return_all = T,silent = T)
-  grid.arrange(downreg$plt, upreg$plt, ncol=2)
+p_list = lapply(p_list,FUN = function(x) {
+  x = x+ 
+   coord_cartesian(clip = "off")
+})
 
-}
+
+p = ggarrange(plotlist = p_list,common.legend = T,legend = "right")
+p
 ```
+
+
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/xeno_DEG_per_patient.rds")
+```
+
 
 
 
