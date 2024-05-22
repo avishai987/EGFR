@@ -19,14 +19,19 @@ output:
 
 
 ```{r}
-a = readRDS("./Figures/xeno_patient_umap.rds")
-b = readRDS("./Figures/xeno_treatment_umap.rds")
+xeno_umap_patients = readRDS("./Figures/xeno_patient_umap.rds")
+xeno_umap_treatment = readRDS("./Figures/xeno_treatment_umap.rds")
+xeno_deg = readRDS("./Figures/xeno_DEG.rds")
+xeno_sipsic_heatmap = readRDS("./Figures/xeno_sipsic_heatmap.rds")
+
 ```
 
 
-```{r fig.height=4, fig.width=10}
-p = cowplot::plot_grid(NULL, a,NULL, b, labels = "AUTO")
-p
+```{r fig.height=15, fig.width=15}
+p1 = cowplot::plot_grid(xeno_umap_treatment,xeno_umap_patients,xeno_deg,ncol = 1,nrow = 3,labels = c("B","C","E"))
+p2 = cowplot::plot_grid(NULL,xeno_sipsic_heatmap,ncol = 1,nrow = 2,labels = c("A","D"))
+p3 = cowplot::plot_grid(p2,p1,nrow = 1,ncol = 2)
+p3
 ```
 
 

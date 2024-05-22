@@ -26,6 +26,8 @@ output:
 ```{r}
 library(stringi)
 library(reticulate)
+library(ggplotify)
+
 source_from_github(repositoy = "DEG_functions",version = "0.2.47")
 source_from_github(repositoy = "cNMF_functions",version = "0.4.04",script_name = "cnmf_functions_V3.R")
 source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_name = "functions.R")
@@ -58,6 +60,7 @@ lung = readRDS("./Data/lung_cancercells_withTP_onlyPatients.rds")
 lung_patients = lung$patient.ident %>% unique() %>% as.character()
 lung_patients_filtered = lung_patients[!(lung_patients %in% c("X1055new","X1099"))] # remove patients with less than 100 malignant cells
 lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
+xeno = readRDS("./Data/10x_xeno_1000.Rds")
 
 
 genesets <- msigdb_download("Homo sapiens",category="H") 
@@ -108,8 +111,7 @@ xeno[["sipsic"]] = CreateAssayObject(counts = pathwayScoresMatrix)
 ```
 
 ```{r}
-trace(Seurat:::FindMarkers.default,edit = T) #replace "bonferroni" with "FDR"
-untrace(Seurat:::FindMarkers.default)
+trace(Seurat:::FindMarkers.default,edit = T) #replace "bonferroni" with "fdr"
 
 ```
 
@@ -147,7 +149,10 @@ for (model in unique(xeno$orig.ident)) {
 fdr_df = apply(fdr_df, 1:2, \(x) format(x, digits=1)) %>% as.data.frame() #round p values 
 fdr_df[fdr_df == 0] = paste0("<",format(.Machine$double.xmin,digits = 1)) # replace p=0 with p<min float
 ```
+```{r}
+untrace(Seurat:::FindMarkers.default)
 
+```
 
 ```{r fig.height=7, fig.width=8}
 col_fun = circlize::colorRamp2(c(-1, 0, 1), c("blue", "white", "red"))
@@ -158,5 +163,32 @@ ComplexHeatmap::Heatmap(logFC_df, name = "log2FC on/pre", col = col_fun,
 ```
 
 
+```{r}
+colors= c()
+for (row_num in 1:nrow(logFC_df)) {
+  row = logFC_df[row_num,]
+  if (sum(row > 0.1)  >= length(row)-2) {
+    colors <- c(colors, "red")
+  }
+  else if (sum(row < -0.1)  >= length(row)-2) {
+    colors <- c(colors, "blue")
+  }
+  else{colors <- c(colors, "black")}
+}
+
+```
+
+```{r fig.height=7, fig.width=8}
+col_fun = circlize::colorRamp2(c(-1, 0, 1), c("blue", "white", "red"))
+p = ComplexHeatmap::Heatmap(logFC_df, name = "log2FC on/pre", col = col_fun,
+    cell_fun = function(j, i, x, y, width, height, fill) {
+        grid.text(fdr_df[i, j], x, y, gp = gpar(fontsize = 8))
+}, row_names_gp = gpar(fontsize = 8,col =colors), clustering_method_rows = "average", clustering_distance_rows = "euclidean")
+p
+```
+
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/xeno_sipsic_heatmap.rds")
+```
 <script src="https://hypothes.is/embed.js" async></script>
 
