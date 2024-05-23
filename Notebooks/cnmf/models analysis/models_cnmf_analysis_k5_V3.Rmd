@@ -16,10 +16,13 @@ output:
 
 
 # Functions
-
+```{r}
+reticulate::use_virtualenv("/sci/labs/yotamd/lab_share/avishai.wizel/python_envs/Virtual_env/cnmf_dev/",required = T)
+reticulate::py_config() # if you see that r-cnmf_dev has not been loaded, restart/terminate r and try again
+```
 
 ```{r warning=FALSE}
-
+library(ggplotify)
 library(stringi)
 library(reticulate)
 source_from_github(repositoy = "DEG_functions",version = "0.2.53")
@@ -33,33 +36,41 @@ source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_
 
 ```{r}
 xeno = readRDS("./Data/10x_xeno_1000.Rds")
+hif_targets = scan( "./Data/hif_targets.csv", character(), quote = "")
 genesets <- msigdb_download("Homo sapiens",category="H") %>% append( msigdb_download("Homo sapiens",category="C2",subcategory = "CP:KEGG"))
 genesets[["HIF_targets"]] = hif_targets
 ```
 
 ```{r fig.height=5, fig.width=12}
-DimPlot(xeno,group.by = "orig.ident") + DimPlot(xeno,group.by = "treatment",shuffle = T)
+p1  = DimPlot(xeno,group.by = "orig.ident")
+p2  =  DimPlot(xeno,group.by = "treatment")
+p1+p2
 ```
+```{r}
+saveRDS(object = as.grob(p1),file = "./Figures/xeno_patient_umap.rds")
+saveRDS(object = as.grob(p2),file = "./Figures/xeno_treatment_umap.rds")
+```
+
 
 
 ```{python}
 from cnmf import cNMF
 import pickle
-f = open('./Data/cnmf_V2/noTPM/models_2Kvargenes_corrected_noTPM_cnmf_obj.pckl', 'rb')
+f = open('./Data/cnmf_V2/noTPM_100iter//models_2Kvargenes_corrected_noTPM_cnmf_obj.pckl', 'rb')
 cnmf_obj = pickle.load(f)
 f.close()
 ```
 
 # K selection plot
 ```{r fig.height=2, fig.width=2}
-plot_path = paste0("/sci/labs/yotamd/lab_share/avishai.wizel/R_projects/EGFR/Data/cnmf_V2/BatchCorrected_cnmf/cnmf_tmp/")
+plot_path = "./Data/cnmf_V2/noTPM_100iter/BatchCorrected_cnmf/BatchCorrected_cnmf.k_selection.png"
 knitr::include_graphics(plot_path)
 ```
 
 ```{python}
 k = 5
 density_threshold = 0.1 
-cnmf_obj.consensus(k=k, density_threshold=density_threshold,show_clustering=True)
+# cnmf_obj.consensus(k=k, density_threshold=density_threshold,show_clustering=True) #only if not calculated before
 usage_norm, gep_scores, _, _ = cnmf_obj.load_results(K=k, density_threshold=density_threshold)
 ```
 
@@ -80,16 +91,30 @@ usage_norm = usage_norm5_xeno_corrected
     xeno = AddMetaData(object = xeno,metadata = metage_metadata,col.name = paste0("gep",i))
   }
   
-  FeaturePlot(object = xeno,features = paste0("gep",1:ncol(usage_norm)),ncol = 3)
+p = FeaturePlot(object = xeno,features = paste0("gep",1:ncol(usage_norm)),ncol = 3)
+
+for (i in 1:ncol(usage_norm)) { 
+  p[[i]] = p[[i]] + ggtitle(paste("program",i)) #change titles
+}
+p
 ```
+
+
+
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/xeno_NMF_usage_UMAP.rds")
+```
+
+
 
 
 # Programs GSEA {.tabset}
 
-```{r fig.height=8, fig.width=10}
+```{r fig.height=11, fig.width=13}
 library(hypeR)
 plotlist = list()
 for (i in 1:ncol(gep_scores)) {
+  print(paste("program 1 out of",ncol(gep_scores)))
   ranked_vec = gep_scores %>% pull(i) %>%  setNames(rownames(gep_scores))
   hyp_obj <-hypeR_fgsea(signature = ranked_vec,genesets = (genesets),up_only = T)
 
@@ -98,18 +123,21 @@ for (i in 1:ncol(gep_scores)) {
     size = guide_legend(title="NES",reverse=T))+scale_x_discrete(expand = expansion(add = c(1,2)))
   plotlist[[i]] = plt
 }
-plotlist = plotlist[1:4]
-plotlist[[2]] = plotlist[[2]] +scale_x_discrete(expand = expansion(add = c(1,2)))
-p = ggarrange(plotlist = plotlist,ncol = 2,nrow = 2,common.legend = T)
 
-```
 
-```{r fig.height=8, fig.width=12}
+plotlist = lapply(plotlist,FUN = function(x) { #fix cropped edges
+  x = x+
+  theme(plot.margin = margin(0.1,1,0.1,0.01, "cm")) 
+})
+
+
+p = ggarrange(plotlist = plotlist,common.legend = T,nrow = 3,ncol = 2)
 p
 ```
 
-```{r fig.height=8, fig.width=12}
-p
+
+```{r fig.height=11, fig.width=13}
+saveRDS(object = as.grob(p),file = "./Figures/xeno_NMF_GSEA.rds")
 ```
 
 
@@ -126,6 +154,12 @@ xeno_vargenes = xeno_vargenes[!xeno_vargenes %in% all_0_genes]
 
 ```
 
+```{python}
+def compute_tpm2(input_counts): #from cnmf.py
+    tpm = input_counts.copy()
+    sc.pp.normalize_per_cell(tpm.to_numpy(), counts_per_cell_after=1e6,copy=True)
+    return(tpm)
+```
 
 # calculate score for Xeno
 ```{python}
@@ -133,7 +167,7 @@ import numpy as np
 import scanpy as sc
 xeno_expression = r.xeno_expression
 xeno_vargenes = r.xeno_vargenes
-tpm =  compute_tpm(xeno_expression)
+tpm =  compute_tpm2(xeno_expression)
 usage_by_calc = get_usage_from_score(counts=xeno_expression,tpm=tpm,genes=xeno_vargenes, cnmf_obj=cnmf_obj,k=k)
 ```
 
