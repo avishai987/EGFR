@@ -26,7 +26,7 @@ library(ggplotify)
 library(stringi)
 library(reticulate)
 source_from_github(repositoy = "DEG_functions",version = "0.2.53")
-source_from_github(repositoy = "cNMF_functions",version = "0.4.04",script_name = "cnmf_functions_V3.R")
+source_from_github(repositoy = "cNMF_functions",version = "0.4.23",script_name = "cnmf_functions_V3.R")
 source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_name = "functions.R")
 
 ```
@@ -36,9 +36,18 @@ source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_
 
 ```{r}
 xeno = readRDS("./Data/10x_xeno_1000.Rds")
-hif_targets = scan( "./Data/hif_targets.csv", character(), quote = "")
+hif_targets = scan("./Data/HIF_targets_Lombardi_PMC9869179.txt", character(), quote = "")
 genesets <- msigdb_download("Homo sapiens",category="H") %>% append( msigdb_download("Homo sapiens",category="C2",subcategory = "CP:KEGG"))
 genesets[["HIF_targets"]] = hif_targets
+```
+```{r}
+lung = readRDS("./Data/lung_cancercells_withTP_onlyPatients.rds")
+lung_patients = lung$patient.ident %>% unique() %>% as.character()
+lung_patients_filtered = lung_patients[!(lung_patients %in% c("X1055new","X1099"))] # remove patients with less than 100 malignant cells
+lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
+lung$treatment = lung$time.point
+lung$orig.ident = lung$patient.ident
+
 ```
 
 ```{r fig.height=5, fig.width=12}
@@ -101,9 +110,7 @@ p
 
 
 
-```{r}
-saveRDS(object = as.grob(p),file = "./Figures/xeno_NMF_usage_UMAP.rds")
-```
+
 
 
 
@@ -114,7 +121,7 @@ saveRDS(object = as.grob(p),file = "./Figures/xeno_NMF_usage_UMAP.rds")
 library(hypeR)
 plotlist = list()
 for (i in 1:ncol(gep_scores)) {
-  print(paste("program 1 out of",ncol(gep_scores)))
+  print(paste("program",i," out of",ncol(gep_scores)))
   ranked_vec = gep_scores %>% pull(i) %>%  setNames(rownames(gep_scores))
   hyp_obj <-hypeR_fgsea(signature = ranked_vec,genesets = (genesets),up_only = T)
 
@@ -133,6 +140,10 @@ plotlist = lapply(plotlist,FUN = function(x) { #fix cropped edges
 
 p = ggarrange(plotlist = plotlist,common.legend = T,nrow = 3,ncol = 2)
 p
+```
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/xeno_nmf_GSEA.rds")
+
 ```
 
 
@@ -154,12 +165,8 @@ xeno_vargenes = xeno_vargenes[!xeno_vargenes %in% all_0_genes]
 
 ```
 
-```{python}
-def compute_tpm2(input_counts): #from cnmf.py
-    tpm = input_counts.copy()
-    sc.pp.normalize_per_cell(tpm.to_numpy(), counts_per_cell_after=1e6,copy=True)
-    return(tpm)
-```
+
+
 
 # calculate score for Xeno
 ```{python}
@@ -167,9 +174,10 @@ import numpy as np
 import scanpy as sc
 xeno_expression = r.xeno_expression
 xeno_vargenes = r.xeno_vargenes
-tpm =  compute_tpm2(xeno_expression)
+tpm =  compute_tpm(xeno_expression)
 usage_by_calc = get_usage_from_score(counts=xeno_expression,tpm=tpm,genes=xeno_vargenes, cnmf_obj=cnmf_obj,k=k)
 ```
+
 
 ```{r}
 xeno_5_metagenes = py$usage_by_calc
@@ -177,12 +185,11 @@ all_metagenes = xeno_5_metagenes
 ```
 
 ```{r}
-colnames(all_metagenes) = c("hypoxia","on_treatment","cell_cycle")
-
+colnames(all_metagenes) = paste0("Program.",1:5)
 ```
 
 # programs expression
-```{r echo=TRUE, fig.height=4, fig.width=12, results='asis'}
+```{r fig.height=7, fig.width=12, results='asis'}
 
 #add each metagene to metadata
 for (i  in 1:ncol(all_metagenes)) {
@@ -190,70 +197,195 @@ for (i  in 1:ncol(all_metagenes)) {
   xeno = AddMetaData(object = xeno,metadata = metagene_metadata,col.name = names(all_metagenes)[i])
 }
 
-FeaturePlot(object = xeno,features = colnames(all_metagenes),ncol = 3)
-DimPlot(xeno,group.by = "treatment")
+p = FeaturePlot(object = xeno,features = colnames(all_metagenes),ncol = 3)
 
+p
+```
+
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/xeno_NMF_usage_UMAP.rds")
+```
+
+```{r fig.height=10}
+all_programs_top_genes = c()
+for (i in 1:(ncol(gep_scores)-1)) {
+  top_genes = gep_scores  %>%  arrange(desc(gep_scores[i])) #sort by score a
+  top = head(rownames(top_genes), 20) #take top top_genes_num
+  all_programs_top_genes = c(all_programs_top_genes,top)
+}
+
+data = FetchData(object = xeno, vars = all_programs_top_genes) %>% scale() %>% t()
+
+annotation_data = FetchData(object = xeno, vars =names(all_metagenes)[1:4])
+annotation_data = annotation_data
+col_dend = as.dendrogram(hclust(dist(annotation_data),method = "complete"))
+
+col_fun = circlize::colorRamp2(c(0, 1), c("white", "red"))
+column_ha = HeatmapAnnotation(df = annotation_data, col = list(Program.1 = col_fun,Program.2 = col_fun,Program.3 = col_fun,Program.4 = col_fun,unknown = col_fun))
+row_annotation_data = data.frame(row.names = all_programs_top_genes,top_genes = as.character(rep(paste("program",c(1,2,3,4)), each=20)))
+row_ha = rowAnnotation(df = row_annotation_data)
+
+p = ComplexHeatmap::Heatmap(
+  data,
+  show_column_names = F,
+  row_names_gp = grid::gpar(fontsize = 7),
+  cluster_rows = F,
+  top_annotation =
+    column_ha,
+  name = "Z-score expression",use_raster = T,cluster_columns = col_dend,right_annotation = row_ha
+)
+  
+p
+```
+
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/xeno_NMF_programs_heatmap.rds")
+```
+
+
+
+```{r warning=FALSE}
+# modify dotplot to be without exponent of the expression
+newDef <- deparse(DotPlot)
+newDef[57] =  "            return(mean(x =  x))"
+newDef[136] =  "            yes = \"Identity\", no = \"Split Identity\")) + cowplot::theme_cowplot()" #add package name
+newDef[95] = "                data.use <- data.use" # remove log
+newDef[146] = "        plot <- plot + scale_color_distiller(palette = cols,  direction = 1)"
+DotPlot.2 <- eval(parse(text=newDef))
 ```
 
 # Programs dotplot
-```{r fig.width=10}
-DotPlot.2(object = xeno, features =  colnames(all_metagenes),group.by  = 'treatment',scale = T)+
-  guides(size = guide_legend(title = "Cells expressing (%)"),color = guide_colorbar(title = "Average Score"))
-VlnPlot(xeno,features = colnames(all_metagenes),group.by = "orig.ident",pt.size = 0,split.by = "treatment")
+
+```{r}
+# scale metagene and add to metadata
+for (i  in 1:ncol(all_metagenes)) {
+  metagene_metadata = all_metagenes[,i,drop=F] %>% scale()
+  xeno = AddMetaData(object = xeno,metadata = metagene_metadata,col.name = paste0(names(all_metagenes)[i],"_scaled"))
+}
+```
+
+
+```{r fig.height=4, fig.width=11}
+
+p = DotPlot.2(object = xeno, features =  paste0(names(all_metagenes),"_scaled"),group.by  = 'treatment',scale = F)+
+  guides(size = guide_legend(title = "Cells above average (%)"),color = guide_colorbar(title = "Average Score"))+ scale_x_discrete(labels= paste0(names(all_metagenes),"\n(",c("IFNa","TNFa-NFKb","HYPOXIA","Cell_Cycle"),")"))
+p
 ```
 
 
 ```{r}
-require(facefuns)
-metagenes_mean_compare.2 = function(dataset,prefix = "",pre_on = c("OSI","NT"),axis.text.x = 11,test = "t.test", programs = c("Hypoxia","TNFa","Cell_cycle"),return_list = F){
-  plt.lst = list()
-  for (metegene in programs) {
-    #create data:
-    genes_by_tp = FetchData(object = dataset,vars =  c("orig.ident","treatment",metegene)) %>% filter(treatment %in% pre_on)  %>% as.data.frame() #mean expression
-    names(genes_by_tp)[3] = "Metagene_mean"
-    
-    fm <- as.formula(paste("Metagene_mean", "~", "treatment")) #make formula to plot
-    
-    #plot and split by patient:   
-    stat.test = compare_means(formula = fm ,data = genes_by_tp,method = test,group.by = "orig.ident",p.adjust.method = "fdr")%>% # Add pairwise comparisons p-value
-      dplyr::filter(group1 == pre_on[1] & group2 == pre_on[2])  #filter for pre vs on treatment only
-    
-    stat.test$p.format =stat.test$p.adj #modift 0 pvalue to be lowest possible float
-    stat.test$p.format[!stat.test$p.format == 0 ] <- paste("=",stat.test$p.format[!stat.test$p.format == 0 ])
-    stat.test$p.format[stat.test$p.format == 0 ] <- paste("<",.Machine$double.xmin %>% signif(digits = 3))
-    
-    plt = ggplot(genes_by_tp, aes(x = orig.ident, y = Metagene_mean,fill = treatment)) + geom_split_violin(scale = 'width')+ylab(metegene)+ 
-      geom_boxplot(width = 0.25, notch = FALSE, notchwidth = .4, outlier.shape = NA, coef=0)+
-      ylim(min(genes_by_tp$Metagene_mean),max(genes_by_tp$Metagene_mean)*1.25)
-    plt = plt +stat_pvalue_manual(stat.test, label = "p {p.format}",  #add p value
-                                  y.position = max(genes_by_tp$Metagene_mean)*1.08,x = "orig.ident",inherit.aes = F,size = 3.3) # set position at the top value
-    
-    plt.lst[[metegene]] = plt
-    if (!return_list) {
-      print(plt)
-      }
-  }
-  if (return_list) {
-    return(plt.lst)
-  }
-}
-
-
+saveRDS(object = as.grob(p),file = "./Figures/xeno_NMF_programs_dotplot.rds")
 ```
+
+
 
 
 
 # NMF programs regulation  {.tabset}
 
-```{r}
-metagenes_mean_compare(dataset = xeno,time.point_var = "treatment",prefix = "model",patient.ident_var = "orig.ident",pre_on = c("NT","OSI"),test = "wilcox.test",programs = colnames(all_metagenes),without_split = F)
-```
-
 ```{r echo=TRUE, fig.height=4, fig.width=7, results='asis'}
-metagenes_mean_compare.2(dataset = xeno,time.point_var = "treatment",prefix = "model",patient.ident_var = "orig.ident",pre_on = c("NT","OSI"),test = "wilcox.test",programs = colnames(all_metagenes),without_split = F)
+p = metagenes_violin_compare(dataset = xeno,prefix = "model",pre_on = c("NT","OSI"),test = "wilcox.test",programs = colnames(all_metagenes)[3], return_list = T)
+p = p[[1]]+xlab("Model")+ylab(paste( "Program 3 (Hypoxia)\n Z-score"))
+
+p
 ```
 
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/xeno_NMF_hypoxia_split_violin.rds")
+```
 
+```{r}
+program_names =  c("IFNa","TNFa", "cell cycle","EMT")
+```
+
+```{r fig.height=5, fig.width=11}
+# for sup:
+plt_list = metagenes_violin_compare(dataset = xeno,prefix = "model",pre_on = c("NT","OSI"),test = "wilcox.test",programs = colnames(all_metagenes)[-c(3)],return_list =  T)
+
+for (i in 1:length(plt_list)) {
+  plt_list[[i]] = plt_list[[i]]+xlab("Model")+ylab(paste0( "Program ",i," (",program_names[i],")\n Z-score"))
+}
+
+p = ggarrange(plotlist = plt_list,common.legend = T)
+p
+```
+
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/xeno_NMF_NOhypoxia_split_violin.rds")
+```
+
+```{r }
+# scale by patient
+
+patient_var = "orig.ident"
+
+xeno = ScaleData(object = xeno,features = hif_targets)
+  genes = hif_targets
+  genes = genes[genes %in% rownames(xeno)]
+  scores = FetchData(object = xeno,vars = c(genes,patient_var))
+  scores = scores %>% mutate(r = rowMeans(dplyr::select_at(scores,vars(-contains(patient_var))))) %>% # z score every patient separately 
+    group_by_at(patient_var) %>% summarise(r = scale(r)) %>% pull(r) %>% as.data.frame() 
+  xeno %<>% AddMetaData(metadata = scores,col.name = "hif_targets")
+  
+
+
+
+
+```
+```{r }
+# scale by patient
+
+patient_var = "orig.ident"
+
+lung = ScaleData(object = lung,features = hif_targets)
+  genes = hif_targets
+  genes = genes[genes %in% rownames(lung)]
+  scores = FetchData(object = lung,vars = c(genes,patient_var))
+  scores = scores %>% mutate(r = rowMeans(dplyr::select_at(scores,vars(-contains(patient_var))))) %>% # z score every patient separately 
+    group_by_at(patient_var) %>% summarise(r = scale(r)) %>% pull(r) %>% as.data.frame() 
+  lung %<>% AddMetaData(metadata = scores,col.name = "hif_targets")
+  
+
+
+
+
+```
+
+```{r echo=TRUE, fig.height=6, fig.width=8, results='asis'}
+p1 = metagenes_violin_compare(dataset = xeno,prefix = "Model",pre_on = c("NT","OSI"),test = "wilcox.test",programs = "hif_targets", return_list = T)
+p1 = p1[[1]]+xlab("Model")+ylab(paste( "HIF-targets\n Z-score")) + ggtitle("Xeno")
+
+p2 = metagenes_violin_compare(dataset = lung,prefix = "Patient",pre_on = c("pre-treatment","on-treatment"),test = "wilcox.test",programs = "hif_targets", return_list = T)
+p2 = p2[[1]]+xlab("Patient")+ylab(paste( "HIF-targets\n Z-score")) + ggtitle("Patients")
+
+p = p1/p2
+p
+```
+
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/xeno_patient_hifTargets_split_violin.rds")
+```
+
+```{r fig.height=10}
+
+data = FetchData(object = xeno, vars = hif_targets) %>% scale() %>% t()
+
+annotation_data = FetchData(object = xeno, vars = "treatment")
+column_ha = HeatmapAnnotation(df = annotation_data)
+
+
+p = ComplexHeatmap::Heatmap(
+  data,
+  show_column_names = F,
+  row_names_gp = grid::gpar(fontsize = 7),
+  cluster_rows = F,
+  top_annotation =
+    column_ha,
+  name = "Z-score expression",use_raster = T,cluster_columns = T
+)
+  
+p
+```
 
 # known genes score
 ```{r}
@@ -285,348 +417,54 @@ for (i in seq_along(gene_list)) {
 
 
 
-
-
-```
-
-```{r}
-cor(xeno$immune_response, xeno$gep2_top)
-cor(xeno$immune_response, xeno$TNFa_genes)
-cor(xeno$immune_response, xeno$TNFa_le)
-cat ("\n")
-
-cor(xeno$hypoxia, xeno$hif_targets)
-cor(xeno$hypoxia, xeno$hif_le)
 ```
 
 
 
-
-
+# known genes score
 ```{r}
 
-p = DotPlot(object = xeno, features =  names(gene_list),group.by  = 'treatment',scale = T)+
-  guides(size = guide_legend(title = "Cells expressing (%)"),color = guide_colorbar(title = "Average Score"))
- p+scale_radius()
-```
-
-
-```{r}
-
-all_pathways = list()
-for (pathway in names(gene_list)) {
-  data = FetchData(object = xeno,vars = c(pathway, "treatment", "orig.ident"))
-  all_patients = list()
-  for (patient in unique(xeno$orig.ident)) {
-    mean1 = data %>% filter(orig.ident == patient, treatment == "NT") %>% pull(1) %>% mean()
-    mean2 = data %>% filter(orig.ident == patient, treatment == "OSI") %>% pull(1) %>% mean()
-    fc =(mean1+1) / (mean2+1)
-    all_patients[[patient]] = fc
-  }
-  all_pathways[[pathway]] = all_patients
+gene_list = list(IFNa_genes = genesets$HALLMARK_INTERFERON_ALPHA_RESPONSE, TNFa_genes = genesets$HALLMARK_TNFA_SIGNALING_VIA_NFKB, hif_targets = hif_targets,E2F_genes = genesets$HALLMARK_E2F_TARGETS)
+patient_var = "orig.ident"
+# xeno = ScaleData(object = xeno,features = unlist(gene_list))
+for (i in seq_along(gene_list)) {
+  genes = gene_list[[i]]
+  name = names(gene_list)[i]
+  genes = genes[genes %in% rownames(xeno)]
+  scores = FetchData(object = xeno,vars = c(genes,patient_var))
+  scores = scores %>% mutate(r = rowMeans(dplyr::select_at(scores,vars(-contains(patient_var))))) %>% # z score every patient separately 
+    group_by_at(patient_var) %>% summarise(r = scale(r)) %>% pull(r) %>% as.data.frame() 
+  print(name)
+  xeno %<>% AddMetaData(metadata = scores,col.name = name)
 }
 
 
-a = as.data.frame(lapply(all_pathways, unlist))
-a = log2(t(a) %>% as.data.frame())
-breaks <- c(seq(-1,1,by=0.05))
-colors_for_plot <- colorRampPalette(colors = c("blue", "white", "red"))(n = length(breaks)-1); colors_for_plot[20:21] = "white"
-pheatmap::pheatmap(a,color = colors_for_plot,breaks = breaks,display_numbers = T,main = "log2(FC) pre/on")
+
+
 
 ```
-
 
 
 
 ```{r}
-metagenes_mean_compare(dataset = xeno,time.point_var = "treatment",prefix = "model",patient.ident_var = "orig.ident",pre_on = c("NT","OSI"),test = "wilcox.test",programs = "hif_le",without_split = F)
-```
 
-
-```{r fig.height=4, fig.width=12}
-for (model in unique(xeno$orig.ident)) {
-  cell_name = FetchData(xeno,vars = "orig.ident") %>% filter(orig.ident == model) %>% rownames()
-  data = FetchData(object = xeno,vars = colnames(all_metagenes),cells = cell_name)%>% scale() %>% t() 
-  annotation = FetchData(object = xeno,vars = c("treatment","orig.ident"),cells = cell_name) %>% arrange(treatment)
-  col = list(treatment = c("NT" = "red", "OSI" = "green", "res" = "blue"),orig.ident = c(model = "grey"));names(col[[2]]) = model
-  column_ha = HeatmapAnnotation(df = annotation,col = col) 
-  data = data[,rownames(annotation)]
-  print(ComplexHeatmap::Heatmap(data,show_column_names = F,show_row_names = T,cluster_rows = F,name = "Z-score expression",use_raster = T,cluster_columns = F,
-                          row_names_gp = grid::gpar(fontsize = 10), top_annotation = column_ha))
-
-}
-
-# data = FetchData(object = xeno,vars = colnames(all_metagenes))%>% scale() %>% t() 
-# annotation = FetchData(object = xeno,vars = c("treatment","orig.ident")) %>% arrange(treatment)
-# column_ha = HeatmapAnnotation(df = annotation) 
-# data = data[,rownames(annotation)]
-# ComplexHeatmap::Heatmap(data,show_column_names = F,show_row_names = T,cluster_rows = F,name = "Z-score expression",use_raster = T,cluster_columns = F,
-#                         row_names_gp = grid::gpar(fontsize = 10), top_annotation = column_ha)
-
-
-```
-
-```{r fig.height=5}
-library(ComplexHeatmap)
-for (i in 1:ncol(gep_scores)) {
-  top_genes = gep_scores  %>%  arrange(desc(gep_scores[i])) #sort by score a
-  top = head(rownames(top_genes),50) #take top top_genes_num
-  data = FetchData(object = xeno,vars = top)%>% scale() %>% t() 
-  metagene_data = FetchData(object = xeno,vars = colnames(all_metagenes)[i],cells = colnames(xeno),slot = "data")
-  metagene_data$names = rownames(metagene_data)
-  col_list = list(circlize::colorRamp2(c(0, 1), c("white", "red"))); names(col_list) = colnames(all_metagenes)[i]
-  column_ha = HeatmapAnnotation(df = metagene_data,col = col_list)
-  print(ComplexHeatmap::Heatmap(data,show_column_names = F,show_row_names = T,cluster_rows = F,name = "Z-score expression",use_raster = T,cluster_columns = F))
-    
-  
-  a = DoHeatmap(object = xeno,features = top,group.by = "treatment",combine = F,cells = colnames(xeno),slot = "data")
-  print(a[[1]]+
-          geom_xsidetile(data = metagene_data,aes(x = names,y = "immune_response",xfill = `immune_response`,width=5, height=15)))
-  
-
-
-}
-```
-
-
-
-
-
-
-# LE genes programs UMAP  {.tabset}
-
-
-```{r results='asis'}
-  for (col in seq_along(gep_scores[1:4])) {
-     ranked_vec = gep_scores[,col] %>% setNames(rownames(gep_scores)) %>% sort(decreasing = TRUE) 
-     hyp_obj <- hypeR_fgsea(ranked_vec, genesets)
-     for (pathway in programs_main_pathways[[col]]) {
-        le_genes =  hyp_obj$data %>% filter(label == pathway) %>% pull("le") %>% strsplit(",") %>% unlist()
-        scoresAndIndices = getPathwayScores(dataMatrix = xeno@assays$RNA@data,pathwayGenes = le_genes)
-        pathway_name = paste0(pathway,"_le")
-        xeno=AddMetaData(xeno,scoresAndIndices$pathwayScores,col.name = pathway_name)
-        print_tab(FeaturePlot(object = xeno,features = pathway_name),title = pathway_name)
-     }
-  }
-```
-
-
-# LE genes programs regulation  {.tabset}
-
-```{r  results='asis'}
-metagenes_mean_compare(dataset = xeno,time.point_var = "treatment",prefix = "model",patient.ident_var = "orig.ident",pre_on = c("NT","OSI"),test = "wilcox.test",programs = programs_main_pathways %>% unlist() %>% paste0("_le"),without_split = F)
-```
-```{r}
-col=2
-ranked_vec = gep_scores[, col] %>% setNames(rownames(gep_scores)) %>% sort(decreasing = TRUE)
-print (paste("running gep",col))
-hyp_obj <-hypeR_fgsea(ranked_vec, genesets_go, up_only = T)
-
-print(hyp_dots(hyp_obj, title = paste("program", col), abrv = 70) + aes(size =nes))
-  
-```
-
-# Top program 2 genes expression correlation
-```{r}
-top_ot = gep_scores [order(gep_scores [,2],decreasing = T),2,drop = F]%>% head(200) %>% rownames()
-
-num_of_clusters = 7
-annotation = plot_genes_cor(dataset = xeno,num_of_clusters = num_of_clusters,geneIds = top_ot,height = 3)
-
-```
-
-#  program 2 all clusters expression {.tabset}
-```{r results='asis',fig.width=14}
-for (chosen_clusters in 1:num_of_clusters) {
-  chosen_genes = annotation %>% dplyr::filter(cluster == chosen_clusters) %>% rownames() #take relevant genes
-  # print(chosen_genes)
-  hyp_obj <- hypeR(chosen_genes, genesets, test = "hypergeometric", fdr=1, plotting=F,background = rownames(xeno_5_gep_scores))
-
-   scoresAndIndices <- getPathwayScores(xeno@assays$RNA@data, chosen_genes)
-  xeno=AddMetaData(xeno,scoresAndIndices$pathwayScores,paste0("cluster",chosen_clusters))
-
-  
-  print_tab(plt = 
-              hyp_dots(hyp_obj,size_by = "none",title = paste0("cluster",chosen_clusters))+
-              FeaturePlot(object = xeno,features = paste0("cluster",chosen_clusters)),
-            title = chosen_clusters)
-}
-
-
-```
-
-# Correlation of clusters
-```{r}
-for (chosen_clusters in 1:num_of_clusters) {
-  
-  cor_res = cor(xeno$TNFa,xeno[[paste0("cluster",chosen_clusters)]])
-print(paste("correlation of TNFa program to", paste0("cluster",chosen_clusters),":", cor_res))
-
-}
-```
-
-
-```{r}
-clusters_idents = c("cluster1", "KEGG_OXIDATIVE_PHOSPHORYLATION","HALLMARK_TNFA_SIGNALING_VIA_NFKB","KEGG_ANTIGEN_PROCESSING_AND_PRESENTATION","HALLMARK_P53_PATHWAY","cluster6","cluster7")
-```
-
-
-#  program 2 intersected genes
-
-
-
-```{r}
-programs_of_cluster = c()
-for (chosen_clusters in 1:num_of_clusters) {
-  chosen_genes = annotation[["myannotation"]] %>% dplyr::filter(cluster == chosen_clusters) %>% rownames() #take relevant genes
-  pathway_name = clusters_idents[chosen_clusters]
-  if (!startsWith(x = pathway_name,prefix = "cluster")){
-      chosen_genes  = (chosen_genes) %>% intersect(genesets[[pathway_name]])
-      pathway_name = paste0(pathway_name,"_cluster")
-  }
-  programs_of_cluster = c(programs_of_cluster,pathway_name)
-  print(pathway_name)
-  print(chosen_genes)
-  cat("\n")
-  scoresAndIndices <- getPathwayScores(xeno@assays$RNA@data, chosen_genes)
-  xeno=AddMetaData(xeno,scoresAndIndices$pathwayScores,pathway_name)
-
-}
-```
-#  program 2 intersected pathway regulation {.tabset}     
-
-```{r  results='asis'}
-metagenes_mean_compare(dataset = xeno,time.point_var = "treatment",prefix = "model",patient.ident_var = "orig.ident",pre_on = c("NT","OSI"),test = "wilcox.test",programs = programs_of_cluster,without_split = F)
-```
-#  program 2 significant plot  
-
-```{r fig.height=12}
-signf_plot_pre_vs_on<- function(dataset,programs,patient.ident_var,prefix,pre_on,test,time.point_var) {
-    final_df = data.frame()
-    for (metegene in programs) {
-      genes_by_tp = FetchData(object = dataset,vars = metegene) %>% rowSums() %>% as.data.frame() #mean expression
-      names(genes_by_tp)[1] = metegene
-      genes_by_tp = cbind(genes_by_tp,FetchData(object = dataset,vars = c(patient.ident_var,time.point_var))) # add id and time points
-      
-      
-      genes_by_tp_forPlot =  genes_by_tp %>% mutate(!!ensym(patient.ident_var) := paste(prefix,genes_by_tp[,patient.ident_var])) #add "model" before  each model/patient
-      fm <- as.formula(paste(metegene, "~", time.point_var)) #make formula to plot
-      
-      #plot and split by patient:   
-      stat.test = compare_means(formula = fm ,data = genes_by_tp_forPlot,method = test,group.by = patient.ident_var)%>% 
-              dplyr::filter(group1 == pre_on[1] & group2 == pre_on[2])  #filter for pre vs on treatment only
-      final_df = rbind(final_df,stat.test)
-    }
-    return(final_df)
-}
-
-undebug(signf_plot_pre_vs_on)
-final_df = signf_plot_pre_vs_on(dataset = xeno,time.point_var = "treatment",prefix = "model",patient.ident_var = "orig.ident",pre_on = c("NT","OSI"),test = "wilcox.test",programs = programs_of_cluster )
-final_df = reshape2::dcast(final_df, orig.ident  ~.y.,value.var = "p.adj") %>% column_to_rownames("orig.ident")
-
-sig_heatmap(all_patients_result = final_df,title = "ad")
-```
-# Top program 3 genes expression correlation
-```{r}
-top_hypoxia = gep_scores [order(gep_scores [,3],decreasing = T),2,drop = F]%>% head(200) %>% rownames()
-
-num_of_clusters = 4
-annotation = plot_genes_cor(dataset = xeno,hallmark_name = NULL,num_of_clusters = num_of_clusters,geneIds = top_hypoxia)
-
-```
-#  program 3 all clusters expression {.tabset}
-
-```{r results='asis',fig.width=14}
-for (chosen_clusters in 1:num_of_clusters) {
-  chosen_genes = annotation[["myannotation"]] %>% dplyr::filter(cluster == chosen_clusters) %>% rownames() #take relevant genes
-  # print(chosen_genes)
-  hyp_obj <- hypeR(chosen_genes, genesets_env, test = "hypergeometric", fdr=1, plotting=F,background = rownames(xeno_5_gep_scores))
-
-   scoresAndIndices <- getPathwayScores(xeno@assays$RNA@data, chosen_genes)
-  xeno=AddMetaData(xeno,scoresAndIndices$pathwayScores,paste0("cluster",chosen_clusters))
-
-  
-  print_tab(plt = 
-              hyp_dots(hyp_obj,size_by = "none",title = paste0("cluster",chosen_clusters))+
-              FeaturePlot(object = xeno,features = paste0("cluster",chosen_clusters)),
-            title = chosen_clusters)
-
-
-}
-
-
-```
-
-# Correlation of clusters
-```{r}
-for (chosen_clusters in 1:num_of_clusters) {
-  
-  cor_res = cor(xeno$hypoxia,xeno[[paste0("cluster",chosen_clusters)]])
-print(paste("correlation of hypoxia program to", paste0("cluster",chosen_clusters),":", cor_res))
-
-}
+p1 = metagenes_violin_compare(dataset = xeno,prefix = "Model",pre_on = c("NT","OSI"),test = "wilcox.test",programs = "hif_targets", return_list = T)[[1]]
+p1
 ```
 
 ```{r}
-clusters_idents = c("HALLMARK_HYPOXIA", "HIF_targets","cluster3","cluster4")
+saveRDS(object = as.grob(p1),file = "./Figures/xeno_hif_targets_violin.rds")
 ```
 
+
+```{r fig.height=4, fig.width=11}
+
+p = DotPlot.2(object = xeno, features =   names(gene_list),group.by  = 'treatment',scale = F)+
+  guides(size = guide_legend(title = "Cells above average (%)"),color = guide_colorbar(title = "Average Score"))
+p
+```
 ```{r}
-programs_of_cluster = c()
-for (chosen_clusters in 1:num_of_clusters) {
-  chosen_genes = annotation[["myannotation"]] %>% dplyr::filter(cluster == chosen_clusters) %>% rownames() #take relevant genes
-  pathway_name = clusters_idents[chosen_clusters]
-  if (!startsWith(x = pathway_name,prefix = "cluster")){
-      chosen_genes  = (chosen_genes) %>% intersect(genesets[[pathway_name]])
-      pathway_name = paste0(pathway_name,"_cluster")
-  }
-  programs_of_cluster = c(programs_of_cluster,pathway_name)
-  print(pathway_name)
-  print(chosen_genes)
-  cat("\n")
-  scoresAndIndices <- getPathwayScores(xeno@assays$RNA@data, chosen_genes)
-  xeno=AddMetaData(xeno,scoresAndIndices$pathwayScores,pathway_name)
-
-}
+saveRDS(object = as.grob(p),file = "./Figures/xeno_signtures_dotplot.rds")
 ```
-#  program 3 intersected pathway regulation {.tabset}     
-
-```{r results='asis'}
-metagenes_mean_compare(dataset = xeno,time.point_var = "treatment",prefix = "model",patient.ident_var = "orig.ident",pre_on = c("NT","OSI"),test = "wilcox.test",programs = programs_of_cluster,without_split = F)
-```
-
-# Top program 3 genes expression correlation
-
-```{r}
-top_cc = gep_scores [order(gep_scores [,4],decreasing = T),2,drop = F]%>% head(200) %>% rownames()
-
-num_of_clusters = 4
-annotation = plot_genes_cor(dataset = xeno,hallmark_name = NULL,num_of_clusters = num_of_clusters,geneIds = top_cc)
-
-```
-#  program 3 all clusters expression {.tabset}
-
-```{r results='asis',fig.width=14}
-for (chosen_clusters in 1:num_of_clusters) {
-  chosen_genes = annotation[["myannotation"]] %>% dplyr::filter(cluster == chosen_clusters) %>% rownames() #take relevant genes
-  # print(chosen_genes)
-  hyp_obj <- hypeR(chosen_genes, genesets_env, test = "hypergeometric", fdr=1, plotting=F,background = rownames(xeno_5_gep_scores))
-
-   scoresAndIndices <- getPathwayScores(xeno@assays$RNA@data, chosen_genes)
-  xeno=AddMetaData(xeno,scoresAndIndices$pathwayScores,paste0("cluster",chosen_clusters))
-
-  
-  print_tab(plt = 
-              hyp_dots(hyp_obj,size_by = "none",title = paste0("cluster",chosen_clusters))+
-              FeaturePlot(object = xeno,features = paste0("cluster",chosen_clusters)),
-            title = chosen_clusters)
-  
-}
-
-
-```
-
-<script src="https://hypothes.is/embed.js" async></script>
-
 
 
