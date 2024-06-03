@@ -36,8 +36,97 @@ p3
 
 
 ```{r}
-svg(filename  = "./test.svg",width = 10,height = 4)
-cowplot::plot_grid(a,b, labels = c('A', 'B'))
+pdf("./final_figures/fig1.pdf",width = 15,height = 15)
+p3
 dev.off()
 ```
 
+# Figure 2
+
+
+```{r}
+xeno_nmf_heatmap = readRDS("./Figures/xeno_NMF_programs_heatmap.rds")
+xeno_nmf_usage_UMAP = readRDS("./Figures/xeno_NMF_usage_UMAP.rds")
+
+```
+
+
+```{r fig.height=17, fig.width=12}
+cowplot::plot_grid(xeno_nmf_usage_UMAP,as.grob(xeno_nmf_heatmap),ncol = 1,labels = "AUTO")
+```
+```{r}
+pdf("./final_figures/fig2.pdf",width = 12,height = 17)
+cowplot::plot_grid(xeno_nmf_usage_UMAP,xeno_nmf_heatmap,ncol = 1,labels = "AUTO")
+dev.off()
+```
+# Figure 3
+
+```{r}
+xeno_nmf_GSEA = readRDS("./Figures/xeno_nmf_GSEA.rds")
+xeno_NMF_programs_dotplot = readRDS("./Figures/xeno_NMF_programs_dotplot.rds")
+xeno_NMF_hypoxia_split_violin = readRDS("./Figures/xeno_NMF_hypoxia_split_violin.rds")
+```
+
+```{r fig.height=12, fig.width=21}
+p1 = cowplot::plot_grid(xeno_NMF_programs_dotplot,xeno_NMF_hypoxia_split_violin, ncol = 1,labels = c("B","C"))
+p = cowplot::plot_grid(xeno_nmf_GSEA,p1, ncol = 2,labels = c("A",NULL,NULL), rel_widths = c(1.5, 1))
+p
+```
+
+```{r}
+pdf("./final_figures/fig3.pdf",width = 22,height = 12)
+p
+dev.off()
+```
+
+# Figure 4
+
+```{r}
+patients_nmf_usage_umap = readRDS("./Figures/patients_nmf_usage_umap.rds")
+bivona_nmf_usage_umap =  readRDS("./Figures/bivona_nmf_usage_umap.rds")
+
+bivona_nmf_dotplot = readRDS("./Figures/bivona_nmf_dotplot.rds")
+bivona_nmf_split_violin = readRDS("./Figures/bivona_nmf_split_violin.rds")
+
+patients_nmf_usage_dotplot =  readRDS("./Figures/patients_nmf_usage_dotplot.rds")
+patients_nmf_hypoxia_violin = readRDS("./Figures/patients_nmf_hypoxia_violin.rds")
+```
+
+```{r fig.height=17, fig.width=17}
+p1 = cowplot::plot_grid(bivona_nmf_usage_umap,patients_nmf_usage_umap, bivona_nmf_dotplot,patients_nmf_usage_dotplot,bivona_nmf_split_violin,patients_nmf_hypoxia_violin,nrow = 3, ncol = 2,labels = "AUTO",rel_heights = c(1.5,1,1))
+
+p1
+```
+
+```{r}
+pdf("./final_figures/fig4.pdf",width = 19,height = 17)
+p1
+dev.off()
+```
+
+# Fig 4 sup
+```{r}
+
+bivona_known_genes_violin = readRDS("./Figures/bivona_known_genes_violin.rds")
+bivona_known_genes_dotplot = readRDS("./Figures/bivona_known_genes_dotplot.rds")
+
+patients_hif_targets_violin = readRDS("./Figures/patients_hif_targets_violin.rds")
+patients_signtures_dotplot =  readRDS("./Figures/patients_signtures_dotplot.rds")
+
+xeno_signtures_dotplot = readRDS("./Figures/xeno_signtures_dotplot.rds")
+xeno_hif_targets_violin = readRDS("./Figures/xeno_hif_targets_violin.rds")
+```
+
+
+```{r fig.height=8, fig.width=16}
+p1 = cowplot::plot_grid(xeno_signtures_dotplot,patients_signtures_dotplot,bivona_known_genes_dotplot,xeno_hif_targets_violin,patients_hif_targets_violin,bivona_known_genes_violin,labels = "AUTO")
+
+p1
+```
+
+
+```{r}
+pdf("./final_figures/fig4_sup.pdf",width = 24,height = 8)
+p1
+dev.off()
+```
