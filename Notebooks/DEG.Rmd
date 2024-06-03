@@ -42,6 +42,7 @@ lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
 ## Xeno DEG
 
 ```{r}
+xeno = SetIdent(object = xeno,value = "treatment")
 xeno = FindVariableFeatures(object = xeno,nfeatures = 5000)
 deg_df = FindMarkers(object = xeno,ident.1 = "NT",ident.2 = "OSI",densify = T,mean.fxn = function(x) {
   return(log(x = rowMeans(x = x) + 1, base = 2))
@@ -52,6 +53,19 @@ p
 ```
 ```{r}
 saveRDS(object = as.grob(p),file = "./Figures/xeno_DEG.rds")
+```
+
+## Xeno DEG regress patients
+
+```{r}
+xeno = SetIdent(object = xeno,value = "treatment")
+xeno = FindVariableFeatures(object = xeno,nfeatures = 5000)
+deg_df = FindMarkers(object = xeno,ident.1 = "NT",ident.2 = "OSI",densify = T,mean.fxn = function(x) {
+  return(log(x = rowMeans(x = x) + 1, base = 2))
+},features = VariableFeatures(xeno), logfc.threshold=0, min.pct=0,test.use = "LR",latent.vars = "orig.ident")
+
+p = volcano_plot(deg_df,top_genes_text = 5,ident1 = "NT",ident2 = "OSI",fc_cutoff = 1.5)+coord_cartesian(clip = "off")
+p
 ```
 
 
@@ -72,7 +86,7 @@ for (patient in patients_list) {
   p_list[[patient]] = p
 }
 
-p_list = lapply(p_list,FUN = function(x) {
+p_list = lapply(p_list,FUN = function(x) { #fix cropped edges
   x = x+ 
    coord_cartesian(clip = "off")
 })
