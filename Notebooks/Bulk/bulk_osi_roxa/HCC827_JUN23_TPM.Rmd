@@ -193,6 +193,38 @@ print_tab(down_genes_df,title = "down")
 ```
 # {-}
 
+```{r}
+genes = diff_genes %>% filter(cpVSop_FC>1) %>% 
+  mutate(greater_than = ifelse(cpVSop_FC > 2*roxaVSctrl_FC, TRUE, FALSE))%>% filter(greater_than == T & cpVSop_padj<0.05) %>% rownames()
+
+mat <- HCC827Jun23[rownames(HCC827Jun23) %in% genes, ]
+mat <- t(scale(t(mat)))
+anno <- as.data.frame(mat)
+
+library(ComplexHeatmap) 
+library(ggplot2) 
+split = data.frame( cluster = cutree(hclust(dist(mat)), k = 2))
+ha = rowAnnotation(cluster = as.character(split$cluster),col = list(cluster = structure(rainbow(n = 2), names=unique(split$cluster))))
+p = Heatmap(mat, cluster_rows = T, cluster_columns = F, column_labels = colnames(anno), name = "fpkm Z-score",column_title = "up in cpVSop but not in roxaVSctrl",row_names_gp =gpar(fontsize = 0),right_annotation = ha)
+p
+```
+
+```{r}
+genes = diff_genes  %>% filter(cpVSop_FC<1) %>% 
+  mutate(greater_than = ifelse(roxaVSctrl_FC  > 1.5*cpVSop_FC, TRUE, FALSE))%>% filter(greater_than == T & cpVSop_padj<0.05) %>% rownames()
+
+mat <- H1975Oct23[rownames(H1975Oct23) %in% genes, ]
+mat <- t(scale(t(mat)))
+anno <- as.data.frame(mat)
+
+library(ComplexHeatmap) 
+library(ggplot2) 
+split = data.frame( cluster = cutree(hclust(dist(mat)), k = 2))
+ha = rowAnnotation(cluster = as.character(split$cluster),col = list(cluster = structure(rainbow(n = 2), names=unique(split$cluster))))
+p = Heatmap(mat, cluster_rows = T, cluster_columns = F, column_labels = colnames(anno), name = "fpkm Z-score",column_title = "Down in cpVSop but not in roxaVSctrl",row_names_gp =gpar(fontsize = 0),right_annotation = ha)
+p
+```
+
 ```{r fig.height=6, fig.width=13,results='asis'}
 hyp_obj <- hypeR(up_genes, genesets, test = "hypergeometric", fdr=1, plotting=F,background = rownames(H1975Oct23))
 plt1 = hyp_dots(hyp_obj,title = "up in comboVSosi but not in roxaVSctrl")
