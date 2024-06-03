@@ -31,7 +31,7 @@ cell_lines_data = read.table(
 rownames(cell_lines_data) = make.unique(cell_lines_data[,"gene_name",drop=T]) #set genes names
 cell_lines_data = cell_lines_data[,8:ncol(cell_lines_data)] #remove genes info
 names(cell_lines_data) %<>% gsub(pattern = paste0("(S\\d).*$"),replacement = "\\1") # remove redundant info 
-
+hif_targets = scan("./Data/HIF_targets_Lombardi_PMC9869179.txt", character(), quote = "")
 ```
 
 ```{r}
@@ -90,11 +90,15 @@ hif_score$condition = strsplit(x = rownames(hif_score),split = "_") %>%
 hif_score$condition <- factor(hif_score$condition, levels = c("Day1_NT", "Day1_OSI","Day14_OSI"))
 
 
-ggbarplot(
+p = ggbarplot(
   hif_score, x = "condition", y = "HIF_TPM_mean", facet.by = "cell_type", color = "condition",  position = position_dodge(), add = c("mean_se", "jitter"), palette = c("#00AFBB", "#E7B800","red"),label = T,lab.nb.digits = 1,lab.vjust =-0.6,lab.size = 3,ggtheme = theme_bw())+ylim(0,370) + 
     theme(axis.text=element_text(size=8))
-```
 
+p
+```
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/cell_lines_hif_targets.rds")
+```
 
 ```{r}
 hif_targets_dana = c("CITED2","EDN1","VEGFA","BNIP3L","CD99","FN1","PLAUR","SERPINE1","ADM","EGLN3","HK2","IGFBP3","PDK1","DDIT4","SLC2A1","PFKFB3","BNIP3","PGK1","LDHA","GPI")
