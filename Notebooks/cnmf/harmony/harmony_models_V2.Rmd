@@ -8,10 +8,7 @@ output:
 ---
 
 
-```{python}
-import scanpy as sc
-adata = sc.read("/sci/labs/yotamd/lab_share/avishai.wizel/R_projects/EGFR/Data/cnmf/xeno_Harmony_NoNeg_2Kvargenes.h5ad")
-```
+
 
 ## Data
 ```{r}
