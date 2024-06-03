@@ -78,12 +78,12 @@ knitr::include_graphics(plot_path)
 ```{python}
 k = 5
 density_threshold = 0.1 
-cnmf_obj.consensus(k=k, density_threshold=density_threshold,show_clustering=True)
+# cnmf_obj.consensus(k=k, density_threshold=density_threshold,show_clustering=True)
 usage_norm, gep_scores, _, _ = cnmf_obj.load_results(K=k, density_threshold=density_threshold)
 ```
 
 ```{r}
-usage_norm5_xeno  = py$usage_norm
+usage_norm5_xeno  = py$usageq_norm
 gep_scores5_xeno = py$gep_scores
 ```
 
