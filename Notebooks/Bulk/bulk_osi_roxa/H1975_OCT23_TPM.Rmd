@@ -212,7 +212,7 @@ H1975_down_genes = down_genes
 # {-}
 
 ```{r}
-genes = diff_genes %>% filter(cpVSop_FC>0) %>% 
+genes = diff_genes %>% filter(cpVSop_FC>1) %>% 
   mutate(greater_than = ifelse(cpVSop_FC > 2*roxaVSctrl_FC, TRUE, FALSE))%>% filter(greater_than == T & cpVSop_padj<0.05) %>% rownames()
 
 mat <- H1975Oct23[rownames(H1975Oct23) %in% genes, ]
@@ -226,6 +226,23 @@ ha = rowAnnotation(cluster = as.character(split$cluster),col = list(cluster = st
 p = Heatmap(mat, cluster_rows = T, cluster_columns = F, column_labels = colnames(anno), name = "fpkm Z-score",column_title = "up in cpVSop but not in roxaVSctrl",row_names_gp =gpar(fontsize = 0),right_annotation = ha)
 p
 ```
+```{r}
+genes = diff_genes  %>% filter(cpVSop_FC<1) %>% 
+  mutate(greater_than = ifelse(roxaVSctrl_FC  > 1.5*cpVSop_FC, TRUE, FALSE))%>% filter(greater_than == T & cpVSop_padj<0.05) %>% rownames()
+
+mat <- H1975Oct23[rownames(H1975Oct23) %in% genes, ]
+mat <- t(scale(t(mat)))
+anno <- as.data.frame(mat)
+
+library(ComplexHeatmap) 
+library(ggplot2) 
+split = data.frame( cluster = cutree(hclust(dist(mat)), k = 2))
+ha = rowAnnotation(cluster = as.character(split$cluster),col = list(cluster = structure(rainbow(n = 2), names=unique(split$cluster))))
+p = Heatmap(mat, cluster_rows = T, cluster_columns = F, column_labels = colnames(anno), name = "fpkm Z-score",column_title = "Down in cpVSop but not in roxaVSctrl",row_names_gp =gpar(fontsize = 0),right_annotation = ha)
+p
+```
+
+
 ```{r}
 H1975_up_genes_FC = split %>% filter(cluster == 1) %>% rownames()
 ```
@@ -348,6 +365,8 @@ wiki_p = (p1/p2)
 print_tab(plt = wiki_p,title = "REACTOME")
 
 ```
+
+
 ```{r}
 cluster_3 = split %>% dplyr::filter(cluster == 3) %>% rownames() 
 # %>% cat(sep = "\n")#take relevant genes
