@@ -167,10 +167,10 @@ ComplexHeatmap::Heatmap(logFC_df, name = "log2FC on/pre", col = col_fun,
 colors= c()
 for (row_num in 1:nrow(logFC_df)) {
   row = logFC_df[row_num,]
-  if (sum(row > 0.1)  >= length(row)-2) {
+  if (sum(row > 0.1)  >= 5) {
     colors <- c(colors, "red")
   }
-  else if (sum(row < -0.1)  >= length(row)-2) {
+  else if (sum(row < -0.1)  >= 5) {
     colors <- c(colors, "blue")
   }
   else{colors <- c(colors, "black")}
