@@ -43,19 +43,15 @@ tiss_subset_tumor2 = UpdateSeuratObject(tiss_subset_tumor2)
 tiss_subset_tumor2$treatment = NULL
 tiss_subset_tumor2@meta.data[["treatment"]] = factor(tiss_subset_tumor2$analysis, levels = c("naive", "grouped_pr","grouped_pd"))
 ```
-
 ```{r}
-tiss_subset_tumor2
-table(tiss_subset_tumor2$analysis)
-tiss_subset_tumor2$sample_name %>% unique %>% length()
-tiss_subset_tumor2@meta.data[,c("sample_name","analysis")] %>% filter(analysis == "grouped_pr") %>% pull(sample_name) %>% unique() %>% length()
-tiss_subset_tumor2@meta.data[,c("sample_name","analysis")] %>% filter(analysis == "grouped_pd") %>% pull(sample_name) %>% unique() %>% length()
 
 ```
 
+
+
 ```{r}
 tiss_subset_tumor2_pri = subset(tiss_subset_tumor2, subset = primary_or_metastaic %in% c("Primary"))
-tiss_subset_tumor2_pri_egfr = subset(tiss_subset_tumor2_pri, subset = driver_gene == "EGFR")
+tiss_subset_tumor2_pri_egfr = subset(tiss_subset_tumor2_pri, subset = driver_gene == "EGFR") %>% subset(subset = histolgy == "Adenocarcinoma") 
 ```
 
 calculate nmf metagenes
