@@ -1,0 +1,580 @@
+---
+title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: FALSE
+    number_sections: true
+    toc_depth: 1
+editor_options: 
+  chunk_output_type: inline
+---
+
+
+# Data
+
+```{r}
+lung = readRDS("./Data/lung_cancercells_withTP_onlyPatients.rds")
+lung_patients = lung$patient.ident %>% unique() %>% as.character()
+lung_patients_filtered = lung_patients[!(lung_patients %in% c("X1055new","X1099"))] # remove patients with less than 100 malignant cells
+lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
+```
+
+
+```{r}
+suffix ="xeno_genes_0-5sigma_2-7theta_100iter_26_9"
+```
+
+
+```{python}
+from cnmf import cNMF
+suffix = r.suffix
+import pickle
+f = open('./Data/cnmf/cnmf_objects/patients_' + suffix + '_cnmf_obj.pckl', 'rb')
+cnmf_obj = pickle.load(f)
+f.close()
+```
+
+
+
+# Functions
+
+```{r}
+library(stringi)
+library(reticulate)
+source_from_github(repositoy = "DEG_functions",version = "0.2.47")
+source_from_github(repositoy = "cNMF_functions",version = "0.4.01",script_name = "cnmf_functions_V3.R")
+source_from_github(repositoy = "sc_general_functions",version = "0.1.28",script_name = "functions.R")
+```
+
+```{r}
+genesets <- msigdb_download("Homo sapiens",category="H") %>% append( msigdb_download("Homo sapiens",category="C2",subcategory = "CP"))
+genesets[["HIF_targets"]] = hif_targets
+
+genesets_go <- msigdb_download("Homo sapiens",category="C5",subcategory = "GO:BP")
+```
+
+# K selection plot
+```{r fig.height=4, fig.width=4}
+plot_path = paste0("/sci/labs/yotamd/lab_share/avishai.wizel/R_projects/EGFR/Data/cnmf/cNMF_patients_Varnorm_Harmony_",suffix,"/cNMF_patients_Varnorm_Harmony_",suffix,".k_selection.png")
+knitr::include_graphics(plot_path)
+```
+
+
+```{python}
+cnmf_obj.consensus(k=3, density_threshold=0.1,show_clustering=True)
+cnmf_obj.consensus(k=6, density_threshold=0.1,show_clustering=True)
+cnmf_obj.consensus(k=7, density_threshold=0.1,show_clustering=True)
+cnmf_obj.consensus(k=8, density_threshold=0.1,show_clustering=True)
+```
+
+
+# gep scores for all NMF k's
+```{python}
+density_threshold = 0.1
+usage_norm3, gep_scores3, gep_tpm3, topgenes = cnmf_obj.load_results(K=3, density_threshold=density_threshold)
+usage_norm6, gep_scores6, gep_tpm6, topgenes = cnmf_obj.load_results(K=6, density_threshold=density_threshold)
+usage_norm7, gep_scores7, gep_tpm7, topgenes = cnmf_obj.load_results(K=7, density_threshold=density_threshold)
+usage_norm8, gep_scores8, gep_tpm8, topgenes = cnmf_obj.load_results(K=8, density_threshold=density_threshold)
+
+```
+
+# Enrichment analysis by top 200 genes of each program {.tabset}
+```{r fig.height=8, fig.width=8, results='asis'}
+gep_scores3 = py$gep_scores3
+gep_scores6 = py$gep_scores6
+gep_scores7 = py$gep_scores7
+gep_scores8 = py$gep_scores8
+
+gep_tpm8 = py$gep_tpm8
+top_genes = py$topgenes
+```
+
+
+```{python}
+import pandas as pd
+spectra_original = cnmf_obj.get_median_spectra(k=8).T #get score 
+path = "/sci/labs/yotamd/lab_share/avishai.wizel/R_projects/EGFR/Data/cnmf/cNMF_patients_Varnorm_Harmony_xeno_genes_0-5sigma_2-7theta_100iter_26_9/cNMF_patients_Varnorm_Harmony_xeno_genes_0-5sigma_2-7theta_100iter_26_9.spectra.k_8.dt_0_1.consensus.txt"
+spectra_scores = pd.read_csv(path, sep='\t', index_col=0).T
+
+```
+
+```{r}
+spectra_scores = py$spectra_scores
+```
+
+# GSEA for every program {.tabset}
+
+```{r results='asis'}
+  for (col in seq_along(gep_tpm8)) {
+     ranked_vec = gep_tpm8[,col] %>% setNames(rownames(gep_tpm8)) %>% sort(decreasing = TRUE) 
+     hyp_obj <- hypeR_fgsea(ranked_vec, genesets)
+     print_tab(hyp_dots(hyp_obj,title = paste("program",col))+ aes(size=nes),title = paste0("gep",col))
+  }
+```
+
+```{r results='asis'}
+  for (col in seq_along(gep_scores8)) {
+     ranked_vec = gep_scores8[,col] %>% setNames(rownames(gep_scores8)) %>% sort(decreasing = TRUE) 
+     hyp_obj <- hypeR_fgsea(ranked_vec, genesets)
+     print_tab(hyp_dots(hyp_obj,title = paste("program",col))+ aes(size=nes),title = paste0("gep",col))
+  }
+```
+
+```{r results='asis'}
+  for (col in seq_along(gep_scores8)) {
+     ranked_vec = gep_scores8[,col] %>% setNames(rownames(gep_scores8)) %>% sort(decreasing = TRUE) 
+     hyp_obj <- hypeR_fgsea(ranked_vec, genesets,up_only = F)
+     print_tab(hyp_dots(hyp_obj,title = paste("program",col))+ aes(size=nes),title = paste0("gep",col))
+  }
+```
+
+```{r}
+programs_main_pathways = list(gep1 = 1:2, gep2 = 1:3,gep3 = 1:4)
+```
+
+
+```{r}
+gep_scores = py$gep_scores8
+usage_norm = py$usage_norm8
+```
+
+# progrmas from NMF
+```{r echo=TRUE, fig.height=9, fig.width=12, results='asis'}
+colnames(usage_norm) = paste0("gep",1:8)
+#add each metagene to metadata
+for (i  in 1:ncol(usage_norm )) {
+  metagene_metadata = usage_norm [,i,drop=F]
+  lung = AddMetaData(object = lung,metadata = metagene_metadata,col.name = colnames(usage_norm)[i])
+}
+
+FeaturePlot(object = lung,features = colnames(usage_norm),ncol = 3)
+
+```
+# progrmas from NMF {.tabset}
+
+```{r results='asis'}
+metagenes_mean_compare(dataset = lung,time.point_var = "time.point",prefix = "patient",patient.ident_var = "patient.ident",pre_on = c("pre-treatment","on-treatment"),test = "wilcox.test",programs = colnames(usage_norm)[1:5],without_split = F)
+```
+
+# Calculate usage by counts before Harmony
+```{r echo=TRUE, results='asis'}
+# get expression with genes in cnmf input
+genes = rownames(gep_scores)
+lung_expression = t(as.matrix(GetAssayData(lung,slot='data'))) 
+lung_expression = 2**lung_expression #convert from log2(tpm+1) to tpm
+lung_expression = lung_expression-1
+lung_expression = lung_expression[,genes] %>% as.data.frame()
+
+all_0_genes = colnames(lung_expression)[colSums(lung_expression==0, na.rm=TRUE)==nrow(lung_expression)] #delete rows that have all 0
+genes = genes[!genes %in% all_0_genes]
+lung_expression = lung_expression[,!colnames(lung_expression) %in% all_0_genes]
+gc(verbose = F)
+```
+
+
+```{python}
+
+lung_expression = r.lung_expression
+genes = r.genes
+usage_by_calc = get_usage_from_score(counts=lung_expression,tpm=lung_expression,genes=genes,cnmf_obj=cnmf_obj,k=8,sumTo1=True)
+usage_by_calc_unnorm = get_usage_from_score(counts=lung_expression,tpm=lung_expression,genes=genes,cnmf_obj=cnmf_obj,k=8,sumTo1=False)
+
+```
+```{r}
+usage_by_calc = py$usage_by_calc
+usage_by_calc_unnorm =py$usage_by_calc_unnorm
+```
+
+```{r}
+colnames(usage_by_calc) = c("autoimmune","TNFa.NFkB", "hypoxia","hypoxia2", "cell_cycle1", "cell_cycle2","INFg","unknown")
+```
+
+
+```{r echo=TRUE, fig.height=9, fig.width=12, results='asis'}
+# colnames(usage_by_calc) = paste0("gep",1:8)
+#add each metagene to metadata
+for (i  in 1:ncol(usage_by_calc )) {
+  metagene_metadata = usage_by_calc [,i,drop=F]
+  lung = AddMetaData(object = lung,metadata = metagene_metadata,col.name = colnames(usage_by_calc)[i])
+}
+
+FeaturePlot(object = lung,features = colnames(usage_by_calc),ncol = 3)
+
+```
+
+```{r}
+cor_res = cor(gep_scores)
+breaks <- c(seq(-1,1,by=0.01))
+colors_for_plot <- colorRampPalette(colors = c("blue", "white", "red"))(n = length(breaks))
+
+pht = pheatmap(cor_res,color = colors_for_plot,breaks = breaks)
+print_tab(pht,title = "correlation")
+```
+
+```{r}
+groups_list = c(5,6)
+patients_geps = union_programs(groups_list = groups_list,all_metagenes = patients_geps)
+```
+
+# Regulation {.tabset}
+
+```{r results='asis'}
+metagenes_mean_compare(dataset = lung,time.point_var = "time.point",prefix = "patient",patient.ident_var = "patient.ident",pre_on = c("pre-treatment","on-treatment"),test = "wilcox.test",programs = colnames(usage_by_calc)[1:5],without_split = F)
+```
+
+
+# programs LE genes {.tabset}
+```{r results='asis'}
+
+programs_main_pathways_names = list()
+  for (col in seq_along(gep_tpm8)) {
+     ranked_vec = gep_tpm8[,col] %>% setNames(rownames(gep_tpm8)) %>% sort(decreasing = TRUE) 
+     hyp_obj <- hypeR_fgsea(ranked_vec, genesets)
+     programs_main_pathways_names[[col]] =  hyp_obj$data[programs_main_pathways[[col]],"label",drop=T]
+     for (pathway_num in programs_main_pathways[[col]]) {
+        le_genes =  hyp_obj$data[pathway_num,,drop=F] %>% pull("le") %>% strsplit(",") %>% unlist()
+        score = FetchData(object = lung,vars = le_genes) %>% rowMeans()
+        pathway_name = paste0(hyp_obj$data[pathway_num,"label",drop=F],"_le")
+        lung=AddMetaData(lung,score,col.name = pathway_name)
+        print_tab(FeaturePlot(object = lung,features = pathway_name),title = pathway_name)
+     }
+  }
+```
+
+```{r results='asis'}
+programs_main_pathways_names = list()
+  for (col in seq_along(gep_scores)) {
+     ranked_vec = gep_scores[,col] %>% setNames(rownames(gep_scores)) %>% sort(decreasing = TRUE) 
+     hyp_obj <- hypeR_fgsea(ranked_vec, genesets)
+     programs_main_pathways_names[[col]] =  hyp_obj$data[programs_main_pathways[[col]],"label",drop=T]
+     for (pathway_num in programs_main_pathways[[col]]) {
+        le_genes =  hyp_obj$data[pathway_num,,drop=F] %>% pull("le") %>% strsplit(",") %>% unlist()
+        score = FetchData(object = lung,vars = le_genes) %>% rowMeans()
+        pathway_name = paste0(hyp_obj$data[pathway_num,"label",drop=F],"_le")
+        lung=AddMetaData(lung,score,col.name = pathway_name)
+        print_tab(FeaturePlot(object = lung,features = pathway_name),title = pathway_name)
+     }
+  }
+```
+```{r}
+genes = gep_scores[,2] %>% setNames(rownames(gep_scores)) %>% sort(decreasing = TRUE) %>% names
+score = FetchData(object = lung,vars = genes[1:100]) %>% rowMeans()
+pathway_name = "top_100_nfkb"
+lung=AddMetaData(lung,score,col.name = pathway_name)
+```
+
+```{r results='asis'}
+metagenes_mean_compare(dataset = lung,time.point_var = "time.point",prefix = "patient",patient.ident_var = "patient.ident",pre_on = c("pre-treatment","on-treatment"),test = "wilcox.test",programs = pathway_name,without_split = F)
+```
+# programs LE genes regulation {.tabset}
+
+```{r results='asis'}
+metagenes_mean_compare(dataset = lung,time.point_var = "time.point",prefix = "patient",patient.ident_var = "patient.ident",pre_on = c("pre-treatment","on-treatment"),test = "wilcox.test",programs = programs_main_pathways_names %>% unlist() %>% paste0("_le"),without_split = F)
+```
+
+
+# Top program 2 genes expression correlation
+```{r}
+top_ot = gep_scores [order(gep_scores [,2],decreasing = T),2,drop = F]%>% head(200) %>% rownames()
+
+annotation = plot_genes_cor(dataset = xeno,geneIds = top_ot,height = 2.8)
+
+```
+# cluster program expression {.tabset}
+
+```{r results='asis',fig.width=14}
+for (chosen_clusters in 1:length(unique(annotation$cluster))) {
+  chosen_genes = annotation %>% dplyr::filter(cluster == chosen_clusters) %>% rownames() #take relevant genes
+  # print(chosen_genes)
+  hyp_obj <- hypeR(chosen_genes, genesets, test = "hypergeometric", fdr=1, plotting=F,background = rownames(patients_geps))
+
+   scoresAndIndices <- getPathwayScores(lung@assays$RNA@data, chosen_genes)
+  lung=AddMetaData(lung,scoresAndIndices$pathwayScores,paste0("cluster",chosen_clusters))
+
+  
+  print_tab(plt = 
+              hyp_dots(hyp_obj,size_by = "none",title = paste0("cluster",chosen_clusters))+
+              FeaturePlot(object = lung,features = paste0("cluster",chosen_clusters)),
+            title = chosen_clusters)
+  
+  cor_res = cor(lung$interferon_like,lung[[paste0("cluster",chosen_clusters)]])
+# print(paste("correlation of TNFa program to", paste0("cluster",chosen_clusters),":", cor_res))
+
+}
+
+```
+
+
+# cluster program regulation {.tabset}
+
+```{r results='asis'}
+metagenes_mean_compare(dataset = lung,time.point_var = "time.point",prefix = "patient",patient.ident_var = "patient.ident",pre_on = c("pre-treatment","on-treatment"),test = "wilcox.test",programs = "CFLAR",without_split = F)
+```
+
+```{r results='asis'}
+metagenes_mean_compare(dataset = lung,time.point_var = "time.point",prefix = "patient",patient.ident_var = "patient.ident",pre_on = c("pre-treatment","on-treatment"),test = "wilcox.test",programs = "NFKB1",without_split = F)
+```
+
+# cluster program enrichment {.tabset}
+```{r}
+top_ot = patients_geps[order(patients_geps[,1],decreasing = T),2,drop = F]%>% head(10) %>% rownames()
+
+chosen_genes = top_ot
+ scoresAndIndices <- getPathwayScores(lung@assays$RNA@data, chosen_genes)
+  lung=AddMetaData(lung,scoresAndIndices$pathwayScores,"immune_gep")
+
+  
+  
+  cor_res = cor(lung$interferon_like,lung[["immune_gep"]])
+print(paste("correlation of TNFa program to", "immune_gep",":", cor_res))
+```
+```{r}
+metagenes_mean_compare(dataset = lung,time.point_var = "time.point",prefix = "patient",patient.ident_var = "patient.ident",pre_on = c("pre-treatment","on-treatment"),test = "wilcox.test",programs = "immune_gep",without_split = F)
+```
+
+```{python}
+import anndata as ad
+import scanpy as sc
+import numpy as np
+from sklearn.decomposition import non_negative_factorization
+import pandas as pd
+
+
+lung_expression = r.lung_expression
+genes = r.genes
+counts=lung_expression
+tpm=lung_expression
+
+counts_adata = ad.AnnData(counts)
+tpm_adata = ad.AnnData(tpm)
+
+
+
+#get matrices
+norm_counts = get_norm_counts(counts=counts_adata,tpm=tpm_adata,high_variance_genes_filter=np.array(genes)) #norm counts like cnmf
+norm_counts = norm_counts.to_df()
+```
+```{r}
+norm_counts = py$norm_counts %>% as.data.frame()
+```
+
+```{r}
+df = gep_scores8
+top = 200
+program_name =paste0("top_", top, "_genes")
+expression = lung_expression
+genes = df[,2] %>% setNames(rownames(df)) %>% sort(decreasing = TRUE) %>% names()
+le_genes
+
+# mult = as.matrix(t(df[genes[1:top],2,drop=F])) %*% (lung@assays$RNA@data[genes[1:top],] %>% as.matrix()); mult = mult[1,]
+mult =  (expression[,genes[1:top]] %>% as.matrix()) %*%  as.matrix((df[genes[1:top],2,drop=F]))
+# mult =  (expression[,le_genes] %>% as.matrix()) %*%  as.matrix((df[le_genes,2,drop=F]))
+
+cor_res = cor(usage_by_calc[,2],mult)
+print(paste("correlation of TNFa/NFkB program to", program_name,":", cor_res))
+```
+
+```{r}
+df = gep_scores8
+expression  = lung_expression
+top = 200
+program_name =paste0("top_", top, "_genes")
+prognam_index= 2
+top_genes = df[,prognam_index] %>% setNames(rownames(df)) %>% sort(decreasing = TRUE) %>% names()
+
+mult =  (expression[,top_genes[1:top]] %>% as.matrix())  %*% as.matrix(df[top_genes[1:top],prognam_index,drop=F])
+
+avg_tpm = expression[,top_genes[1:top]] %>% rowMeans()
+avg_tpm_all_genes = lung@assays$RNA@data[top_genes[1:top],] %>% 2^. %>% magrittr::subtract(1) %>%  colMeans()
+
+cor(usage_by_calc[,prognam_index],mult)
+cor(usage_by_calc[,prognam_index],avg_tpm)
+cor(usage_by_calc[,prognam_index],avg_tpm_all_genes)
+
+
+```
+
+```{r}
+metagenes_mean_compare(dataset = lung,time.point_var = "time.point",prefix = "patient",patient.ident_var = "patient.ident",pre_on = c("pre-treatment","on-treatment"),test = "wilcox.test",programs = "immune_gep_mult",without_split = F)
+```
+```{r echo=TRUE, results='asis'}
+# get expression with genes in cnmf input
+lung = FindVariableFeatures(object = lung,nfeatures = 2000)
+genes = rownames(lung)[rownames(lung) %in% VariableFeatures(object = xeno)[1:2000]]
+
+lung_expression = t(as.matrix(GetAssayData(lung,slot='data'))) 
+lung_expression = 2**lung_expression #convert from log2(tpm+1) to tpm
+lung_expression = lung_expression-1
+lung_expression = lung_expression[,genes] %>% as.data.frame()
+
+all_0_genes = colnames(lung_expression)[colSums(lung_expression==0, na.rm=TRUE)==nrow(lung_expression)] #delete rows that have all 0
+genes = genes[!genes %in% all_0_genes]
+lung_expression = lung_expression[,!colnames(lung_expression) %in% all_0_genes]
+gc(verbose = F)
+```
+```{python}
+
+lung_expression = r.lung_expression
+genes = r.genes
+# gep_scores = r.patients_geps
+usage_by_calc = get_usage_from_score(counts=lung_expression,tpm=lung_expression,genes=genes,cnmf_obj=cnmf_obj,k=8,sumTo1=False)
+```
+
+```{python}
+def get_usage_from_score(counts,tpm, genes,cnmf_obj,k, sumTo1 = True,do_norm_counts = True): #based on 'consensus' method
+      import anndata as ad
+      import scanpy as sc
+      import numpy as np
+      from sklearn.decomposition import non_negative_factorization
+      import pandas as pd
+      counts_adata = ad.AnnData(counts)
+      tpm_adata = ad.AnnData(tpm)
+      
+      #get matrices
+      if(do_norm_counts):
+        norm_counts = get_norm_counts(counts=counts_adata,tpm=tpm_adata,high_variance_genes_filter=np.array(genes)) #norm counts like cnmf
+      else:
+        norm_counts = ad.AnnData(counts)
+      spectra_original = cnmf_obj.get_median_spectra(k=k) #get score 
+      
+      # filter 
+      spectra = spectra_original[spectra_original.columns.intersection(genes)] #remove genes not in @genes
+      norm_counts = norm_counts[:, spectra.columns].copy() #remove genes not in spectra
+      spectra = spectra.T.reindex(norm_counts.to_df().columns).T #reorder spectra genes like norm_counts
+      
+      # calculate usage
+      usage_by_calc,_,_ = non_negative_factorization(X=norm_counts.X, H = spectra.values, update_H=False,n_components = k,max_iter=1000,init ='random')
+      usage_by_calc = pd.DataFrame(usage_by_calc, index=counts.index, columns=spectra.index) #insert to df+add names
+      
+      #normalize
+      if(sumTo1):
+          usage_by_calc = usage_by_calc.div(usage_by_calc.sum(axis=1), axis=0) # sum rows to 1 and assign to main df
+      
+      # reorder
+        # get original order
+      original_norm_counts = sc.read(cnmf_obj.paths['normalized_counts'])
+      usage_by_calc_original,_,_ = non_negative_factorization(X=original_norm_counts.X, H = spectra_original.values, update_H=False,n_components = k,max_iter=1000,init ='random')
+      usage_by_calc_original = pd.DataFrame(usage_by_calc_original, index=original_norm_counts.obs.index, columns=spectra_original.index)  
+      norm_original_usages =usage_by_calc_original.div(usage_by_calc_original.sum(axis=1), axis=0)      
+      reorder = norm_original_usages.sum(axis=0).sort_values(ascending=False)
+        #apply
+      usage_by_calc = usage_by_calc.loc[:, reorder.index]
+      return(usage_by_calc)
+    
+
+```
+
+```{python}
+
+lung_expression = r.lung_expression
+genes = r.genes
+usage_by_calc = get_usage_from_score(counts=lung_expression,tpm=lung_expression,genes=genes,cnmf_obj=cnmf_obj,k=8,sumTo1=True,do_norm_counts=False)
+```
+
+
+
+```{r}
+usage_by_calc = py$usage_by_calc
+groups_list = c(4,3,6)
+usage_by_calc = union_programs(groups_list = groups_list,all_metagenes = usage_by_calc)
+# usage_by_calc = apply(usage_by_calc, MARGIN = 1, sum_2_one) %>% t() %>% as.data.frame()
+usage_by_calc =usage_by_calc %>% rename(cell_cycle = gep4.3.6, hypoxia_like = gep2, interferon_like = gep1, TNFa =  gep5, INF2 = gep7)
+```
+
+```{r}
+lung=AddMetaData(lung,usage_by_calc[,1,drop=F],"immune_gep_no_sum2one")
+metagenes_mean_compare(dataset = lung,time.point_var = "time.point",prefix = "patient",patient.ident_var = "patient.ident",pre_on = c("pre-treatment","on-treatment"),test = "wilcox.test",programs = "immune_gep_no_sum2one",without_split = F)
+```
+
+# Program 2
+```{r}
+col=1
+ranked_vec = gep_scores8[, col] %>% setNames(rownames(gep_scores8)) %>% sort(decreasing = TRUE)
+print (paste("running gep",col))
+hyp_obj <-hypeR_fgsea(ranked_vec, genesets_go, up_only = T)
+
+print(hyp_dots(hyp_obj, title = paste("program", col), abrv = 70) + aes(size =nes))
+  
+```
+
+
+```{r}
+col=2
+ranked_vec = gep_scores8[, col] %>% setNames(rownames(gep_scores8)) %>% sort(decreasing = TRUE)
+print (paste("running gep",col))
+hyp_obj <-hypeR_fgsea(ranked_vec, genesets_go, up_only = T)
+
+print(hyp_dots(hyp_obj, title = paste("program", col), abrv = 70) + aes(size =nes))
+  
+```
+
+
+```{r}
+pathway_num = 1
+le_genes = hyp_obj$as.data.frame()[pathway_num,"le"] %>% strsplit(",") %>% unlist()
+score = (lung_expression[, le_genes] %>% as.matrix())  %*% as.matrix(gep_scores8[le_genes, 2, drop =F])
+
+# score = FetchData(object = lung,vars = le_genes) %>% rowMeans()
+pathway_name = paste0(hyp_obj$data[pathway_num, "label", drop = F], "_le") %>% gsub(pattern = " ",replacement = "_")
+lung = AddMetaData(lung, score, col.name = pathway_name)
+print_tab(FeaturePlot(object = lung,features = pathway_name),title = pathway_name)
+```
+```{r}
+pathway_num = 1
+le_genes = hyp_obj$as.data.frame()[pathway_num,"le"] %>% strsplit(",") %>% unlist()
+score = (lung_expression[, le_genes[ le_genes %in% top_genes[1:200]]] %>% as.matrix())  %*% as.matrix(gep_scores8[le_genes[ le_genes %in% top_genes[1:200]], 2, drop =F])
+cor(score,usage_by_calc[,2])
+score = FetchData(object = lung,vars = le_genes[ le_genes %in% top_genes[1:200]]) %>% rowMeans()
+cor(score,usage_by_calc[,2])
+
+        
+top_genes = gep_scores8[,2] %>% setNames(rownames(gep_scores8)) %>% sort(decreasing = TRUE) %>% names()
+score = (lung_expression[, top_genes[1:200]] %>% as.matrix())  %*% as.matrix(gep_scores8[top_genes[1:200], 2, drop =F])
+ top_genes %in%  le_genes %>% which()
+cor(score,usage_by_calc[,2])
+
+pathway_name = paste0(hyp_obj$data[pathway_num, "label", drop = F], "_le") %>% gsub(pattern = " ",replacement = "_")
+lung = AddMetaData(lung, score, col.name = pathway_name)
+print_tab(FeaturePlot(object = lung,features = pathway_name),title = pathway_name)
+```
+
+```{r results='asis'}
+metagenes_mean_compare(dataset = lung,time.point_var = "time.point",prefix = "patient",patient.ident_var = "patient.ident",pre_on = c("pre-treatmen
+                                                                                                                                      t","on-treatment"),test = "wilcox.test",programs = pathway_name,without_split = F)
+```
+
+
+# programs LE genes {.tabset}
+
+
+
+```{r results='asis'}
+
+programs_main_pathways_names = list()
+  for (col in seq_along(gep_scores8)[1:3]) {
+     ranked_vec = gep_scores8[,col] %>% setNames(rownames(gep_scores8)) %>% sort(decreasing = TRUE) 
+     hyp_obj <- hypeR_fgsea(ranked_vec, genesets)
+     programs_main_pathways_names[[col]] =  hyp_obj$data[programs_main_pathways[[col]],"label",drop=T]
+     for (pathway_num in programs_main_pathways[[col]]) {
+        le_genes =  hyp_obj$data[pathway_num,,drop=F] %>% pull("le") %>% strsplit(",") %>% unlist()
+        # score = (lung_expression[,le_genes] %>% as.matrix())  %*% as.matrix(gep_scores8[le_genes,col,drop=F])
+        # score = score %>% as.vector()
+        score = FetchData(object = lung,vars = le_genes) %>% rowMeans()
+        pathway_name = paste0(hyp_obj$data[pathway_num,"label",drop=F],"_le")
+        lung=AddMetaData(lung,score,col.name = pathway_name)
+        cor_res = cor(score,usage_by_calc[,col])
+        print_tab(FeaturePlot(object = lung,features = pathway_name)+ggtitle(pathway_name, subtitle = paste("cor to usage:",cor_res)),title = pathway_name)
+     }
+  }
+```
+# programs LE genes {.tabset}
+
+```{r results='asis'}
+metagenes_mean_compare(dataset = lung,time.point_var = "time.point",prefix = "patient",patient.ident_var = "patient.ident",pre_on = c("pre-treatment","on-treatment"),test = "wilcox.test",programs = programs_main_pathways_names %>% unlist() %>% paste0("_le") ,without_split = F)
+```

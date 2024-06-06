@@ -1,0 +1,308 @@
+---
+title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: FALSE
+    number_sections: true
+    toc_depth: 1
+---
+
+
+
+# Functions
+
+```{r warning=FALSE}
+```
+
+# Data
+
+```{r}
+lung = readRDS("./Data/lung_cancercells_withTP_onlyPatients.rds")
+lung_patients = lung$patient.ident %>% unique() %>% as.character()
+lung_patients_filtered = lung_patients[!(lung_patients %in% c("X1055new","X1099"))] # remove patients with less than 100 malignant cells
+lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
+lung$treatment = lung$time.point
+lung$orig.ident = lung$patient.ident
+genesets_h = getGmt("./Data/h.all.v2023.2.Hs.symbols.gmt") %>% geneIds()
+```
+
+```{r}
+reticulate::use_virtualenv("/sci/labs/yotamd/lab_share/avishai.wizel/python_envs/Virtual_env/cnmf_dev/",required = T)
+reticulate::py_config() # if you see that r-cnmf_dev has not been loaded, restart/terminate r and try again. Do not load reticulate before.
+hif_targets = scan("./Data/HIF_targets_Lombardi_PMC9869179.txt", character(), quote = "")
+
+```
+
+```{r warning=FALSE}
+library(stringi)
+library(reticulate)
+source_from_github(repositoy = "DEG_functions",version = "0.2.53")
+source_from_github(repositoy = "cNMF_functions",version = "0.4.23",script_name = "cnmf_functions_V3.R")
+source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_name = "functions.R")
+
+```
+
+calculate nmf metagenes
+```{python}
+from cnmf import cNMF
+import pickle
+f = open('./Data/cnmf_V2/noTPM_100iter/models_2Kvargenes_corrected_noTPM_cnmf_obj.pckl', 'rb')
+cnmf_obj = pickle.load(f)
+f.close()
+```
+
+```{python}
+k = 5
+density_threshold = 0.1 
+_, gep_scores, _, _ = cnmf_obj.load_results(K=k, density_threshold=density_threshold)
+```
+
+
+# Calculate usage by lung counts 
+```{r echo=TRUE, results='asis'}
+# get expression with genes in cnmf input
+genes = rownames(py$gep_scores)
+genes = genes [genes %in% rownames(lung)]
+lung_expression = t(as.matrix(GetAssayData(lung,slot='data'))) 
+lung_expression = 2**lung_expression #convert from log2(tpm+1) to tpm
+lung_expression = lung_expression-1
+lung_expression = lung_expression[,genes] %>% as.data.frame()
+
+all_0_genes = colnames(lung_expression)[colSums(lung_expression==0, na.rm=TRUE)==nrow(lung_expression)] #delete rows that have all 0
+genes = genes[!genes %in% all_0_genes]
+lung_expression = lung_expression[,!colnames(lung_expression) %in% all_0_genes]
+gc(verbose = F)
+```
+
+```{python}
+lung_expression = r.lung_expression
+genes = r.genes
+usage_by_calc = get_usage_from_score(counts=lung_expression,tpm=lung_expression,genes=genes,cnmf_obj=cnmf_obj,k=5,sumTo1=True)
+
+```
+
+```{r}
+lung_5_metagenes = py$usage_by_calc
+```
+
+```{r}
+all_metagenes = lung_5_metagenes
+colnames(all_metagenes) = paste0("Program.",1:5)
+
+```
+
+# programs expression
+
+```{r echo=TRUE, fig.height=7, fig.width=12, results='asis'}
+
+#add each metagene to metadata
+for (i  in 1:ncol(all_metagenes)) {
+  metagene_metadata = all_metagenes[,i,drop=F]
+  lung = AddMetaData(object = lung,metadata = metagene_metadata,col.name = names(all_metagenes)[i])
+}
+
+p  = FeaturePlot(object = lung,features = colnames(all_metagenes),ncol = 3)+DimPlot(object = lung,group.by = "time.point",shuffle = T)
+
+p
+```
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/patients_nmf_usage_umap.rds")
+```
+
+# NMF programs violin
+```{r}
+p = metagenes_violin_combine_patients(dataset = lung,prefix = "patient",pre_on = c("pre-treatment","on-treatment"),test = "wilcox.test",programs = colnames(all_metagenes), return_list = F)
+
+p
+```
+
+
+# NMF programs dotplot
+
+```{r warning=FALSE}
+# modify dotplot to be without exponent of the expression
+newDef <- deparse(DotPlot)
+newDef[57] =  "            return(mean(x =  x))" # remove exponent
+newDef[136] =  "            yes = \"Identity\", no = \"Split Identity\")) + cowplot::theme_cowplot()" #add package name
+newDef[95] = "                data.use <- data.use" # remove log
+newDef[146] = "        plot <- plot + scale_color_distiller(palette = cols,  direction = 1)"
+DotPlot.2 <- eval(parse(text=newDef))
+```
+
+```{r}
+# scale metagene and add to metadata
+for (i  in 1:ncol(all_metagenes)) {
+  metagene_metadata = all_metagenes[,i,drop=F] %>% scale()
+  lung = AddMetaData(object = lung,metadata = metagene_metadata,col.name = paste0(names(all_metagenes)[i],"_scaled"))
+}
+```
+
+
+```{r fig.height=4, fig.width=11}
+
+p = DotPlot.2(object = lung, features =  paste0(names(all_metagenes),"_scaled"),
+              group.by  = 'treatment',scale = F)+
+  guides(size = guide_legend(title = "Cells above average (%)"),
+         color = guide_colorbar(title = "Average Score"))+
+  scale_x_discrete(labels= paste0(names(all_metagenes),"\n(",c("IFNa","TNFa-NFKb","HIF","Cell_Cycle"),")"))+ 
+  scale_y_discrete(limits = c("pre-treatment","on-treatment"))
+p
+```
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/patients_nmf_usage_dotplot.rds")
+```
+
+# NMF HIF per patient
+
+
+```{r echo=TRUE, fig.height=4, fig.width=7, results='asis'}
+p = metagenes_violin_compare(dataset = lung,prefix = "patient",pre_on = c("pre-treatment","on-treatment"),test = "wilcox.test",programs = colnames(all_metagenes)[3], return_list = T)
+p = p[[1]]+xlab("Patient")+ylab(paste( "Program 3 (HIF)\n"))
+
+p
+```
+
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/patients_nmf_hypoxia_violin.rds")
+```
+
+# NMF programs per patient
+
+```{r fig.height=5, fig.width=11}
+plt_list = metagenes_violin_compare(dataset = lung,prefix = "patient",pre_on = c("pre-treatment","on-treatment"),test = "wilcox.test",programs = colnames(all_metagenes)[c(1,2,4,5)], return_list = T)
+p = ggarrange(plotlist = plt_list,common.legend = T)
+p
+```
+
+
+
+# known genes signatures log TPM
+```{r}
+
+gene_list = list(IFNa_genes = genesets_h$HALLMARK_INTERFERON_ALPHA_RESPONSE, TNFa_genes = genesets_h$HALLMARK_TNFA_SIGNALING_VIA_NFKB, hif_targets = hif_targets,E2F_genes = genesets_h$HALLMARK_E2F_TARGETS)
+patient_var = "patient.ident"
+# xeno = ScaleData(object = xeno,features = unlist(gene_list))
+for (i in seq_along(gene_list)) {
+  genes = gene_list[[i]]
+  name = names(gene_list)[i]
+  genes = genes[genes %in% rownames(lung)]
+  scores = FetchData(object = lung,vars = c(genes,patient_var))
+  scores = scores %>% mutate(r = rowMeans(dplyr::select_at(scores,vars(-contains(patient_var))))) %>% # z score every patient separately 
+    group_by_at(patient_var) %>% summarise(r = scale(r)) %>% pull(r) %>% as.data.frame() 
+  print(name)
+  lung %<>% AddMetaData(metadata = scores,col.name = name)
+}
+
+```
+
+
+## violin
+```{r}
+p2 = metagenes_violin_compare(dataset = lung,prefix = "Patient",pre_on = c("pre-treatment","on-treatment"),test = "wilcox.test",programs = "hif_targets", return_list = T)[[1]] + xlab("Patient")
+p2
+```
+
+```{r}
+saveRDS(object = as.grob(p2),file = "./Figures/patients_hif_targets_violin.rds")
+```
+
+## Dotplot
+
+```{r}
+# scale for all cells
+gene_list = list(IFNa_genes = genesets_h$HALLMARK_INTERFERON_ALPHA_RESPONSE, TNFa_genes = genesets_h$HALLMARK_TNFA_SIGNALING_VIA_NFKB, hif_targets = hif_targets,E2F_genes = genesets_h$HALLMARK_E2F_TARGETS)
+# xeno = ScaleData(object = xeno,features = unlist(gene_list))
+for (i in seq_along(gene_list)) {
+  genes = gene_list[[i]]
+  name = paste0(names(gene_list)[i],"_scaled")
+  genes = genes[genes %in% rownames(lung)]
+  scores = FetchData(object = lung,vars = c(genes)) %>% rowMeans() %>% scale()
+  lung %<>% AddMetaData(metadata = scores,col.name = name)
+}
+```
+
+
+```{r fig.height=4, fig.width=11}
+
+p = DotPlot.2(object = lung, features =  paste0(names(gene_list),"_scaled"),group.by  = 'treatment',scale = F)+
+  guides(size = guide_legend(title = "Cells above average (%)"),
+         color = guide_colorbar(title = "Average Score"))+ 
+  scale_y_discrete(limits = c("pre-treatment","on-treatment"))+
+  scale_x_discrete(labels= names(gene_list))
+p
+```
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/patients_signtures_dotplot.rds")
+```
+
+
+# known genes signatures TPM
+```{r}
+
+gene_list = list(IFNa_genes = genesets_h$HALLMARK_INTERFERON_ALPHA_RESPONSE, TNFa_genes = genesets_h$HALLMARK_TNFA_SIGNALING_VIA_NFKB, hif_targets = hif_targets,E2F_genes = genesets_h$HALLMARK_E2F_TARGETS)
+patient_var = "patient.ident"
+# xeno = ScaleData(object = xeno,features = unlist(gene_list))
+for (i in seq_along(gene_list)) {
+  genes = gene_list[[i]]
+  name = names(gene_list)[i]
+  genes = genes[genes %in% rownames(lung)]
+  scores = FetchData(object = lung,vars = c(genes,patient_var))
+  scores[,1:(ncol(scores)-1)] = (2^scores[,1:(ncol(scores)-1)])-1 # log(tpm+1)to tpm without last col (patients idents)
+  scores = scores %>% mutate(r = rowMeans(dplyr::select_at(scores,vars(-contains(patient_var))))) %>% # z score every patient separately 
+    group_by_at(patient_var) %>% summarise(r = scale(r)) %>% pull(r) %>% as.data.frame() 
+  print(name)
+  lung %<>% AddMetaData(metadata = scores,col.name = name)
+}
+
+```
+
+
+## violin
+```{r}
+p2 = metagenes_violin_compare(dataset = lung,prefix = "Patient",pre_on = c("pre-treatment","on-treatment"),test = "wilcox.test",programs = "hif_targets", return_list = T)[[1]] + xlab("Patient")+
+  ylab("HIF targets Z-score")
+p2
+```
+
+```{r}
+saveRDS(object = as.grob(p2),file = "./Figures/patients_hif_targets_TPM_violin.rds")
+```
+
+## Dotplot
+
+```{r}
+# scale for all cells
+gene_list = list(IFNa_genes = genesets_h$HALLMARK_INTERFERON_ALPHA_RESPONSE, TNFa_genes = genesets_h$HALLMARK_TNFA_SIGNALING_VIA_NFKB, hif_targets = hif_targets,E2F_genes = genesets_h$HALLMARK_E2F_TARGETS)
+# xeno = ScaleData(object = xeno,features = unlist(gene_list))
+for (i in seq_along(gene_list)) {
+  genes = gene_list[[i]]
+  name = paste0(names(gene_list)[i],"_scaled")
+  genes = genes[genes %in% rownames(lung)]
+  scores = FetchData(object = lung,vars = c(genes))
+  scores = (2^scores)-1 
+  scores = scores %>%  rowMeans() %>% scale() #log(tpm+1)to tpm
+  lung %<>% AddMetaData(metadata = scores,col.name = name)
+}
+```
+
+
+```{r fig.height=4, fig.width=11}
+
+p = DotPlot.2(object = lung, features =  paste0(names(gene_list),"_scaled"),group.by  = 'treatment',scale = F)+
+  guides(size = guide_legend(title = "Cells above average (%)"),
+         color = guide_colorbar(title = "Average Score"))+ 
+  scale_y_discrete(limits = c("pre-treatment","on-treatment"))+
+  scale_x_discrete(labels= names(gene_list))
+p
+```
+
+
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/patients_signtures_TPM_dotplot.rds")
+```

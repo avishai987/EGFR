@@ -1,0 +1,134 @@
+---
+title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: FALSE
+    number_sections: true
+    toc_depth: 1
+editor_options: 
+  chunk_output_type: inline
+---
+
+
+
+# Functions
+
+```{r warning=FALSE}
+library(stringi)
+library(reticulate)
+source_from_github(repositoy = "DEG_functions",version = "0.2.45")
+source_from_github(repositoy = "cNMF_functions",version = "0.3.91",script_name = "cnmf_function_Harmony.R")
+
+```
+
+# Data
+
+```{r read_data}
+xeno = readRDS("./Data/10x_xeno_1000.Rds")
+lung = readRDS("./Data/lung_cancercells_withTP_onlyPatients.rds")
+lung_patients = lung$patient.ident %>% unique() %>% as.character()
+lung_patients_filtered = lung_patients[!(lung_patients %in% c("X1055new","X1099"))] # remove patients with less than 100 malignant cells
+lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
+```
+
+```{python}
+from cnmf import cNMF
+import pickle
+f = open('./Data/cnmf/cnmf_objects/models_2Kvargenes_all_K_cnmf_obj.pckl', 'rb')
+cnmf_obj = pickle.load(f)
+f.close()
+```
+
+
+```{python}
+k = 9
+density_threshold = 0.1 
+cnmf_obj.consensus(k=k, density_threshold=density_threshold,show_clustering=True)
+usage_norm, gep_scores, _, _ = cnmf_obj.load_results(K=k, density_threshold=density_threshold)
+
+```
+
+```{r}
+usage_norm = py$usage_norm
+gep_scores = py$gep_scores
+gep_scores9_xeno = gep_scores #save 
+usage_norm9_xeno = usage_norm #save
+```
+
+
+
+# NMF usage
+```{r fig.height=12, fig.width=12, results='asis'}
+
+
+  for (i in 1:ncol(usage_norm)) {
+    metage_metadata = usage_norm %>% dplyr::select(i)
+    xeno = AddMetaData(object = xeno,metadata = metage_metadata,col.name = paste0("gep",i))
+  }
+  
+  FeaturePlot(object = xeno,features = paste0("gep",1:ncol(usage_norm)),ncol = 3)
+
+
+```
+# Programs GSEA {.tabset}
+
+```{r results='asis'}
+  for (col in seq_along(gep_scores)) {
+     ranked_vec = gep_scores[,col] %>% setNames(rownames(gep_scores)) %>% sort(decreasing = TRUE) 
+     hyp_obj <- fgsea.wrapper(ranked_vec, genesets)
+       print_tab(hyp_dots(hyp_obj),title = paste0("gep",col))
+  }
+```
+
+```{r}
+xeno = FindVariableFeatures(object = xeno,nfeatures = 2000)
+xeno_vargenes = VariableFeatures(object = xeno)
+
+xeno_expression = FetchData(object = xeno,vars = xeno_vargenes,slot='counts')
+all_0_genes = colnames(xeno_expression)[colSums(xeno_expression==0, na.rm=TRUE)==nrow(xeno_expression)] #delete rows that have all 0
+xeno_vargenes = xeno_vargenes[!xeno_vargenes %in% all_0_genes]
+
+```
+
+
+# calculate score for Xeno
+```{python}
+import numpy as np
+import scanpy as sc
+xeno_expression = r.xeno_expression
+xeno_vargenes = r.xeno_vargenes
+tpm =  compute_tpm(xeno_expression)
+usage_by_calc = get_usage_from_score(counts=xeno_expression,tpm=tpm,genes=xeno_vargenes, cnmf_obj=cnmf_obj,k=k)
+```
+
+```{r}
+xeno_5_metagenes = py$usage_by_calc #save
+```
+
+
+```{r}
+all_metagenes = xeno_5_metagenes #load
+colnames(all_metagenes) = c("EMT","OT_TNFa","OT_KRAS", "hypoxia","model1071","cell_cycle1","cell_cycle2","unknown","unknown_EMT")
+```
+
+
+# programs expression
+```{r echo=TRUE, fig.height=10, fig.width=12, results='asis'}
+
+#add each metagene to metadata
+for (i  in 1:ncol(all_metagenes)) {
+  metagene_metadata = all_metagenes[,i,drop=F]
+  xeno = AddMetaData(object = xeno,metadata = metagene_metadata,col.name = names(all_metagenes)[i])
+}
+
+FeaturePlot(object = xeno,features = colnames(all_metagenes),ncol = 3)
+```
+
+<script src="https://hypothes.is/embed.js" async></script>
+

@@ -1,0 +1,301 @@
+---
+title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+output: 
+  html_notebook:
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float:
+      collapsed: FALSE
+    number_sections: true
+    toc_depth: 1
+---
+
+## Parameters
+
+```{r warning=FALSE}
+suffix = ""
+```
+
+
+
+## functions
+
+```{r warning=FALSE}
+```
+
+## Data
+
+```{r}
+xeno = readRDS("./Data/10x_xeno_1000.Rds")
+lung = readRDS("./Data/lung_cancercells_withTP_onlyPatients.rds")
+lung_patients = lung$patient.ident %>% unique() %>% as.character()
+lung_patients_filtered = lung_patients[!(lung_patients %in% c("X1055new","X1099"))] # remove patients with less than 100 malignant cells
+lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
+```
+
+
+# HIF1 targets
+```{r}
+#from:
+# https://pubmed.ncbi.nlm.nih.gov/36384128/
+
+hif_targets = "LDHA
+PPFIA4
+PFKFB4
+AK4
+ERO1A
+BNIP3L
+BNIP3
+PFKL
+ENO1
+MIR210HG
+TPI1
+HILPDA
+PGK1
+INSIG2
+AK4P1
+AC114803.1
+ENO2
+FUT11
+EGLN3
+NDRG1
+BNIP3P1
+WDR54
+OVOL1-AS1
+STC2
+DDX41
+C4orf47
+GYS1
+ANKRD37
+BICDL2
+P4HA1
+PDK1
+OSMR
+PKM
+LDHAP5
+AL158201.1
+PFKP
+MIR210
+NLRP3P1
+GSX1
+AL109946.1
+PGAM1
+SLC16A3
+ISM2
+TCAF2
+ARID3A
+KDM3A
+JMJD6
+C4orf3
+" 
+
+
+hif_targets = strsplit(hif_targets,"\n")[[1]]
+hif_targets
+```
+
+
+# Xeno {.tabset}
+```{r results='asis'}
+hif_targets_exp = FetchData(object = xeno,vars = c(hif_targets))
+hif_targets_exp = hif_targets_exp[,colSums(hif_targets_exp[])>0] #remove no expression genes
+hif_cor = cor(hif_targets_exp)
+pht1 = pheatmap(mat = hif_cor,silent = T)
+```
+
+```{r echo=TRUE, fig.height=8, fig.width=12, results='asis'}
+num_of_clusters = 3
+clustering_distance = "euclidean"
+myannotation = as.data.frame(cutree(pht1[["tree_row"]], k = num_of_clusters)) #split into k clusters
+ 
+names(myannotation)[1] = "cluster"
+  myannotation$cluster = as.factor(myannotation$cluster)
+  
+  palette1 <-brewer.pal(num_of_clusters, "Paired")
+
+  names(palette1) = unique(myannotation$cluster)
+  ann_colors = list (cluster = palette1)
+  annotation = list(ann_colors = ann_colors, myannotation = myannotation)
+  
+  colors <- c(seq(-1,1,by=0.01))
+  my_palette <- c("blue",colorRampPalette(colors = c("blue", "white", "red"))
+                                                   (n = length(colors)-3), "red")
+
+
+  print_tab(plt = 
+                pheatmap(mat = hif_cor,annotation_col =  annotation[["myannotation"]], annotation_colors = annotation[["ann_colors"]], clustering_distance_rows = clustering_distance,clustering_distance_cols = clustering_distance,color = my_palette,breaks = colors,show_rownames = T,show_colnames = F,fontsize_row = 9)
+            ,title = "genes expression heatmap")
+```
+
+
+
+```{r echo=TRUE, results='asis'}
+cluster_3_genes = annotation[["myannotation"]] %>% dplyr::filter(cluster == 3) %>% rownames() #take relevant genes
+hif_targets_by_tp = FetchData(object = xeno,vars = c(cluster_3_genes)) %>% rowSums() %>% as.data.frame() #mean expression
+names(hif_targets_by_tp)[1] = "hif1_targets_mean"
+
+hif_targets_by_tp = cbind(hif_targets_by_tp,FetchData(object = xeno,vars = c("orig.ident","treatment"))) # add vars
+
+hif_targets_by_tp_forPlot =  hif_targets_by_tp %>% mutate(orig.ident = paste("model",orig.ident)) #add "model" before model num
+my_comparisons = list( c("NT", "OSI") )
+plt = ggplot(hif_targets_by_tp_forPlot, aes(x=treatment, y=hif1_targets_mean)) +
+  geom_boxplot() +
+  scale_y_continuous(limits = c(0, 37))+ #scale axis 
+  facet_wrap(~orig.ident, nrow = 2, strip.position = "top")+
+  stat_compare_means(comparisons = my_comparisons,method = "wilcox.test") + # Add pairwise comparisons p-value
+ylab("HIF target genes")
+xeno_cluster_3 = cluster_3_genes
+print_tab(plt = plt,title = "cluster 3 genes")
+
+
+```
+
+```{r echo=TRUE, results='asis'}
+cluster_3_genes = annotation[["myannotation"]] %>% dplyr::filter(cluster == 3 | cluster == 1) %>% rownames() #take relevant genes
+hif_targets_by_tp = FetchData(object = xeno,vars = c(cluster_3_genes)) %>% rowSums() %>% as.data.frame() #mean expression
+names(hif_targets_by_tp)[1] = "hif1_targets_mean"
+
+hif_targets_by_tp = cbind(hif_targets_by_tp,FetchData(object = xeno,vars = c("orig.ident","treatment"))) # add vars
+
+hif_targets_by_tp_forPlot =  hif_targets_by_tp %>% mutate(orig.ident = paste("model",orig.ident)) #add "model" before model num
+my_comparisons = list( c("NT", "OSI") )
+plt = ggplot(hif_targets_by_tp_forPlot, aes(x=treatment, y=hif1_targets_mean)) +
+  geom_boxplot() +
+  scale_y_continuous(limits = c(0, 60))+ #scale axis 
+  facet_wrap(~orig.ident, nrow = 2, strip.position = "top")+
+  stat_compare_means(comparisons = my_comparisons,method = "wilcox.test")+ # Add pairwise comparisons p-value
+ylab("HIF target genes")
+xeno_cluster_3_2 = cluster_3_genes
+
+print_tab(plt = plt,title = "cluster 3+2 genes")
+```
+
+```{r}
+score <- apply(xeno@assays$RNA@data[cluster_3_genes,],2,mean)
+xeno=AddMetaData(xeno,score,"HIF_targets")
+
+print_tab(FeaturePlot(object = xeno, features = "HIF_targets"),title = "Expression")
+```
+
+# Patients {.tabset}
+```{r }
+hif_targets_exp = FetchData(object = lung,vars = c(hif_targets))
+hif_targets_exp = hif_targets_exp[,colSums(hif_targets_exp[])>0] #remove no expression genes
+hif_cor = cor(hif_targets_exp)
+pht1 = pheatmap(mat = hif_cor,silent = T)
+```
+
+```{r echo=TRUE, fig.height=8, fig.width=12, results='asis'}
+num_of_clusters = 4
+clustering_distance = "euclidean"
+myannotation = as.data.frame(cutree(pht1[["tree_row"]], k = num_of_clusters)) #split into k clusters
+ 
+names(myannotation)[1] = "cluster"
+  myannotation$cluster = as.factor(myannotation$cluster)
+  
+  palette1 <-brewer.pal(num_of_clusters, "Paired")
+
+  names(palette1) = unique(myannotation$cluster)
+  ann_colors = list (cluster = palette1)
+  annotation = list(ann_colors = ann_colors, myannotation = myannotation)
+  
+  colors <- c(seq(-1,1,by=0.01))
+  my_palette <- c("blue",colorRampPalette(colors = c("blue", "white", "red"))
+                                                   (n = length(colors)-3), "red")
+
+
+  print_tab(plt = 
+                pheatmap(mat = hif_cor,annotation_col =  annotation[["myannotation"]], annotation_colors = annotation[["ann_colors"]], clustering_distance_rows = clustering_distance,clustering_distance_cols = clustering_distance,color = my_palette,breaks = colors,show_rownames = T,show_colnames = F,fontsize_row = 9)
+            ,title = "genes expression heatmap")
+```
+
+```{r echo=TRUE, results='asis'}
+cluster_3_genes = annotation[["myannotation"]] %>% dplyr::filter(cluster == 1) %>% rownames() #take relevant genes
+hif_targets_by_tp = FetchData(object = lung,vars = c(cluster_3_genes)) %>%  rowSums() %>% as.data.frame() #mean expression
+names(hif_targets_by_tp)[1] = "hif1_targets_mean"
+
+hif_targets_by_tp = cbind(hif_targets_by_tp,FetchData(object = lung,vars = c("patient.ident","time.point"))) # add vars
+
+hif_targets_by_tp_forPlot =  hif_targets_by_tp %>% mutate(patient.ident = paste("patient ",patient.ident)) #add "model" before model num
+my_comparisons = list( c("pre-treatment", "on-treatment") )
+plt = ggplot(hif_targets_by_tp_forPlot, aes(x=time.point, y=hif1_targets_mean)) +
+  geom_boxplot() +
+  scale_y_continuous(limits = c(0, max(hif_targets_by_tp_forPlot$hif1_targets_mean)*1.1))+ #scale axis
+  facet_wrap(~patient.ident, nrow = 2, strip.position = "top")+
+  stat_compare_means(comparisons = my_comparisons,method = "wilcox.test") + # Add pairwise comparisons p-value
+ylab("HIF target genes")
+
+print_tab(plt = plt,title = "cluster 1 genes")
+```
+```{r}
+score <- apply(lung@assays$RNA@data[cluster_3_genes,],2,mean)
+lung=AddMetaData(lung,score,"HIF_targets")
+
+print_tab(FeaturePlot(object = lung, features = "HIF_targets"),title = "Expression")
+```
+```{r echo=TRUE, results='asis'}
+metagenes_mean_compare(dataset = lung, time.point_var = "time.point",prefix = "patient",patient.ident_var = "patient.ident",pre_on = c("pre-treatment","on-treatment"),axis.text.x = 8,programs = c("HALLMARK_HYPOXIA","HIF_targets"))
+```
+
+
+```{r echo=TRUE, results='asis'}
+cluster_3_genes = annotation[["myannotation"]] %>% dplyr::filter(cluster == 1 | cluster == 4) %>% rownames() #take relevant genes
+hif_targets_by_tp = FetchData(object = lung,vars = c(cluster_3_genes)) %>% rowSums() %>% as.data.frame() #mean expression
+names(hif_targets_by_tp)[1] = "hif1_targets_mean"
+
+hif_targets_by_tp = cbind(hif_targets_by_tp,FetchData(object = lung,vars = c("patient.ident","time.point"))) # add vars
+
+hif_targets_by_tp_forPlot =  hif_targets_by_tp %>% mutate(patient.ident = paste("patient ",patient.ident)) #add "model" before model num
+my_comparisons = list( c("pre-treatment", "on-treatment") )
+plt = ggplot(hif_targets_by_tp_forPlot, aes(x=time.point, y=hif1_targets_mean)) +
+  geom_boxplot() +
+  scale_y_continuous(limits = c(0, max(hif_targets_by_tp_forPlot$hif1_targets_mean)*1.1))+ #extend y axis for pval
+  facet_wrap(~patient.ident, nrow = 2, strip.position = "top")+
+  stat_compare_means(comparisons = my_comparisons,method = "wilcox.test") + # Add pairwise comparisons p-value
+ylab("HIF target genes")
+
+print_tab(plt = plt,title = "cluster 1+4 genes")
+```
+
+
+```{r echo=TRUE, results='asis'}
+cluster_3_genes =xeno_cluster_3
+hif_targets_by_tp = FetchData(object = lung,vars = c(cluster_3_genes)) %>% rowSums() %>% as.data.frame() #mean expression
+names(hif_targets_by_tp)[1] = "hif1_targets_mean"
+
+hif_targets_by_tp = cbind(hif_targets_by_tp,FetchData(object = lung,vars = c("patient.ident","time.point"))) # add vars
+
+hif_targets_by_tp_forPlot =  hif_targets_by_tp %>% mutate(patient.ident = paste("patient ",patient.ident)) #add "model" before model num
+my_comparisons = list( c("pre-treatment", "on-treatment") )
+plt = ggplot(hif_targets_by_tp_forPlot, aes(x=time.point, y=hif1_targets_mean)) +
+  geom_boxplot() +
+  scale_y_continuous(limits = c(0, max(hif_targets_by_tp_forPlot$hif1_targets_mean)*1.1))+ #extend y axis for pval
+  facet_wrap(~patient.ident, nrow = 2, strip.position = "top")+
+  stat_compare_means(comparisons = my_comparisons,method = "wilcox.test") + # Add pairwise comparisons p-value
+ylab("HIF target genes")
+
+print_tab(plt = plt,title = "models cluster 3")
+```
+
+
+```{r echo=TRUE, results='asis'}
+cluster_3_genes =xeno_cluster_3_2
+hif_targets_by_tp = FetchData(object = lung,vars = c(cluster_3_genes)) %>% rowSums() %>% as.data.frame() #mean expression
+names(hif_targets_by_tp)[1] = "hif1_targets_mean"
+
+hif_targets_by_tp = cbind(hif_targets_by_tp,FetchData(object = lung,vars = c("patient.ident","time.point"))) # add vars
+
+hif_targets_by_tp_forPlot =  hif_targets_by_tp %>% mutate(patient.ident = paste("patient ",patient.ident)) #add "model" before model num
+my_comparisons = list( c("pre-treatment", "on-treatment") )
+plt = ggplot(hif_targets_by_tp_forPlot, aes(x=time.point, y=hif1_targets_mean)) +
+  geom_boxplot() +
+  scale_y_continuous(limits = c(0, max(hif_targets_by_tp_forPlot$hif1_targets_mean)*1.1))+ #extend y axis for pval
+  facet_wrap(~patient.ident, nrow = 2, strip.position = "top")+
+  stat_compare_means(comparisons = my_comparisons,method = "wilcox.test") + # Add pairwise comparisons p-value
+ylab("HIF target genes")
+
+print_tab(plt = plt,title = "models cluster 3+2")
+```

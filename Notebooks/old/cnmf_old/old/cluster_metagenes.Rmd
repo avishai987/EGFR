@@ -1,0 +1,295 @@
+---
+title: "Title"
+author: "Avishai Wizel"
+date: '`r Sys.Date()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+---
+
+## Parameters
+
+```{r warning=FALSE}
+lung_suffix = "2Kvargenes_normalized_2-7theta"
+xeno_suffix = "2Kvargenes"
+```
+
+```{r}
+library(reticulate)
+```
+
+
+## functions
+
+```{r warning=FALSE, include=FALSE}
+library(stringi)
+source_from_github(repositoy = "DEG_functions",version = "0.2.1")
+source_from_github(repositoy = "cNMF_functions",version = "0.3.48",script_name = "cnmf_function_Harmony.R")
+```
+
+## Data
+
+```{python}
+lung_suffix = r.lung_suffix
+xeno_suffix = r.xeno_suffix
+import pandas as pd
+import pickle
+f = open('./Data/cnmf/cnmf_objects/patients_' + lung_suffix + '_cnmf_obj.pckl', 'rb')
+
+lung_cnmf_obj = pickle.load(f)
+f.close()
+
+f = open('./Data/cnmf/cnmf_objects/models_' + xeno_suffix + '_cnmf_obj.pckl', 'rb')
+xeno_cnmf_obj = pickle.load(f)
+f.close()
+```
+
+```{python}
+selected_k = 5
+density_threshold = 0.1
+# cnmf_obj.consensus(k=selected_k, density_threshold=density_threshold) #if not already computed 
+usage_norm, lung_gep_scores, lung_gep_tpm, topgenes = lung_cnmf_obj.load_results(K=selected_k, density_threshold=density_threshold)
+```
+
+```{python}
+selected_k = 4
+density_threshold = 0.1
+# cnmf_obj.consensus(k=selected_k, density_threshold=density_threshold) #if not already computed
+usage_norm, xeno_gep_scores, xeno_gep_tpm, topgenes = xeno_cnmf_obj.load_results(K=selected_k, density_threshold=density_threshold)
+```
+## Enrichment in lung/xeno scores
+```{r fig.height=8}
+xeno_gep_scores= py$xeno_gep_scores
+lung_gep_scores = py$lung_gep_scores
+
+scores_lst  = list("lung scores" = lung_gep_scores, "models scores" =xeno_gep_scores)
+j=1  
+for (score in scores_lst) {
+  plt_list = list()
+    for (i in 1:ncol(score)) {
+      top_genes = score  %>%  arrange(desc(score[i])) #sort by score a
+      top = head(rownames(top_genes),200) #take top top_genes_num
+      res = genes_vec_enrichment(genes = top,background = rownames(score),homer = T,title = 
+                        names(score)[i],silent = T,return_all = T)
+       
+      plt_list[[i]] = res$plt
+    }
+    gridExtra::grid.arrange(grobs = plt_list, top = names(scores_lst)[j])
+    j = j+1
+}
+```
+
+```{r}
+scores_lst = merge_scores_with_common(score_1 = xeno_gep_scores,score_2 = lung_gep_scores,normalization = "min_max_normalize")
+```
+```{r}
+#combine 2 scores
+xeno_gep_scores = scores_lst[1]
+lung_gep_scores = res[2]
+cell_cycle = xeno_gep_scores[,3] %>% cbind(lung_gep_scores[,3]) %>% rowMeans()
+on_treatment = xeno_gep_scores[,2] %>% cbind(lung_gep_scores[,2]) %>% rowMeans()
+hypoxia = xeno_gep_scores[,1] %>% cbind(lung_gep_scores[,1]) %>% rowMeans()
+gep_scores = cbind(hypoxia,on_treatment,cell_cycle) %>% as.data.frame() %>% setNames(c("cell_cycle","on_treatment","hypoxia"))
+```
+
+```{r}
+
+```
+
+
+```{r}
+  xeno_gep_scores= py$xeno_gep_scores
+  lung_gep_scores = py$lung_gep_scores
+  debug(merge_scores_with_adding)
+  gep_scores = merge_scores_with_adding(score_1 = xeno_gep_scores,score_2 = lung_gep_scores)
+  gep_scores = merge_scores_with_adding(score_1 = xeno_gep_scores,score_2 = lung_gep_scores,z_score = T)
+  gep_scores = merge_scores_with_adding(score_1 = xeno_gep_scores,score_2 = lung_gep_scores,min_max = T)
+  gep_scores = merge_scores_with_adding(score_1 = xeno_gep_scores,score_2 = lung_gep_scores,sum2one = T)
+
+```
+
+```{r}
+gep_scores = merge_scores_with_adding(score_1 = xeno_gep_scores,score_2 = lung_gep_scores)
+all_metagenes = expression_mult(gep_scores = gep_scores,dataset = lung,top_genes = T)
+for (i in 1:ncol(all_metagenes)) {
+  metage_metadata = all_metagenes %>% select(i)
+  lung = AddMetaData(object = lung,metadata = metage_metadata)
+}
+FeaturePlot(object = lung,features = colnames(all_metagenes))
+
+
+gep_scores = merge_scores_with_adding(score_1 = xeno_gep_scores,score_2 = lung_gep_scores,z_score = T)
+all_metagenes = expression_mult(gep_scores = gep_scores,dataset = lung,top_genes = T,z_score = T)
+for (i in 1:ncol(all_metagenes)) {
+  metage_metadata = all_metagenes %>% select(i)
+  lung = AddMetaData(object = lung,metadata = metage_metadata)
+}
+FeaturePlot(object = lung,features = colnames(all_metagenes))
+
+gep_scores = merge_scores_with_adding(score_1 = xeno_gep_scores,score_2 = lung_gep_scores,min_max = T)
+all_metagenes = expression_mult(gep_scores = gep_scores,dataset = lung,top_genes = T,min_max = T)
+for (i in 1:ncol(all_metagenes)) {
+  metage_metadata = all_metagenes %>% select(i)
+  lung = AddMetaData(object = lung,metadata = metage_metadata)
+}
+FeaturePlot(object = lung,features = colnames(all_metagenes))
+
+
+```
+
+
+```{r}
+gep_scores = merge_scores_with_adding(score_1 = xeno_gep_scores,score_2 = lung_gep_scores)
+all_metagenes = expression_mult(gep_scores = gep_scores,dataset = lung,top_genes = F)
+for (i in 1:ncol(all_metagenes)) {
+  metage_metadata = all_metagenes %>% select(i)
+  lung = AddMetaData(object = lung,metadata = metage_metadata)
+}
+FeaturePlot(object = lung,features = colnames(all_metagenes))
+
+
+gep_scores = merge_scores_with_adding(score_1 = xeno_gep_scores,score_2 = lung_gep_scores,z_score = T)
+all_metagenes = expression_mult(gep_scores = gep_scores,dataset = lung,top_genes = F,z_score = T)
+for (i in 1:ncol(all_metagenes)) {
+  metage_metadata = all_metagenes %>% select(i)
+  lung = AddMetaData(object = lung,metadata = metage_metadata)
+}
+FeaturePlot(object = lung,features = colnames(all_metagenes))
+
+gep_scores = merge_scores_with_adding(score_1 = xeno_gep_scores,score_2 = lung_gep_scores,min_max = T)
+all_metagenes = expression_mult(gep_scores = gep_scores,dataset = lung,top_genes = F,min_max = T)
+for (i in 1:ncol(all_metagenes)) {
+  metage_metadata = all_metagenes %>% select(i)
+  lung = AddMetaData(object = lung,metadata = metage_metadata)
+}
+FeaturePlot(object = lung,features = colnames(all_metagenes))
+
+```
+
+
+
+```{r fig.height=10, fig.width=10, paged.print=FALSE}
+gep_scores = py$xeno_gep_scores
+gep_scores = gep_scores %>% setNames(c("cell_cycle","on_treatment","hypoxia","unknown"))
+undebug(expression_mult)
+all_metagenes = expression_mult(gep_scores = gep_scores,dataset = lung,top_genes = T)
+for (i in 1:ncol(all_metagenes)) {
+  metage_metadata = all_metagenes %>% select(i)
+  lung = AddMetaData(object = lung,metadata = metage_metadata)
+}
+FeaturePlot(object = lung,features = colnames(all_metagenes))
+
+
+all_metagenes = expression_mult(gep_scores = gep_scores,dataset = lung,top_genes = T,z_score = T)
+for (i in 1:ncol(all_metagenes)) {
+  metage_metadata = all_metagenes %>% select(i)
+  lung = AddMetaData(object = lung,metadata = metage_metadata)
+}
+FeaturePlot(object = lung,features = colnames(all_metagenes))
+
+all_metagenes = expression_mult(gep_scores = gep_scores,dataset = lung,top_genes = T,min_max = T)
+for (i in 1:ncol(all_metagenes)) {
+  metage_metadata = all_metagenes %>% select(i)
+  lung = AddMetaData(object = lung,metadata = metage_metadata)
+}
+FeaturePlot(object = lung,features = colnames(all_metagenes))
+```
+
+
+```{r}
+lung = program_assignment(dataset = lung,larger_by = 1,program_names = colnames(all_metagenes))
+
+data =FetchData(object = lung,vars = c("program.assignment","time.point"))
+data = data %>% dplyr::count(program.assignment, time.point) %>%  dplyr::add_count(time.point, wt = n, name = "overall")%>% 
+mutate(proportion = n / overall)   
+
+plt_list = list()
+for (program_name in unique(data$program.assignment)) {
+  program_data = data[data$program.assignment == program_name,]
+  p = ggplot(data=program_data, aes(x=time.point, y=proportion)) +geom_bar(stat="identity")+ylab("precentage") +ggtitle("program" %>% paste(program_data$program.assignment %>% unique() %>% as.character())) +
+    scale_y_continuous(limits = c(0,1))  
+    plt_list[[program_name]] = p
+}
+gridExtra::grid.arrange(grobs = plt_list)
+DimPlot(lung,group.by = "program.assignment",pt.size = 0.5)
+```
+
+
+
+```{r fig.height=10, fig.width=10, paged.print=FALSE}
+gep_scores = py$xeno_gep_scores
+gep_scores = gep_scores %>% setNames(c("cell_cycle","on_treatment","hypoxia","unknown"))
+all_metagenes = expression_mult(gep_scores = gep_scores,dataset = lung,top_genes = F)
+for (i in 1:ncol(all_metagenes)) {
+  metage_metadata = all_metagenes %>% select(i)
+  lung = AddMetaData(object = lung,metadata = metage_metadata)
+}
+FeaturePlot(object = lung,features = colnames(all_metagenes))
+
+
+all_metagenes = expression_mult(gep_scores = gep_scores,dataset = lung,top_genes = F,z_score = T)
+for (i in 1:ncol(all_metagenes)) {
+  metage_metadata = all_metagenes %>% select(i)
+  lung = AddMetaData(object = lung,metadata = metage_metadata)
+}
+FeaturePlot(object = lung,features = colnames(all_metagenes))
+
+all_metagenes = expression_mult(gep_scores = gep_scores,dataset = lung,top_genes = F,min_max = T)
+for (i in 1:ncol(all_metagenes)) {
+  metage_metadata = all_metagenes %>% select(i)
+  lung = AddMetaData(object = lung,metadata = metage_metadata)
+}
+FeaturePlot(object = lung,features = colnames(all_metagenes))
+```
+
+
+```{r}
+lung = program_assignment(dataset = lung,larger_by = 1,program_names = colnames(all_metagenes))
+
+data =FetchData(object = lung,vars = c("program.assignment","time.point"))
+data = data %>% dplyr::count(program.assignment, time.point) %>%  dplyr::add_count(time.point, wt = n, name = "overall")%>% 
+mutate(proportion = n / overall)   
+
+plt_list = list()
+for (program_name in unique(data$program.assignment)) {
+  program_data = data[data$program.assignment == program_name,]
+  p = ggplot(data=program_data, aes(x=time.point, y=proportion)) +geom_bar(stat="identity")+ylab("precentage") +ggtitle("program" %>% paste(program_data$program.assignment %>% unique() %>% as.character())) +
+    scale_y_continuous(limits = c(0,1))  
+    plt_list[[program_name]] = p
+}
+gridExtra::grid.arrange(grobs = plt_list)
+DimPlot(lung,group.by = "program.assignment",pt.size = 0.5)
+```
+
+```{r}
+xeno_genes_in_lung = intersect(rownames(gep_scores),rownames(lung))
+```
+
+```{r}
+lung@project.name = "patients_ss2"
+all_metagenes_lst = list()
+for (dataset in list(xeno,lung)) {
+  all_metagenes = expression_mult(gep_scores = gep_scores,dataset = dataset)
+  all_metagenes_lst[[dataset@project.name]] = all_metagenes
+}
+
+```
+
+
+```{r fig.height=10, fig.width=10}
+#Make metagene names
+
+for (dataset in list(xeno,lung)) {
+  all_metagenes = all_metagenes_lst[[dataset@project.name]]
+  #add each metagene to metadata
+  for (i in 1:ncol(all_metagenes)) {
+    metage_metadata = all_metagenes %>% select(i)
+    dataset = AddMetaData(object = dataset,metadata = metage_metadata)
+  }
+ print(FeaturePlot(object = dataset,features = colnames(all_metagenes)))
+}
+
+```
+
+
+

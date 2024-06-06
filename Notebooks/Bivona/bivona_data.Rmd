@@ -1,0 +1,252 @@
+---
+title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: FALSE
+    number_sections: true
+    toc_depth: 1
+---
+
+
+
+
+# Functions
+```{r}
+reticulate::use_virtualenv("/sci/labs/yotamd/lab_share/avishai.wizel/python_envs/Virtual_env/cnmf_dev/",required = T)
+reticulate::py_config() # if you see that r-cnmf_dev has not been loaded, restart/terminate r and try again. Do not load reticulate before.
+hif_targets = scan("./Data/HIF_targets_Lombardi_PMC9869179.txt", character(), quote = "")
+
+```
+
+
+```{r warning=FALSE}
+library(stringi)
+library(reticulate)
+source_from_github(repositoy = "DEG_functions",version = "0.2.53")
+source_from_github(repositoy = "cNMF_functions",version = "0.4.23",script_name = "cnmf_functions_V3.R")
+source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_name = "functions.R")
+
+```
+
+
+# Data
+
+```{r}
+load("./Data/Bivona_scRNAseq/NI04_tumor_seurat_object.RData")
+tiss_subset_tumor2 = UpdateSeuratObject(tiss_subset_tumor2)
+tiss_subset_tumor2$treatment = NULL
+tiss_subset_tumor2@meta.data[["treatment"]] = factor(tiss_subset_tumor2$analysis, levels = c("naive", "grouped_pr","grouped_pd"))
+tiss_subset_tumor2$treatment = tiss_subset_tumor2$treatment %>% gsub(pattern = "grouped_pr",replacement = "RD")%>%
+  gsub(pattern = "grouped_pd",replacement = "PD") %>% factor(levels = c("naive","RD","PD"))
+```
+
+
+
+
+```{r}
+tiss_subset_tumor2_pri = subset(tiss_subset_tumor2, subset = primary_or_metastaic %in% c("Primary"))
+tiss_subset_tumor2_pri_egfr = subset(tiss_subset_tumor2_pri, subset = driver_gene == "EGFR") %>%
+  subset(subset = histolgy == "Adenocarcinoma") 
+```
+
+```{r}
+# re run umap
+tiss_subset_tumor2_pri_egfr = FindVariableFeatures(object = tiss_subset_tumor2_pri_egfr)
+tiss_subset_tumor2_pri_egfr = ScaleData(object = tiss_subset_tumor2_pri_egfr)
+tiss_subset_tumor2_pri_egfr = RunPCA(object = tiss_subset_tumor2_pri_egfr,verbose = F)
+tiss_subset_tumor2_pri_egfr = RunUMAP(tiss_subset_tumor2_pri_egfr, dims = 1:5,verbose = F)
+```
+
+calculate nmf metagenes
+```{python}
+from cnmf import cNMF
+import pickle
+f = open('./Data/cnmf_V2/noTPM_100iter//models_2Kvargenes_corrected_noTPM_cnmf_obj.pckl', 'rb')
+cnmf_obj = pickle.load(f)
+f.close()
+```
+
+```{python}
+k = 5
+density_threshold = 0.1 
+_, gep_scores, _, _ = cnmf_obj.load_results(K=k, density_threshold=density_threshold)
+```
+
+# Calculate usage by bivona counts 
+```{r echo=TRUE, results='asis'}
+# get expression with genes in cnmf input
+genes = rownames(py$gep_scores)
+genes = genes [genes %in% rownames(tiss_subset_tumor2_pri_egfr)]
+bivona_expression = t(as.matrix(GetAssayData(tiss_subset_tumor2_pri_egfr,slot='data'))) 
+bivona_expression = 2**bivona_expression #convert from log2(tpm+1) to tpm
+bivona_expression = bivona_expression-1
+bivona_expression = bivona_expression[,genes] %>% as.data.frame()
+
+all_0_genes = colnames(bivona_expression)[colSums(bivona_expression==0, na.rm=TRUE)==nrow(bivona_expression)] #delete rows that have all 0
+genes = genes[!genes %in% all_0_genes]
+bivona_expression = bivona_expression[,!colnames(bivona_expression) %in% all_0_genes]
+gc(verbose = F)
+```
+
+
+```{python}
+bivona_expression = r.bivona_expression
+genes = r.genes
+usage_by_calc = get_usage_from_score(counts=bivona_expression,tpm=bivona_expression,genes=genes,cnmf_obj=cnmf_obj,k=5,sumTo1=True)
+
+```
+
+```{r}
+bivona_5_metagenes = py$usage_by_calc
+```
+
+```{r}
+all_metagenes = bivona_5_metagenes
+colnames(all_metagenes) = paste0("Program.",1:5)
+
+```
+
+# programs expression
+```{r echo=TRUE, fig.height=7, fig.width=12, results='asis'}
+
+#add each metagene to metadata
+for (i  in 1:ncol(all_metagenes)) {
+  metagene_metadata = all_metagenes[,i,drop=F]
+  tiss_subset_tumor2_pri_egfr = AddMetaData(object = tiss_subset_tumor2_pri_egfr,metadata = metagene_metadata,col.name = names(all_metagenes)[i])
+}
+
+p = FeaturePlot(object = tiss_subset_tumor2_pri_egfr,features = colnames(all_metagenes),ncol = 3)+DimPlot(object = tiss_subset_tumor2_pri_egfr,group.by = "treatment")
+
+p
+```
+
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/bivona_nmf_usage_umap.rds")
+```
+
+
+
+
+# NMF programs
+```{r}
+p = metagenes_violin_combine_patients(dataset = tiss_subset_tumor2_pri_egfr,prefix = "patient",pre_on = c("naive","RD"),test = "wilcox.test",programs = colnames(all_metagenes), return_list = F)
+
+p
+```
+
+```{r}
+# plot violin
+data = FetchData(object = tiss_subset_tumor2_pri_egfr,vars = c(colnames(all_metagenes)[3],"treatment"))
+formula = as.formula(paste0(colnames(all_metagenes)[3],"~treatment"))
+stat.test = wilcox_test(formula = formula,data = data, p.adjust.method = "fdr") %>% 
+  add_xy_position(x = "treatment", dodge = 0.8,step.increase = 0.3)
+
+
+p = ggplot(data, aes_string(x="treatment", y=colnames(all_metagenes)[3])) + 
+    geom_violin(trim=FALSE,aes(fill = treatment))+geom_boxplot(width = 0.15)+
+  theme_minimal()+
+  scale_fill_manual(values = c("#00AFBB", "#E7B800", "#FC4E07"))+
+  theme(legend.position = "none")+stat_pvalue_manual(stat.test, label = "{p.adj}")+
+  ylab("Program 3 Z-score")
+
+p
+
+```
+
+
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/bivona_nmf_violin.rds")
+```
+
+```{r warning=FALSE}
+# modify dotplot to be without exponent of the expression
+newDef <- deparse(DotPlot)
+newDef[57] =  "            return(mean(x =  x))" # remove exponent
+newDef[136] =  "            yes = \"Identity\", no = \"Split Identity\")) + cowplot::theme_cowplot()" #add package name
+newDef[95] = "                data.use <- data.use" # remove log
+newDef[146] = "        plot <- plot + scale_color_distiller(palette = cols,  direction = 1)"
+DotPlot.2 <- eval(parse(text=newDef))
+```
+
+```{r}
+# scale metagene and add to metadata
+for (i  in 1:ncol(all_metagenes)) {
+  metagene_metadata = all_metagenes[,i,drop=F] %>% scale()
+  tiss_subset_tumor2_pri_egfr = AddMetaData(object = tiss_subset_tumor2_pri_egfr,metadata = metagene_metadata,col.name = paste0(names(all_metagenes)[i],"_scaled"))
+}
+```
+
+
+```{r fig.height=4, fig.width=11}
+
+p = DotPlot.2(object = tiss_subset_tumor2_pri_egfr, features =  paste0(names(all_metagenes),"_scaled"),group.by  = 'treatment',scale = F)+
+  guides(size = guide_legend(title = "Cells above average (%)"),color = guide_colorbar(title = "Average Score"))+
+  scale_x_discrete(labels= paste0(names(all_metagenes),"\n(",c("IFNa","TNFa-NFKb","HIF","Cell_Cycle"),")"))
+p
+```
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/bivona_nmf_dotplot.rds")
+```
+
+# known genesets
+
+
+```{r}
+genesets <- msigdb_download("Homo sapiens",category="H") 
+gene_list = list(IFNa_genes = genesets$HALLMARK_INTERFERON_ALPHA_RESPONSE, TNFa_genes = genesets$HALLMARK_TNFA_SIGNALING_VIA_NFKB, hif_targets = hif_targets,E2F_genes = genesets$HALLMARK_E2F_TARGETS)
+for (i in seq_along(gene_list)) {
+  genes = gene_list[[i]]
+  genes = genes[genes %in% rownames(tiss_subset_tumor2_pri_egfr)]
+  name = names(gene_list)[i]
+  scores = FetchData(object = tiss_subset_tumor2_pri_egfr,vars = c(genes))
+  scores = scores %>% select(where(~ sum(.) != 0))# remove cols with all o 
+  scores = scores %>% scale() %>% rowMeans() %>% as.data.frame()
+  tiss_subset_tumor2_pri_egfr %<>% AddMetaData(metadata = scores,col.name = name)
+  
+}
+```
+
+```{r}
+# plot violin
+data = FetchData(object = tiss_subset_tumor2_pri_egfr,vars = c("hif_targets","treatment"))
+stat.test = wilcox_test(formula = hif_targets  ~ treatment,data = data, p.adjust.method = "fdr") %>% 
+  add_xy_position(x = "treatment", dodge = 0.8,step.increase = 0.3)
+
+
+p = ggplot(data, aes(x=treatment, y=hif_targets)) + 
+    geom_violin(trim=FALSE,aes(fill = treatment))+geom_boxplot(width = 0.2)+
+  theme_minimal()+
+  scale_fill_manual(values = c("#00AFBB", "#E7B800", "#FC4E07"))+
+  theme(legend.position = "none")+stat_pvalue_manual(stat.test, label = "{p.adj}")+
+  ylab("HIF targets Z-score")
+
+p
+
+```
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/bivona_hif_targets_violin.rds")
+```
+
+```{r}
+p = metagenes_violin_combine_patients(dataset = tiss_subset_tumor2_pri_egfr,prefix = "patient",pre_on = c("naive","RD"),test = "wilcox.test",programs = names(gene_list), return_list = F)
+p
+```
+
+
+```{r fig.height=4, fig.width=11}
+
+p = DotPlot.2(object = tiss_subset_tumor2_pri_egfr, features =  names(gene_list),group.by  = 'treatment',scale = F)+
+  guides(size = guide_legend(title = "Cells above average (%)"),color = guide_colorbar(title = "Average Score"))
+p
+```
+
+
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/bivona_known_genes_dotplot.rds")
+```

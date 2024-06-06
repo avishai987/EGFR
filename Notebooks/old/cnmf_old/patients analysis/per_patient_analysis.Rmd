@@ -1,0 +1,263 @@
+---
+title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+author: "Avishai Wizel"
+date: '`r Sys.Date()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: FALSE
+    number_sections: true
+    toc_depth: 1
+---
+
+
+# All cells combined 
+***
+```{r}
+lung = SetIdent(object = lung,value = "program.assignment")
+lung  = RenameIdents(object = lung,"metagene.1" = "Hypoxia")
+lung  = RenameIdents(object = lung,"metagene.2" = "TNFa")
+lung  = RenameIdents(object = lung,"metagene.3" = "cell_cycle")
+
+lung$program.assignment = Idents(object = lung)
+```
+
+```{r}
+ df  = FetchData(object = lung,vars = c("program.assignment","time.point")) %>% 
+    filter (program.assignment %in% c("Hypoxia","TNFa")) %>% 
+    filter (time.point %in% c("pre-treatment","on-treatment")) %>% 
+    droplevels() 
+  test = fisher.test(table(df))
+    
+  library(ggstatsplot)
+print(
+    ggbarstats(
+    df, program.assignment, time.point,
+    results.subtitle = FALSE,
+    subtitle = paste0(
+      "Fisher's exact test", ", p-value = ",
+      ifelse(test$p.value < 0.001, "< 0.001", round(test$p.value, 3))
+    )
+  )
+)
+```
+```{r}
+cell_percentage(dataset = lung,time.point_var = "time.point")
+```
+
+# Per patient fisher test {.tabset }
+***
+
+```{r results='asis'}
+patients_vector = lung$patient.ident %>% unique()
+for (patient_name in patients_vector) {
+  df  = FetchData(object = lung,vars = c("program.assignment","patient.ident","time.point")) %>% 
+    filter (patient.ident == patient_name) %>% 
+    filter (program.assignment %in% c("Hypoxia")) %>% 
+    filter (time.point %in% c("pre-treatment","on-treatment")) %>% 
+    select(-patient.ident) %>% 
+    droplevels() 
+    
+  df2  = FetchData(object = lung,vars = c("program.assignment","patient.ident","time.point")) %>% 
+  filter (patient.ident == patient_name) %>% 
+  filter (time.point %in% c("pre-treatment","on-treatment")) %>% 
+   select(-patient.ident) %>% mutate(program.assignment = "all")%>% 
+    droplevels() 
+  
+  all_df = rbind(df,df2)
+    test = fisher.test(table(all_df),alternative = "greater")
+
+  
+  library(ggstatsplot)
+
+   p =  ggbarstats(
+    all_df, time.point ,program.assignment,
+    results.subtitle = FALSE,
+    subtitle = paste0(
+      "Fisher's exact test", ", p-value = ",
+      ifelse(test$p.value < 0.001, "< 0.001", round(test$p.value, 3))
+    ),title = patient_name
+  )
+print_tab(plt = p,title = patient_name)
+}
+```
+```{r results='asis'}
+patients_vector = lung$patient.ident %>% unique()
+for (patient_name in patients_vector) {
+  df  = FetchData(object = lung,vars = c("program.assignment","patient.ident","time.point")) %>% 
+    filter (patient.ident == patient_name) %>% 
+    filter (program.assignment %in% c("TNFa")) %>% 
+    filter (time.point %in% c("pre-treatment","on-treatment")) %>% 
+    select(-patient.ident) %>% 
+    droplevels() 
+    
+  df2  = FetchData(object = lung,vars = c("program.assignment","patient.ident","time.point")) %>% 
+  filter (patient.ident == patient_name) %>% 
+  filter (time.point %in% c("pre-treatment","on-treatment")) %>% 
+   select(-patient.ident) %>% mutate(program.assignment = "all")%>% 
+    droplevels() 
+  
+  all_df = rbind(df,df2)
+    test = fisher.test(table(all_df),alternative = "greater")
+
+  
+  library(ggstatsplot)
+
+   p =  ggbarstats(
+    all_df, time.point ,program.assignment,
+    results.subtitle = FALSE,
+    subtitle = paste0(
+      "Fisher's exact test", ", p-value = ",
+      ifelse(test$p.value < 0.001, "< 0.001", round(test$p.value, 3))
+    ),title = patient_name
+  )
+print_tab(plt = p,title = patient_name)
+}
+```
+```{r}
+patients_vector = lung$patient.ident %>% unique()
+for (patient_name in patients_vector) {
+  df  = FetchData(object = lung,vars = c("program.assignment","patient.ident","time.point")) %>% 
+    filter (patient.ident == patient_name) %>% 
+    filter (time.point %in% c("pre-treatment","on-treatment")) %>% 
+    select(-patient.ident) %>% 
+    droplevels() 
+  test = fisher.test(table(df),alternative = "less")
+      df$program.assignment = sub('TNFa','not Hypoxia ',df$program.assignment)
+      df$program.assignment = sub('cell_cycle','not Hypoxia ',df$program.assignment)
+      df$program.assignment = sub('NA','not Hypoxia ',df$program.assignment)
+
+  library(ggstatsplot)
+
+   p =  ggbarstats(
+    df, program.assignment  ,time.point ,
+    results.subtitle = FALSE,
+    subtitle = paste0(
+      "Fisher's exact test", ", p-value = ",
+      ifelse(test$p.value < 0.001, "< 0.001", round(test$p.value, 3))
+    ),title = patient_name
+  )
+print_tab(plt = p,title = patient_name)
+}
+```
+
+```{r results='asis'}
+
+  df  = FetchData(object = lung,vars = c("program.assignment","patient.ident","time.point")) %>% 
+    filter (program.assignment %in% c("Hypoxia")) %>% 
+    filter (time.point %in% c("pre-treatment","on-treatment")) %>% 
+    select(-patient.ident) %>% 
+    droplevels() 
+  df$program.assignment = sub('Hypoxia','Hypoxia cells',df$program.assignment)
+  df2  = FetchData(object = lung,vars = c("program.assignment","patient.ident","time.point")) %>% 
+  filter (time.point %in% c("pre-treatment","on-treatment")) %>% 
+   select(-patient.ident) %>% mutate(program.assignment = "all cells")%>% 
+    droplevels() 
+  
+  all_df = rbind(df,df2)
+    test = fisher.test(table(all_df),alternative = "less")
+
+  
+  library(ggstatsplot)
+
+   p =  ggbarstats(
+    all_df, time.point ,program.assignment,
+    results.subtitle = FALSE,
+    subtitle = paste0(
+      "Fisher's exact test", ", p-value = ",
+      ifelse(test$p.value < 0.001, "< 0.001", round(test$p.value, 3))
+    )
+  )
+p
+```
+
+
+```{r results='asis'}
+patients_vector = lung$patient.ident %>% unique()
+for (patient_name in patients_vector) {
+  df  = FetchData(object = lung,vars = c("program.assignment","patient.ident","time.point")) %>% 
+    filter (patient.ident == patient_name) %>% 
+    filter (program.assignment %in% c("Hypoxia")) %>% 
+    filter (time.point %in% c("pre-treatment","on-treatment")) %>% 
+    select(-patient.ident) %>% rbind(.) %>% 
+    droplevels() 
+  test = fisher.test(table(df))
+    
+  library(ggstatsplot)
+
+   p =  ggbarstats(
+    df, time.point ,program.assignment,
+    results.subtitle = FALSE,
+    subtitle = paste0(
+      "Fisher's exact test", ", p-value = ",
+      ifelse(test$p.value < 0.001, "< 0.001", round(test$p.value, 3))
+    ),title = patient_name
+  )
+print_tab(plt = p,title = patient_name)
+}
+```
+
+
+# Per patient programs ratio {.tabset}
+***
+
+
+
+```{r}
+patients_vector = lung$patient.ident %>% unique()
+for (patient_name in patients_vector) {
+  undebug(cell_percentage)
+  patient_data = subset(x = lung, subset = patient.ident == patient_name)
+  tp = FetchData(object = patient_data,vars = "time.point")
+  pre_count = nrow(tp[tp[,1] == "pre-treatment",,drop=F])/nrow(tp)
+  on_count = nrow(tp[tp[,1] == "on-treatment",,drop=F])/nrow(tp)
+    res_count = nrow(tp[tp[,1] == "resistant",,drop=F])/nrow(tp)
+
+print(pre_count)
+print(on_count)
+
+print(res_count)
+
+}
+```
+
+
+```{r results='asis'}
+patients_vector = lung$patient.ident %>% unique()
+all_data = data.frame(row.names=c("metagene.1","metagene.2","metagene.3","NA"))
+for (patient_name in patients_vector) {
+  patient_data = subset(x = lung, subset = patient.ident == patient_name)
+    data =FetchData(object = patient_data,vars = c("program.assignment",time.point_var))
+    data = data %>% dplyr::count(.[time.point_var] , program.assignment) %>%  dplyr::add_count(.[time.point_var], wt = n, name = "overall")%>% 
+        mutate(proportion = n / overall)   
+    data = data %>% dplyr::filter(time.point == "pre-treatment") 
+    names(data)[5] = patient_name
+    all_data = cbind(data,all_data)
+}
+  
+```
+
+
+```{r}
+xeno = SetIdent(object = xeno,value = "program.assignment")
+xeno  = RenameIdents(object = xeno,"metagene.1" = "Hypoxia")
+xeno  = RenameIdents(object = xeno,"metagene.2" = "TNFa")
+xeno  = RenameIdents(object = xeno,"metagene.3" = "cell_cycle")
+
+xeno$program.assignment = Idents(object = xeno)
+```
+
+```{r results='asis'}
+patients_vector = xeno$orig.ident %>% unique()
+for (patient_name in patients_vector) {
+  patient_data = subset(x = xeno, subset = orig.ident == patient_name)
+  p = cell_percentage(dataset = patient_data,time.point_var = "treatment")
+  p = annotate_figure(p = p, top = text_grob(patient_name))
+  print_tab(plt = p,title = patient_name)
+
+}
+  
+```

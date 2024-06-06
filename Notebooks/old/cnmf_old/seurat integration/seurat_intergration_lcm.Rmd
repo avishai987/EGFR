@@ -1,0 +1,144 @@
+---
+title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+author: "Avishai Wizel"
+date: '`r Sys.Date()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: FALSE
+---
+
+
+## Parameters
+
+```{r warning=FALSE}
+suffix = ""
+data_to_read = ""
+```
+
+
+## functions
+
+```{r warning=FALSE}
+```
+
+## Data
+
+```{r}
+lcm = readRDS("./Data/LCM/egf816_V5.RDS")
+lcm  = subset(lcm,subset = patient.ident != "MGH10124")
+```
+
+```{r}
+lcm.list <- SplitObject(lcm, split.by = "patient.ident")
+```
+
+```{r}
+ lapply(X = lcm.list, FUN = function(x) {
+print(ncol(x))})
+```
+
+```{r}
+lcm.list <- lapply(X = lcm.list, FUN = function(x) {
+    # x <- NormalizeData(x)
+    x <- FindVariableFeatures(x, selection.method = "vst", nfeatures = 10000)
+})
+```
+
+```{r}
+features <- SelectIntegrationFeatures(object.list = lcm.list,nfeatures = 10000)
+```
+
+```{r}
+immune.anchors <- FindIntegrationAnchors(object.list = lcm.list, anchor.features = features,dims = 1:9,k.score = 9,k.filter = 9)
+```
+
+```{r}
+# this command creates an 'integrated' data assay
+immune.combined <- IntegrateData(anchorset = immune.anchors,k.weight = 9)
+```
+
+```{r}
+DefaultAssay(immune.combined) <- "integrated"
+immune.combined = FindVariableFeatures(object = immune.combined,nfeatures = 10000)
+# Run the standard workflow for visualization and clustering
+immune.combined <- ScaleData(immune.combined,features = VariableFeatures(immune.combined))
+immune.combined <- RunPCA(immune.combined,features = VariableFeatures(immune.combined))
+ElbowPlot(object = immune.combined)
+```
+
+```{r}
+immune.combined <- RunUMAP(immune.combined, reduction = "pca", dims = 1:5,verbose = F)
+
+```
+
+```{r}
+DimPlot(immune.combined, reduction = "umap", group.by = "patient.ident",pt.size = 3)
+DimPlot(immune.combined, reduction = "umap", group.by = "time.point",pt.size = 3)
+```
+```{r}
+metadata = FetchData(object = immune.combined,vars = c("seurat_clusters","time.point"))
+ metadata =  group_by(metadata,seurat_clusters,time.point)%>% summarise(count = n())
+```
+
+```{r}
+DimPlot(immune.combined, reduction = "umap")
+```
+
+
+```{r}
+ggplot(metadata, aes(seurat_clusters, count, fill = time.point)) +
+  geom_bar(stat = 'identity')
+```
+
+```{r}
+data_matrix <- data.frame(immune.combined@assays$integrated@data) %>% t() %>% as.data.frame()
+zero_negative_values <- function(x) {
+  x[x<0] = 0
+  x
+}
+data_matrix = apply(data_matrix, 2, FUN = zero_negative_values) %>% as.data.frame()
+  fwrite(x = data_matrix, file = "./Data/cNMF/patients_SeuratIntegration_data_noNeg" %>% paste(suffix,sep = "_") %>% paste0(".txt"),sep = '\t',row.names=T)
+```
+
+
+
+cNMF:
+
+
+```{python}
+suffix = r.suffix
+```
+
+```{python}
+from cnmf import cNMF
+import numpy as np
+name = 'cNMF_patients_SeuratIntegration_' + suffix
+outdir = './Data/cNMF'
+K_range = np.arange(3,4)
+cnmf_obj = cNMF(output_dir=outdir, name=name)
+counts_fn='./Data/cNMF/patients_SeuratIntegration_data_noNeg_' + suffix +'.txt'
+
+
+cnmf_obj.prepare(counts_fn=counts_fn, components=K_range, seed=14,densify=True)
+```
+
+```{python}
+cnmf_obj.factorize(worker_i=0, total_workers=1)
+```
+
+```{python}
+cnmf_obj.combine()
+cnmf_obj.k_selection_plot()
+```
+
+```{python}
+import pickle
+f = open('./Data/cnmf/cnmf_objects/patients_SeuratIntegration_data_noNeg_' + suffix +'_cnmf_obj.pckl', 'wb')
+pickle.dump(cnmf_obj, f)
+f.close()
+```
+

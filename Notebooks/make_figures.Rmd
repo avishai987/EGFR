@@ -52,11 +52,12 @@ xeno_nmf_usage_UMAP = readRDS("./Figures/xeno_NMF_usage_UMAP.rds")
 
 
 ```{r fig.height=17, fig.width=12}
-cowplot::plot_grid(xeno_nmf_usage_UMAP,xeno_nmf_heatmap,ncol = 1,labels = "AUTO")
+p = cowplot::plot_grid(xeno_nmf_usage_UMAP,xeno_nmf_heatmap,ncol = 1,labels = "AUTO")
+p
 ```
 ```{r}
 pdf("./final_figures/fig2.pdf",width = 12,height = 17)
-cowplot::plot_grid(xeno_nmf_usage_UMAP,xeno_nmf_heatmap,ncol = 1,labels = "AUTO")
+p
 dev.off()
 ```
 # Figure 3
@@ -118,7 +119,7 @@ xeno_hif_targets_violin = readRDS("./Figures/xeno_hif_targets_violin.rds")
 ```
 
 
-```{r fig.height=8, fig.width=16}
+```{r fig.height=8, fig.width=24}
 p1 = cowplot::plot_grid(xeno_signtures_dotplot,patients_signtures_dotplot,bivona_known_genes_dotplot,xeno_hif_targets_violin,patients_hif_targets_violin,bivona_known_genes_violin,labels = "AUTO")
 
 p1
