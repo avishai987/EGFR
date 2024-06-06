@@ -55,6 +55,7 @@ sipsic_per_patient <- function(x, dataset_splited, patients_names,to_TPM) {
 
 # Data
 
+
 ```{r}
 lung = readRDS("./Data/lung_cancercells_withTP_onlyPatients.rds")
 lung_patients = lung$patient.ident %>% unique() %>% as.character()
@@ -162,12 +163,12 @@ ComplexHeatmap::Heatmap(logFC_df, name = "log2FC on/pre", col = col_fun,
 }, row_names_gp = gpar(fontsize = 8), clustering_method_rows = "average", clustering_distance_rows = "euclidean")
 ```
 
-
 ```{r}
+# color row name if consistent across patients/models
 colors= c()
 for (row_num in 1:nrow(logFC_df)) {
   row = logFC_df[row_num,]
-  if (sum(row > 0.1)  >= 5) {
+  if (sum(row > 0.1)  >= 5) { # if at least x values are more than 0.1 FC
     colors <- c(colors, "red")
   }
   else if (sum(row < -0.1)  >= 5) {
