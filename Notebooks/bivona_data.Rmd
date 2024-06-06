@@ -42,16 +42,25 @@ load("./Data/Bivona_scRNAseq/NI04_tumor_seurat_object.RData")
 tiss_subset_tumor2 = UpdateSeuratObject(tiss_subset_tumor2)
 tiss_subset_tumor2$treatment = NULL
 tiss_subset_tumor2@meta.data[["treatment"]] = factor(tiss_subset_tumor2$analysis, levels = c("naive", "grouped_pr","grouped_pd"))
+tiss_subset_tumor2$treatment = tiss_subset_tumor2$treatment %>% gsub(pattern = "grouped_pr",replacement = "RD")%>%
+  gsub(pattern = "grouped_pd",replacement = "PD") %>% factor(levels = c("naive","RD","PD"))
 ```
-```{r}
 
-```
 
 
 
 ```{r}
 tiss_subset_tumor2_pri = subset(tiss_subset_tumor2, subset = primary_or_metastaic %in% c("Primary"))
-tiss_subset_tumor2_pri_egfr = subset(tiss_subset_tumor2_pri, subset = driver_gene == "EGFR") %>% subset(subset = histolgy == "Adenocarcinoma") 
+tiss_subset_tumor2_pri_egfr = subset(tiss_subset_tumor2_pri, subset = driver_gene == "EGFR") %>%
+  subset(subset = histolgy == "Adenocarcinoma") 
+```
+
+```{r}
+# re run umap
+tiss_subset_tumor2_pri_egfr = FindVariableFeatures(object = tiss_subset_tumor2_pri_egfr)
+tiss_subset_tumor2_pri_egfr = ScaleData(object = tiss_subset_tumor2_pri_egfr)
+tiss_subset_tumor2_pri_egfr = RunPCA(object = tiss_subset_tumor2_pri_egfr,verbose = F)
+tiss_subset_tumor2_pri_egfr = RunUMAP(tiss_subset_tumor2_pri_egfr, dims = 1:5,verbose = F)
 ```
 
 calculate nmf metagenes
@@ -99,7 +108,7 @@ bivona_5_metagenes = py$usage_by_calc
 
 ```{r}
 all_metagenes = bivona_5_metagenes
-colnames(all_metagenes) = c("IFNa_nmf","TNFa_nmf", "hypoxia_nmf","cell_cycle_nmf","unknown")
+colnames(all_metagenes) = paste0("Program.",1:5)
 
 ```
 
@@ -126,13 +135,33 @@ saveRDS(object = as.grob(p),file = "./Figures/bivona_nmf_usage_umap.rds")
 
 # NMF programs
 ```{r}
-p = metagenes_violin_combine_patients(dataset = tiss_subset_tumor2_pri_egfr,prefix = "patient",pre_on = c("naive","grouped_pr"),test = "wilcox.test",programs = colnames(all_metagenes), return_list = F)
+p = metagenes_violin_combine_patients(dataset = tiss_subset_tumor2_pri_egfr,prefix = "patient",pre_on = c("naive","RD"),test = "wilcox.test",programs = colnames(all_metagenes), return_list = F)
 
 p
 ```
 
 ```{r}
-saveRDS(object = as.grob(p),file = "./Figures/bivona_nmf_split_violin.rds")
+# plot violin
+data = FetchData(object = tiss_subset_tumor2_pri_egfr,vars = c(colnames(all_metagenes)[3],"treatment"))
+formula = as.formula(paste0(colnames(all_metagenes)[3],"~treatment"))
+stat.test = wilcox_test(formula = formula,data = data, p.adjust.method = "fdr") %>% 
+  add_xy_position(x = "treatment", dodge = 0.8,step.increase = 0.3)
+
+
+p = ggplot(data, aes_string(x="treatment", y=colnames(all_metagenes)[3])) + 
+    geom_violin(trim=FALSE,aes(fill = treatment))+geom_boxplot(width = 0.15)+
+  theme_minimal()+
+  scale_fill_manual(values = c("#00AFBB", "#E7B800", "#FC4E07"))+
+  theme(legend.position = "none")+stat_pvalue_manual(stat.test, label = "{p.adj}")+
+  ylab("Program 3 Z-score")
+
+p
+
+```
+
+
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/bivona_nmf_violin.rds")
 ```
 
 ```{r warning=FALSE}
@@ -157,7 +186,8 @@ for (i  in 1:ncol(all_metagenes)) {
 ```{r fig.height=4, fig.width=11}
 
 p = DotPlot.2(object = tiss_subset_tumor2_pri_egfr, features =  paste0(names(all_metagenes),"_scaled"),group.by  = 'treatment',scale = F)+
-  guides(size = guide_legend(title = "Cells above average (%)"),color = guide_colorbar(title = "Average Score"))+ scale_x_discrete(labels= paste0(names(all_metagenes),"\n(",c("IFNa","TNFa-NFKb","HYPOXIA","Cell_Cycle"),")"))
+  guides(size = guide_legend(title = "Cells above average (%)"),color = guide_colorbar(title = "Average Score"))+
+  scale_x_discrete(labels= paste0(names(all_metagenes),"\n(",c("IFNa","TNFa-NFKb","HIF","Cell_Cycle"),")"))
 p
 ```
 ```{r}
@@ -182,15 +212,32 @@ for (i in seq_along(gene_list)) {
 }
 ```
 
+```{r}
+# plot violin
+data = FetchData(object = tiss_subset_tumor2_pri_egfr,vars = c("hif_targets","treatment"))
+stat.test = wilcox_test(formula = hif_targets  ~ treatment,data = data, p.adjust.method = "fdr") %>% 
+  add_xy_position(x = "treatment", dodge = 0.8,step.increase = 0.3)
 
+
+p = ggplot(data, aes(x=treatment, y=hif_targets)) + 
+    geom_violin(trim=FALSE,aes(fill = treatment))+geom_boxplot(width = 0.2)+
+  theme_minimal()+
+  scale_fill_manual(values = c("#00AFBB", "#E7B800", "#FC4E07"))+
+  theme(legend.position = "none")+stat_pvalue_manual(stat.test, label = "{p.adj}")+
+  ylab("HIF targets Z-score")
+
+p
+
+```
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/bivona_hif_targets_violin.rds")
+```
 
 ```{r}
-p = metagenes_violin_combine_patients(dataset = tiss_subset_tumor2_pri_egfr,prefix = "patient",pre_on = c("naive","grouped_pr"),test = "wilcox.test",programs = names(gene_list), return_list = F)
+p = metagenes_violin_combine_patients(dataset = tiss_subset_tumor2_pri_egfr,prefix = "patient",pre_on = c("naive","RD"),test = "wilcox.test",programs = names(gene_list), return_list = F)
 p
 ```
-```{r}
-saveRDS(object = as.grob(p),file = "./Figures/bivona_known_genes_violin.rds")
-```
+
 
 ```{r fig.height=4, fig.width=11}
 
@@ -198,6 +245,8 @@ p = DotPlot.2(object = tiss_subset_tumor2_pri_egfr, features =  names(gene_list)
   guides(size = guide_legend(title = "Cells above average (%)"),color = guide_colorbar(title = "Average Score"))
 p
 ```
+
+
 ```{r}
 saveRDS(object = as.grob(p),file = "./Figures/bivona_known_genes_dotplot.rds")
 ```
