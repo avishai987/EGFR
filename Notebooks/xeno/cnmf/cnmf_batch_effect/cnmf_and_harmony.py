@@ -1,3 +1,4 @@
+# WARNING: paths updated
 # to run, open onteractive job and:
 # source /sci/labs/yotamd/lab_share/avishai.wizel/python_envs/Virtual_env/cnmf_dev/bin/activate.csh
 # cd "/sci/labs/yotamd/lab_share/avishai.wizel/R_projects/EGFR/Notebooks/cnmf/cnmf_batch_effect/"
