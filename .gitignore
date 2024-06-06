@@ -16,3 +16,4 @@ history.Rhistory
 .RDataTmp
 .RDataTmp1
 raw_data/
+processed_data/
