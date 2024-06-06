@@ -52,7 +52,7 @@ xeno_nmf_usage_UMAP = readRDS("./Figures/xeno_NMF_usage_UMAP.rds")
 
 
 ```{r fig.height=17, fig.width=12}
-cowplot::plot_grid(xeno_nmf_usage_UMAP,as.grob(xeno_nmf_heatmap),ncol = 1,labels = "AUTO")
+cowplot::plot_grid(xeno_nmf_usage_UMAP,xeno_nmf_heatmap,ncol = 1,labels = "AUTO")
 ```
 ```{r}
 pdf("./final_figures/fig2.pdf",width = 12,height = 17)
@@ -86,14 +86,14 @@ patients_nmf_usage_umap = readRDS("./Figures/patients_nmf_usage_umap.rds")
 bivona_nmf_usage_umap =  readRDS("./Figures/bivona_nmf_usage_umap.rds")
 
 bivona_nmf_dotplot = readRDS("./Figures/bivona_nmf_dotplot.rds")
-bivona_nmf_split_violin = readRDS("./Figures/bivona_nmf_split_violin.rds")
+bivona_nmf_violin = readRDS("./Figures/bivona_nmf_violin.rds")
 
 patients_nmf_usage_dotplot =  readRDS("./Figures/patients_nmf_usage_dotplot.rds")
 patients_nmf_hypoxia_violin = readRDS("./Figures/patients_nmf_hypoxia_violin.rds")
 ```
 
 ```{r fig.height=17, fig.width=17}
-p1 = cowplot::plot_grid(bivona_nmf_usage_umap,patients_nmf_usage_umap, bivona_nmf_dotplot,patients_nmf_usage_dotplot,bivona_nmf_split_violin,patients_nmf_hypoxia_violin,nrow = 3, ncol = 2,labels = "AUTO",rel_heights = c(1.5,1,1))
+p1 = cowplot::plot_grid(bivona_nmf_usage_umap,patients_nmf_usage_umap, bivona_nmf_dotplot,patients_nmf_usage_dotplot,bivona_nmf_violin,patients_nmf_hypoxia_violin,nrow = 3, ncol = 2,labels = "AUTO",rel_heights = c(1.5,1,1))
 
 p1
 ```
@@ -107,7 +107,7 @@ dev.off()
 # Fig 4 sup
 ```{r}
 
-bivona_known_genes_violin = readRDS("./Figures/bivona_known_genes_violin.rds")
+bivona_known_genes_violin = readRDS("./Figures/bivona_hif_targets_violin.rds")
 bivona_known_genes_dotplot = readRDS("./Figures/bivona_known_genes_dotplot.rds")
 
 patients_hif_targets_violin = readRDS("./Figures/patients_hif_targets_violin.rds")
