@@ -20,7 +20,7 @@ output:
 ```{r}
 reticulate::use_virtualenv("/sci/labs/yotamd/lab_share/avishai.wizel/python_envs/Virtual_env/cnmf_dev/",required = T)
 reticulate::py_config() # if you see that r-cnmf_dev has not been loaded, restart/terminate r and try again. Do not load reticulate before.
-hif_targets = scan("./Data/HIF_targets_Lombardi_PMC9869179.txt", character(), quote = "")
+hif_targets = scan("./raw_data/HIF_targets_Lombardi_PMC9869179.txt", character(), quote = "")
 
 ```
 
@@ -38,7 +38,7 @@ source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_
 # Data
 
 ```{r}
-load("./Data/Bivona_scRNAseq/NI04_tumor_seurat_object.RData")
+load("./raw_data/Bivona_scRNAseq/NI04_tumor_seurat_object.RData")
 tiss_subset_tumor2 = UpdateSeuratObject(tiss_subset_tumor2)
 tiss_subset_tumor2$treatment = NULL
 tiss_subset_tumor2@meta.data[["treatment"]] = factor(tiss_subset_tumor2$analysis, levels = c("naive", "grouped_pr","grouped_pd"))
@@ -67,7 +67,7 @@ calculate nmf metagenes
 ```{python}
 from cnmf import cNMF
 import pickle
-f = open('./Data/cnmf_V2/noTPM_100iter//models_2Kvargenes_corrected_noTPM_cnmf_obj.pckl', 'rb')
+f = open('./processed_data/cnmf_V2/noTPM_100iter//models_2Kvargenes_corrected_noTPM_cnmf_obj.pckl', 'rb')
 cnmf_obj = pickle.load(f)
 f.close()
 ```

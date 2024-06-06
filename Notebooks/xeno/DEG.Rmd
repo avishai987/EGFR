@@ -31,10 +31,6 @@ source_from_github(repositoy = "DEG_functions",version = "0.2.54")
 
 ```{r}
 xeno = readRDS("./Data/10x_xeno_1000.Rds")
-lung = readRDS("./Data/lung_cancercells_withTP_onlyPatients.rds")
-lung_patients = lung$patient.ident %>% unique() %>% as.character()
-lung_patients_filtered = lung_patients[!(lung_patients %in% c("X1055new","X1099"))] #remove patients with less then 100 cells
-lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
 ```
 
 

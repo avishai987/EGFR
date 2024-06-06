@@ -18,7 +18,7 @@ output:
 # Functions
 ```{r}
 reticulate::use_virtualenv("/sci/labs/yotamd/lab_share/avishai.wizel/python_envs/Virtual_env/cnmf_dev/",required = T)
-reticulate::py_config() # if you see that r-cnmf_dev has not been loaded, restart/terminate r and try again
+reticulate::py_config() # if you see that r-cnmf_dev has not been loaded, restart/terminate r and try again, DO NOT load reticulate before.
 ```
 
 ```{r warning=FALSE}
@@ -35,13 +35,14 @@ source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_
 # Data
 
 ```{r}
-xeno = readRDS("./Data/10x_xeno_1000.Rds")
-hif_targets = scan("./Data/HIF_targets_Lombardi_PMC9869179.txt", character(), quote = "")
-genesets <- msigdb_download("Homo sapiens",category="H") %>% append( msigdb_download("Homo sapiens",category="C2",subcategory = "CP:KEGG"))
+xeno = readRDS("./raw_data/10x_xeno_1000.Rds")
+hif_targets = scan("./raw_data/HIF_targets_Lombardi_PMC9869179.txt", character(), quote = "")
+genesets = getGmt("./raw_data/h.all.v2023.2.Hs.symbols.gmt") %>% geneIds()
 genesets[["HIF_targets"]] = hif_targets
 ```
+
 ```{r}
-lung = readRDS("./Data/lung_cancercells_withTP_onlyPatients.rds")
+lung = readRDS("./raw_data/lung_cancercells_withTP_onlyPatients.rds")
 lung_patients = lung$patient.ident %>% unique() %>% as.character()
 lung_patients_filtered = lung_patients[!(lung_patients %in% c("X1055new","X1099"))] # remove patients with less than 100 malignant cells
 lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
@@ -65,14 +66,14 @@ saveRDS(object = as.grob(p2),file = "./Figures/xeno_treatment_umap.rds")
 ```{python}
 from cnmf import cNMF
 import pickle
-f = open('./Data/cnmf_V2/noTPM_100iter//models_2Kvargenes_corrected_noTPM_cnmf_obj.pckl', 'rb')
+f = open('./processed_data/cnmf_V2/noTPM_100iter//models_2Kvargenes_corrected_noTPM_cnmf_obj.pckl', 'rb')
 cnmf_obj = pickle.load(f)
 f.close()
 ```
 
 # K selection plot
 ```{r fig.height=2, fig.width=2}
-plot_path = "./Data/cnmf_V2/noTPM_100iter/BatchCorrected_cnmf/BatchCorrected_cnmf.k_selection.png"
+plot_path = "./processed_data/cnmf_V2/noTPM_100iter/BatchCorrected_cnmf/BatchCorrected_cnmf.k_selection.png"
 knitr::include_graphics(plot_path)
 ```
 
