@@ -30,7 +30,7 @@ source_from_github(repositoy = "DEG_functions",version = "0.2.54")
 ## Data
 
 ```{r}
-xeno = readRDS("./Data/10x_xeno_1000.Rds")
+xeno = readRDS("./raw_data/10x_xeno_1000.Rds")
 ```
 
 
@@ -47,6 +47,8 @@ deg_df = FindMarkers(object = xeno,ident.1 = "NT",ident.2 = "OSI",densify = T,me
 p = volcano_plot(deg_df,top_genes_text = 5,ident1 = "NT",ident2 = "OSI",fc_cutoff = 1.5)+coord_cartesian(clip = "off")
 p
 ```
+
+
 ```{r}
 saveRDS(object = as.grob(p),file = "./Figures/xeno_DEG.rds")
 ```
