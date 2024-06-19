@@ -14,6 +14,12 @@ output:
 ---
 
 
+```{r setup}
+knitr::opts_chunk$set(
+  fig.width = 8,
+  fig.path = "./my_figures/prefix-"
+)
+```
 
 # Functions
 ```{r}
@@ -51,9 +57,9 @@ lung$orig.ident = lung$patient.ident
 
 ```
 
-```{r fig.height=5, fig.width=12}
-p1  = DimPlot(xeno,group.by = "orig.ident")
-p2  =  DimPlot(xeno,group.by = "treatment")
+```{r fig.height=6, fig.width=14}
+p1  = DimPlot(xeno,group.by = "orig.ident")+ggtitle("")+ guides(color=guide_legend(title="Model",override.aes = list(size=3)))
+p2  =  DimPlot(xeno,group.by = "treatment",shuffle = T)+ggtitle("")+ guides(color=guide_legend(title="Treatment",override.aes = list(size=3)))
 p1+p2
 ```
 ```{r}
@@ -249,7 +255,28 @@ saveRDS(object = as.grob(p),file = "./Figures/xeno_NMF_programs_heatmap.rds")
 grid.arrange(as.grob(p))
 ```
 
+#  line plots
+```{r fig.height=6, fig.width=17}
+for (model in unique(xeno$orig.ident)) {
+  model_data = subset(x = xeno,subset = orig.ident == model)
+  # line plots
+  data = FetchData(object = model_data, vars = paste0("Program.", 1:4))
+  # data = data[1:100, ]
+  col_dend = hclust(dist(data), method = "complete")
+  data = data[col_dend$order, ]
+  data$cell = 1:nrow(data)
+  d <- reshape2::melt(data, id = "cell")
+  
+  p = ggplot(d, aes(x = cell, y = value, color = variable)) +
+    geom_line(size = 1) +
+    theme(axis.text.x = element_blank(),
+          axis.ticks.x = element_blank())+ggtitle(model)
+  print(p)
+}
 
+
+
+```
 ```{r warning=FALSE}
 # modify dotplot to be without exponent of the expression
 newDef <- deparse(DotPlot)
