@@ -57,21 +57,10 @@ sipsic_per_patient <- function(x, dataset_splited, patients_names,to_TPM) {
 
 
 ```{r}
-lung = readRDS("./Data/lung_cancercells_withTP_onlyPatients.rds")
-lung_patients = lung$patient.ident %>% unique() %>% as.character()
-lung_patients_filtered = lung_patients[!(lung_patients %in% c("X1055new","X1099"))] # remove patients with less than 100 malignant cells
-lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
-xeno = readRDS("./Data/10x_xeno_1000.Rds")
-
-
+xeno = readRDS("./raw_data/10x_xeno_1000.Rds")
 genesets <- msigdb_download("Homo sapiens",category="H") 
-hif_targets = c("LDHA", "PPFIA4", "PFKFB4", "AK4", "ERO1A", "BNIP3L", "BNIP3",  #https://pubmed.ncbi.nlm.nih.gov/36384128/
-"PFKL", "ENO1", "MIR210HG", "TPI1", "HILPDA", "PGK1", "INSIG2", 
-"AK4P1", "AC114803.1", "ENO2", "FUT11", "EGLN3", "NDRG1", "BNIP3P1", 
-"WDR54", "OVOL1-AS1", "STC2", "DDX41", "C4orf47", "GYS1", "ANKRD37", 
-"BICDL2", "P4HA1", "PDK1", "OSMR", "PKM", "LDHAP5", "AL158201.1", 
-"PFKP", "MIR210", "NLRP3P1", "GSX1", "AL109946.1", "PGAM1", "SLC16A3", 
-"ISM2", "TCAF2", "ARID3A", "KDM3A", "JMJD6", "C4orf3")
+hif_targets = scan("./raw_data/HIF_targets_Lombardi_PMC9869179.txt", character(), quote = "")
+
 genesets[["HIF_targets"]] = hif_targets
 ```
 
@@ -148,7 +137,7 @@ for (model in unique(xeno$orig.ident)) {
 }
 
 fdr_df = apply(fdr_df, 1:2, \(x) format(x, digits=1)) %>% as.data.frame() #round p values 
-fdr_df[fdr_df == 0] = paste0("<",format(.Machine$double.xmin,digits = 1)) # replace p=0 with p<min float
+# fdr_df[fdr_df == 0] = paste0("<",format(.Machine$double.xmin,digits = 1)) # replace p=0 with p<min float
 ```
 ```{r}
 untrace(Seurat:::FindMarkers.default)
@@ -159,7 +148,7 @@ untrace(Seurat:::FindMarkers.default)
 col_fun = circlize::colorRamp2(c(-1, 0, 1), c("blue", "white", "red"))
 ComplexHeatmap::Heatmap(logFC_df, name = "log2FC on/pre", col = col_fun,
     cell_fun = function(j, i, x, y, width, height, fill) {
-        grid.text(fdr_df[i, j], x, y, gp = gpar(fontsize = 8))
+        grid.text( (fdr_df[i, j]), x, y, gp = gpar(fontsize = 8))
 }, row_names_gp = gpar(fontsize = 8), clustering_method_rows = "average", clustering_distance_rows = "euclidean")
 ```
 
