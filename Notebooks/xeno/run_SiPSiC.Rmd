@@ -1,0 +1,91 @@
+---
+title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: FALSE
+    number_sections: true
+    toc_depth: 1
+---
+
+
+
+
+# Functions
+
+```{r}
+library(stringi)
+library(reticulate)
+library(ggplotify)
+
+source_from_github(repositoy = "DEG_functions",version = "0.2.47")
+source_from_github(repositoy = "cNMF_functions",version = "0.4.04",script_name = "cnmf_functions_V3.R")
+source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_name = "functions.R")
+
+
+sipsic_per_patient <- function(x, dataset_splited, patients_names,to_TPM) {
+  i <<- i + 1
+  message(paste("pathway "), i)
+  all_patients = c()
+  
+  for (patient in patients_names) {
+    patient_data = dataset_splited[[patient]]
+    if (to_TPM) {
+      res = getPathwayScores((2 ^ patient_data@assays$RNA@data) - 1, unlist(x))[["pathwayScores"]]
+    } else{
+      res = getPathwayScores(patient_data@assays$RNA@data, unlist(x))[["pathwayScores"]]
+    }
+    all_patients = c(all_patients, res)
+  }
+  scoresAndIndices = append(scoresAndIndices, all_patients)
+  
+}
+
+```
+
+# Data
+
+
+```{r}
+xeno <- readRDS("./raw_data/10x_xeno_1000.Rds")
+genesets <- msigdb_download("Homo sapiens", category = "H")
+hif_targets <- scan("./raw_data/HIF_targets_Lombardi_PMC9869179.txt", character(), quote = "")
+
+genesets[["HIF_targets"]] <- hif_targets
+```
+
+
+# DE pathways
+
+```{r}
+calculatePathwayScores <- function(pathwayToScore, countsMatrix) {
+  pathwayName <- pathwayToScore@setName
+  print(pathwayName)
+  pathwayGenes <- pathwayToScore@geneIds
+  pathwayScoresObject <- getPathwayScores(countsMatrix, pathwayGenes)
+  suppressWarnings(
+    if (is.na(pathwayScoresObject)) {
+      return(NA)
+    }
+  )
+  return(pathwayScoresObject$pathwayScores)
+}
+```
+
+```{r}
+genesets <- getGmt("./Data/msigdb_pathways/h.all.v7.0.symbols.pluscc.gmt")
+genesets_cp <- getGmt("./Data/msigdb_pathways/c2.cp.v2023.2.Hs.symbols.gmt")
+genesets_h_cp = GeneSetCollection(c(genesets,genesets_cp))
+```
+
+```{r}
+pathwayScoreLists <- lapply(X = genesets_h_cp@.Data, calculatePathwayScores, xeno@assays$RNA@data %>% expm1())
+pathwayScoreLists <- pathwayScoreLists[!is.na(pathwayScoreLists)] #remove NA pathways
+pathwayScoresMatrix <- as.data.frame(do.call("rbind", pathwayScoreLists))
+```
+
