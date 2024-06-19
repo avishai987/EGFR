@@ -1,0 +1,69 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+```{r setup}
+knitr::opts_chunk$set(
+  fig.width = 8,
+  fig.path = "./my_figures/prefix-"
+)
+```
+
+```{r}
+reticulate::use_virtualenv("/sci/labs/yotamd/lab_share/avishai.wizel/python_envs/Virtual_env/cnmf_dev/",required = T)
+reticulate::py_config() # if you see that r-cnmf_dev has not been loaded, restart/terminate r and try again, DO NOT load reticulate before.
+```
+
+```{python}
+import scipy
+import matplotlib.pyplot as plt
+import scanpy as sc
+adata_corr_nonneg = sc.read_h5ad('./Data/cnmf_V2/noTPM_100iter/xeno_batchCorrect.Corrected.HVG.Varnorm.h5ad')
+```
+
+
+## import to seurat for plotting UMAP
+```{r}
+exprs <- t(py$adata_corr_nonneg$X)
+colnames(exprs) <- py$adata_corr_nonneg$obs_names$to_list()
+rownames(exprs) <- py$adata_corr_nonneg$var_names$to_list()
+
+# Create the Seurat object
+xeno_corr_nonneg <- CreateSeuratObject(counts = exprs)
+xeno_corr_nonneg$orig.ident <- py$adata_corr_nonneg$obs["orig.ident"]
+xeno_corr_nonneg$treatment <- py$adata_corr_nonneg$obs["treatment"]
+
+```
+
+## PCA after correction
+```{r}
+xeno_corr_nonneg = ScaleData(object = xeno_corr_nonneg,features = rownames(xeno_corr_nonneg))
+# xeno_corr_nonneg@assays$RNA@scale.data = exprs
+
+xeno_corr_nonneg <- RunPCA(xeno_corr_nonneg, features = rownames(xeno_corr_nonneg))
+
+ElbowPlot(xeno_corr_nonneg)
+```
+## Run dim reduction
+```{r results='hide',include=FALSE}
+pc2use = 1:10
+xeno_corr_nonneg <- FindNeighbors(xeno_corr_nonneg, dims = pc2use)
+xeno_corr_nonneg <- FindClusters(xeno_corr_nonneg, resolution = 0.5)
+xeno_corr_nonneg <- RunUMAP(xeno_corr_nonneg, dims = 1:10)
+
+```
+
+## UMAP after correction
+```{r}
+# Description
+xeno_corr_nonneg$orig.ident = factor(xeno_corr_nonneg$orig.ident, levels = c( "1068", "1071", "1109", "1157","119", "PC9"))
+```
+
+```{r fig.height=6, fig.width=12}
+p1 = DimPlot(xeno_corr_nonneg, reduction = "umap",group.by = "orig.ident",shuffle = T)+ggtitle("")+ guides(color=guide_legend(title="Model",override.aes = list(size=3)))
+
+p2 = DimPlot(xeno_corr_nonneg, reduction = "umap",group.by = "treatment",shuffle = T)+ggtitle("")+ guides(color=guide_legend(title="Treatment",override.aes = list(size=3)))
+p1+p2
+
+```
+
