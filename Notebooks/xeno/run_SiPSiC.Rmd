@@ -53,10 +53,7 @@ sipsic_per_patient <- function(x, dataset_splited, patients_names,to_TPM) {
 
 ```{r}
 xeno <- readRDS("./raw_data/10x_xeno_1000.Rds")
-genesets <- msigdb_download("Homo sapiens", category = "H")
-hif_targets <- scan("./raw_data/HIF_targets_Lombardi_PMC9869179.txt", character(), quote = "")
-
-genesets[["HIF_targets"]] <- hif_targets
+genesets = getGmt("./raw_data/h.all.v2023.2.Hs.symbols.gmt")
 ```
 
 
@@ -77,15 +74,18 @@ calculatePathwayScores <- function(pathwayToScore, countsMatrix) {
 }
 ```
 
-```{r}
-genesets <- getGmt("./Data/msigdb_pathways/h.all.v7.0.symbols.pluscc.gmt")
-genesets_cp <- getGmt("./Data/msigdb_pathways/c2.cp.v2023.2.Hs.symbols.gmt")
-genesets_h_cp = GeneSetCollection(c(genesets,genesets_cp))
-```
+
 
 ```{r}
-pathwayScoreLists <- lapply(X = genesets_h_cp@.Data, calculatePathwayScores, xeno@assays$RNA@data %>% expm1())
+pathwayScoreLists <- lapply(X = genesets@.Data, calculatePathwayScores, xeno@assays$RNA@data %>% expm1())
+names(pathwayScoreLists) = names(genesets)
 pathwayScoreLists <- pathwayScoreLists[!is.na(pathwayScoreLists)] #remove NA pathways
 pathwayScoresMatrix <- as.data.frame(do.call("rbind", pathwayScoreLists))
 ```
 
+```{r}
+# save
+
+saveRDS(object = pathwayScoresMatrix,file = "./output_data/run_SiPSiC/pathwayScoresMatrix.RDS")
+
+```

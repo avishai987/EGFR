@@ -33,24 +33,6 @@ source_from_github(repositoy = "cNMF_functions",version = "0.4.04",script_name =
 source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_name = "functions.R")
 
 
-sipsic_per_patient <- function(x, dataset_splited, patients_names,to_TPM) {
-  i <<- i + 1
-  message(paste("pathway "), i)
-  all_patients = c()
-  
-  for (patient in patients_names) {
-    patient_data = dataset_splited[[patient]]
-    if (to_TPM) {
-      res = getPathwayScores((2 ^ patient_data@assays$RNA@data) - 1, unlist(x))[["pathwayScores"]]
-    } else{
-      res = getPathwayScores(patient_data@assays$RNA@data, unlist(x))[["pathwayScores"]]
-    }
-    all_patients = c(all_patients, res)
-  }
-  scoresAndIndices = append(scoresAndIndices, all_patients)
-  
-}
-
 ```
 
 # Data
@@ -58,40 +40,10 @@ sipsic_per_patient <- function(x, dataset_splited, patients_names,to_TPM) {
 
 ```{r}
 xeno = readRDS("./raw_data/10x_xeno_1000.Rds")
-genesets <- msigdb_download("Homo sapiens",category="H") 
-hif_targets = scan("./raw_data/HIF_targets_Lombardi_PMC9869179.txt", character(), quote = "")
-
-genesets[["HIF_targets"]] = hif_targets
 ```
 
 
 # DE pathways
-
-```{r}
-calculatePathwayScores <- function(pathwayToScore, countsMatrix)
-{
-  pathwayName <- pathwayToScore@setName
-  print(pathwayName)
-  pathwayGenes <- pathwayToScore@geneIds
-  pathwayScoresObject <- getPathwayScores(countsMatrix, pathwayGenes) 
-  suppressWarnings(
-    if(is.na(pathwayScoresObject)){return (NA)}
-  )
-  return(pathwayScoresObject$pathwayScores)
-}
-```
-
-```{r}
-genesets <- getGmt("./Data/msigdb_pathways/h.all.v7.0.symbols.pluscc.gmt")
-genesets_cp <- getGmt("./Data/msigdb_pathways/c2.cp.v2023.2.Hs.symbols.gmt")
-genesets_h_cp = GeneSetCollection(c(genesets,genesets_cp))
-```
-
-```{r}
-pathwayScoreLists <- lapply(X = genesets_h_cp@.Data, calculatePathwayScores, xeno@assays$RNA@data%>% expm1())
-pathwayScoreLists <- pathwayScoreLists[!is.na(pathwayScoreLists)] #remove NA pathways
-pathwayScoresMatrix <- as.data.frame(do.call("rbind", pathwayScoreLists))
-```
 
 ```{r}
 pathwayScoresMatrix = read_rds(file = "./Data/msigdb_pathways/xeno_pathwayScoresMatrix.rds")
@@ -137,6 +89,15 @@ for (model in unique(xeno$orig.ident)) {
 }
 
 fdr_df = apply(fdr_df, 1:2, \(x) format(x, digits=1)) %>% as.data.frame() #round p values 
+a = fdr_df
+a[] <- lapply(a, as.numeric)
+
+convert <- function(vec) {
+  symnum(vec, corr = FALSE, na = FALSE, cutpoints = c(0, 
+    0.001, 0.01, 0.05, 0.1, 1), symbols = c("***", "**", "*", ".", " ")) %>% as.character()
+} 
+
+a[] = apply(a, MARGIN = 1, FUN = convert)
 # fdr_df[fdr_df == 0] = paste0("<",format(.Machine$double.xmin,digits = 1)) # replace p=0 with p<min float
 ```
 ```{r}
@@ -148,7 +109,7 @@ untrace(Seurat:::FindMarkers.default)
 col_fun = circlize::colorRamp2(c(-1, 0, 1), c("blue", "white", "red"))
 ComplexHeatmap::Heatmap(logFC_df, name = "log2FC on/pre", col = col_fun,
     cell_fun = function(j, i, x, y, width, height, fill) {
-        grid.text( (fdr_df[i, j]), x, y, gp = gpar(fontsize = 8))
+        grid.text( (a[i, j]), x, y, gp = gpar(fontsize = 8))
 }, row_names_gp = gpar(fontsize = 8), clustering_method_rows = "average", clustering_distance_rows = "euclidean")
 ```
 
@@ -179,6 +140,30 @@ p
 
 ```{r}
 saveRDS(object = as.grob(p),file = "./Figures/xeno_sipsic_heatmap.rds")
+```
+
+
+```{r fig.height=15}
+DefaultAssay(xeno) = "sipsic"
+data = FetchData(object = xeno, vars = c(pathways_names,"orig.ident"))
+data[] <- data %>%  group_by(orig.ident) %>% mutate(across(is.numeric, ~ as.numeric(scale(.)))) %>% ungroup() %>% select(-orig.ident) 
+data = data %>% t() %>% as.data.frame()
+
+annotation_data = FetchData(object = xeno, vars = c("orig.ident","treatment")) %>% dplyr::arrange(orig.ident,treatment)
+column_ha = HeatmapAnnotation(df = annotation_data[,2])
+data = data[,rownames(annotation_data)] #order data like annotation
+data = na.omit(data)
+p = ComplexHeatmap::Heatmap(
+  data,
+  show_column_names = F,
+  row_names_gp = grid::gpar(fontsize = 7),
+  cluster_rows = T,
+  top_annotation = column_ha,
+  name = "Z-score expression",use_raster = F,cluster_columns = F,column_split   = annotation_data$orig.ident,
+  column_gap = unit(2, "mm"), border = TRUE,show_parent_dend_line = FALSE, show_column_dend = FALSE,cluster_column_slices = F
+)
+  
+p
 ```
 <script src="https://hypothes.is/embed.js" async></script>
 
