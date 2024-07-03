@@ -39,15 +39,15 @@ source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_
 
 
 ```{r}
-xeno = readRDS("./raw_data/10x_xeno_1000.Rds")
+xeno <- qs::qread("./raw_data/xeno.qs")
 ```
 
 
 # DE pathways
 
+
 ```{r}
-pathwayScoresMatrix = read_rds(file = "./Data/msigdb_pathways/xeno_pathwayScoresMatrix.rds")
-rownames(pathwayScoresMatrix) = names(genesets_h_cp)
+pathwayScoresMatrix = read_rds(file = "./output_data/run_SiPSiC/pathwayScoresMatrix.RDS")
 xeno[["sipsic"]] = CreateAssayObject(counts = pathwayScoresMatrix)
 
 ```
@@ -59,7 +59,7 @@ trace(Seurat:::FindMarkers.default,edit = T) #replace "bonferroni" with "fdr"
 
 ```{r}
 xeno = SetIdent(xeno, value = "treatment")
-pathways_names = gsub(names(genesets), pattern = "_", replacement = "-")
+pathways_names = gsub(rownames(pathwayScoresMatrix), pattern = "_", replacement = "-")
 
 
 logFC_df = data.frame(row.names = pathways_names)
@@ -87,31 +87,16 @@ for (model in unique(xeno$orig.ident)) {
   logFC_df = cbind(logFC_df, avg_log2FC)
   fdr_df = cbind(fdr_df, fdr)
 }
-
+fdr_df_raw = fdr_df
 fdr_df = apply(fdr_df, 1:2, \(x) format(x, digits=1)) %>% as.data.frame() #round p values 
-a = fdr_df
-a[] <- lapply(a, as.numeric)
-
-convert <- function(vec) {
-  symnum(vec, corr = FALSE, na = FALSE, cutpoints = c(0, 
-    0.001, 0.01, 0.05, 0.1, 1), symbols = c("***", "**", "*", ".", " ")) %>% as.character()
-} 
-
-a[] = apply(a, MARGIN = 1, FUN = convert)
-# fdr_df[fdr_df == 0] = paste0("<",format(.Machine$double.xmin,digits = 1)) # replace p=0 with p<min float
+fdr_df[fdr_df == 0] = paste0("<",format(.Machine$double.xmin,digits = 1)) # replace p=0 with p<min float
 ```
 ```{r}
 untrace(Seurat:::FindMarkers.default)
 
 ```
 
-```{r fig.height=7, fig.width=8}
-col_fun = circlize::colorRamp2(c(-1, 0, 1), c("blue", "white", "red"))
-ComplexHeatmap::Heatmap(logFC_df, name = "log2FC on/pre", col = col_fun,
-    cell_fun = function(j, i, x, y, width, height, fill) {
-        grid.text( (a[i, j]), x, y, gp = gpar(fontsize = 8))
-}, row_names_gp = gpar(fontsize = 8), clustering_method_rows = "average", clustering_distance_rows = "euclidean")
-```
+
 
 ```{r}
 # color row name if consistent across patients/models
@@ -142,11 +127,39 @@ p
 saveRDS(object = as.grob(p),file = "./Figures/xeno_sipsic_heatmap.rds")
 ```
 
+# Heatmap with asterisks
 
+
+
+```{r}
+# Description
+fdr_df_sig = fdr_df_raw
+fdr_df_sig[] <- lapply(fdr_df_sig, as.numeric)
+
+convert <- function(vec) {
+  symnum(vec, corr = FALSE, na = FALSE, cutpoints = c(0, 
+    0.001, 0.01, 0.05, 0.1, 1), symbols = c("***", "**", "*", ".", " ")) %>% as.character()
+} 
+
+fdr_df_sig[] = apply(fdr_df_sig, MARGIN = 1, FUN = convert)
+```
+
+
+```{r fig.height=7, fig.width=8}
+col_fun = circlize::colorRamp2(c(-1, 0, 1), c("blue", "white", "red"))
+p = ComplexHeatmap::Heatmap(logFC_df, name = "log2FC on/pre", col = col_fun,
+    cell_fun = function(j, i, x, y, width, height, fill) {
+        grid.text(fdr_df_sig[i, j], x, y, gp = gpar(fontsize = 8))
+}, row_names_gp = gpar(fontsize = 8,col =colors), clustering_method_rows = "average", clustering_distance_rows = "euclidean")
+p
+```
+
+# Heatmap
 ```{r fig.height=15}
 DefaultAssay(xeno) = "sipsic"
 data = FetchData(object = xeno, vars = c(pathways_names,"orig.ident"))
-data[] <- data %>%  group_by(orig.ident) %>% mutate(across(is.numeric, ~ as.numeric(scale(.)))) %>% ungroup() %>% select(-orig.ident) 
+data[] <- data %>%  group_by(orig.ident) %>% mutate(across(is.numeric, ~ as.numeric(scale(.)))) %>% ungroup() 
+data = data %>% select(-orig.ident) 
 data = data %>% t() %>% as.data.frame()
 
 annotation_data = FetchData(object = xeno, vars = c("orig.ident","treatment")) %>% dplyr::arrange(orig.ident,treatment)
@@ -165,5 +178,35 @@ p = ComplexHeatmap::Heatmap(
   
 p
 ```
-<script src="https://hypothes.is/embed.js" async></script>
 
+```{r fig.height=15}
+# heatmap with clutering per model and time point
+DefaultAssay(xeno) = "sipsic"
+data = FetchData(object = xeno, vars = c(pathways_names,"orig.ident"))
+data[] <- data %>%  group_by(orig.ident) %>%
+  mutate(across(is.numeric, ~ as.numeric(scale(.)))) %>% ungroup() # scale per model
+data = data %>% select(-orig.ident) # remove ident var
+data = data %>% t() %>% as.data.frame()
+
+annotation_data = FetchData(object = xeno, vars = c("orig.ident","treatment")) %>% dplyr::arrange(orig.ident,treatment)
+column_ha = HeatmapAnnotation(Treatment = annotation_data[,2], #set annotation
+                              col = list(Treatment = c("NT" = "red", "OSI" = "green", "res" = "blue"))) 
+data = data[,rownames(annotation_data)] #order data like annotation
+data = na.omit(data)
+column_split = paste(annotation_data$orig.ident,annotation_data$treatment,sep = "\n") #split by ident+tp
+column_names = unique(column_split) %>% gsub(pattern = "119\nOSI",replacement = "      119\n      OSI") #adujst location to avoid overlap
+DefaultAssay(xeno) = "RNA" #make RNA default again
+
+p = ComplexHeatmap::Heatmap(
+  data,
+  show_column_names = F,
+  row_names_gp = grid::gpar(fontsize = 10),
+  cluster_rows = T,
+  top_annotation = column_ha,
+  name = "Z-score expression",use_raster = F,cluster_columns = T,column_split = column_split,
+  column_title = column_names,
+  column_gap = unit(2, "mm"), border = TRUE,show_parent_dend_line = FALSE, show_column_dend = F,cluster_column_slices = F)
+
+  
+p
+```
