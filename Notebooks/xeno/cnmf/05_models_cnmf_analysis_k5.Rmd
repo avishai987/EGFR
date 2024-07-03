@@ -1,0 +1,582 @@
+---
+title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: FALSE
+    number_sections: true
+    toc_depth: 1
+---
+
+
+
+# Functions
+
+```{r}
+reticulate::use_virtualenv("/sci/labs/yotamd/lab_share/avishai.wizel/python_envs/Virtual_env/cnmf_dev/",required = T)
+reticulate::py_config() # if you see that r-cnmf_dev has not been loaded, restart/terminate r and try again, DO NOT load reticulate before.
+```
+
+
+```{r warning=FALSE}
+library(ggplotify)
+library(stringi)
+library(reticulate)
+source_from_github(repositoy = "DEG_functions",version = "0.2.53")
+source_from_github(repositoy = "cNMF_functions",version = "0.4.23",script_name = "cnmf_functions_V3.R")
+source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_name = "functions.R")
+
+```
+
+
+# Data
+
+```{r}
+xeno <- qs::qread("./raw_data/xeno.qs")
+hif_targets = scan("./raw_data/HIF_targets_Lombardi_PMC9869179.txt", character(), quote = "")
+genesets = getGmt("./raw_data/h.all.v2023.2.Hs.symbols.gmt") %>% geneIds()
+genesets[["HIF_targets"]] = hif_targets
+
+gep_scores = readRDS("./output_data/xeno/04_calculate_programs/gep_scores.RDS")
+```
+
+
+
+```{r fig.height=6, fig.width=14}
+p1  = DimPlot(xeno,group.by = "orig.ident")+ggtitle("")+ guides(color=guide_legend(title="Model",override.aes = list(size=3)))
+p2  =  DimPlot(xeno,group.by = "treatment",shuffle = T)+ggtitle("")+ guides(color=guide_legend(title="Treatment",override.aes = list(size=3)))
+p1+p2
+```
+```{r}
+saveRDS(object = as.grob(p1),file = "./Figures/xeno_patient_umap.rds")
+saveRDS(object = as.grob(p2),file = "./Figures/xeno_treatment_umap.rds")
+```
+
+
+# Programs GSEA {.tabset}
+
+```{r fig.height=11, fig.width=13}
+library(hypeR)
+plotlist = list()
+for (i in 1:ncol(gep_scores)) {
+  print(paste("program",i,"out of",ncol(gep_scores)))
+  ranked_vec = gep_scores %>% pull(i) %>%  setNames(rownames(gep_scores))
+  hyp_obj <-hypeR_fgsea(signature = ranked_vec,genesets = (genesets),up_only = T)
+
+  plt = hyp_dots(hyp_obj,merge = F,fdr = 0.2)+ aes(size=nes)+ggtitle(paste("program", i))+ 
+  guides(
+    size = guide_legend(title="NES",reverse=T))+scale_x_discrete(expand = expansion(add = c(1,2)))
+  plotlist[[i]] = plt
+}
+
+
+plotlist = lapply(plotlist,FUN = function(x) { #fix cropped edges
+  x = x+
+  theme(plot.margin = margin(0.1,1,0.1,0.01, "cm")) 
+})
+
+
+p = ggarrange(plotlist = plotlist,common.legend = T,nrow = 3,ncol = 2)
+p
+```
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/xeno_nmf_GSEA.rds")
+
+```
+
+
+
+
+
+
+# programs expression
+```{r fig.height=7, fig.width=12, results='asis'}
+
+#add each metagene to metadata
+for (i  in 1:ncol(all_metagenes)) {
+  metagene_metadata = all_metagenes[,i,drop=F]
+  xeno = AddMetaData(object = xeno,metadata = metagene_metadata,col.name = names(all_metagenes)[i])
+}
+
+p = FeaturePlot(object = xeno,features = colnames(all_metagenes),ncol = 3)
+
+p
+```
+
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/xeno_NMF_usage_UMAP.rds")
+```
+
+# Heatmap
+```{r fig.height=10}
+all_programs_top_genes = c()
+for (i in 1:(ncol(gep_scores)-1)) {
+  top_genes = gep_scores  %>%  arrange(desc(gep_scores[i])) #sort by score a
+  top = head(rownames(top_genes), 20) #take top top_genes_num
+  all_programs_top_genes = c(all_programs_top_genes,top)
+}
+
+data = FetchData(object = xeno, vars = all_programs_top_genes) %>% scale() %>% t()
+data = data
+annotation_data = FetchData(object = xeno, vars =names(all_metagenes)[1:4])
+annotation_data = annotation_data
+col_dend = as.dendrogram(hclust(dist(annotation_data),method = "complete"))
+
+col_fun = circlize::colorRamp2(c(0, 1), c("white", "red"))
+column_ha = HeatmapAnnotation(df = annotation_data, col = list(Program.1 = col_fun,Program.2 = col_fun,Program.3 = col_fun,Program.4 = col_fun,unknown = col_fun))
+row_annotation_data = data.frame(row.names = all_programs_top_genes,top_genes = as.character(rep(paste("program",c(1,2,3,4)), each=20)))
+row_ha = rowAnnotation(df = row_annotation_data)
+
+p = ComplexHeatmap::Heatmap(
+  data,
+  show_column_names = F,
+  row_names_gp = grid::gpar(fontsize = 7),
+  cluster_rows = F,
+  top_annotation =
+    column_ha,
+  name = "Z-score expression",use_raster = F,cluster_columns = col_dend,right_annotation = row_ha
+)
+  
+
+```
+
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/xeno_NMF_programs_heatmap.rds")
+```
+ 
+```{r fig.height=12, fig.width=12} 
+# Description
+grid.arrange(as.grob(p))
+```
+
+#  line plots
+```{r fig.height=6, fig.width=17}
+for (model in unique(xeno$orig.ident)) {
+  model_data = subset(x = xeno,subset = orig.ident == model)
+  # line plots
+  data = FetchData(object = model_data, vars = c(paste0("Program.", 1:4),"treatment"))
+  colnames(data)[1:4] = paste(c("IFNa","TNFa-NFKb","HIF","CC"),"program")
+
+  # data = data[1:100, ]
+  col_dend = hclust(dist(data[,1:4],), method = "average") # cluster cells by program expression
+  # col_dend = hclust(as.dist(cor(t(data[,1:4]))), method = "complete")
+
+  data = data[col_dend$order, ] #reorder cells by dendogram
+  data$cell = 1:nrow(data) # cell count
+  d <- reshape2::melt(data, id = c("cell","treatment"))
+  
+  cols <- c("NT" = "red", "OSI" = "green") #make colors
+  if ("res" %in% unique(data$treatment)) {
+    cols = c(cols,c("res" = "blue"))
+  }
+
+  p = ggplot(d, aes(x = cell, y = value, color = variable)) + 
+    geom_rect(aes(xmin = cell, xmax = cell+1, fill = treatment),  # fill colors by treatment
+              ymin = 0, ymax = 1, alpha = 0.2,data = data, inherit.aes = F) + scale_fill_manual(values = cols)+
+    geom_line(size = 1) + #plot lines by program expression
+    theme(axis.text.x = element_blank(),
+          axis.ticks.x = element_blank())+ggtitle(model)
+  
+ 
+  print(p)
+  }
+
+
+
+```
+
+
+```{r fig.height=6, fig.width=17}
+for (model in unique(xeno$orig.ident)) {
+  model_data = subset(x = xeno,subset = orig.ident == model)
+  # line plots
+  data = FetchData(object = model_data, vars = c(paste0("Program.", 1:4),"treatment"))
+  colnames(data)[1:4] = paste(c("IFNa","TNFa-NFKb","HIF","CC"),"program")
+
+  # data = data[1:100, ]
+  col_dend = hclust(dist(data[,1:4],))
+  # col_dend = hclust(as.dist(cor(t(data[,1:4]))), method = "complete")
+
+  data = data[col_dend$order, ]
+  data$cell = 1:nrow(data)
+  d <- reshape2::melt(data, id = c("cell","treatment"))
+  
+  cols <- c("NT" = "red", "OSI" = "green")
+  if ("res" %in% unique(data$treatment)) {
+    cols = c(cols,c("res" = "blue"))
+  }
+
+  p = ggplot(d, aes(x = cell, y = value, color = variable)) +
+    geom_rect(aes(xmin = cell, xmax = cell+1, fill = treatment), 
+              ymin = 0, ymax = 1, alpha = 0.2,data = data, inherit.aes = F) + scale_fill_manual(values = cols)+
+    geom_line(size = 1) +
+    theme(axis.text.x = element_blank(),
+          axis.ticks.x = element_blank())+ggtitle(model)
+  
+ 
+  print(p)
+  }
+
+
+
+```
+
+```{r warning=FALSE}
+# modify dotplot to be without exponent of the expression
+newDef <- deparse(DotPlot)
+newDef[57] =  "            return(mean(x =  x))"
+newDef[136] =  "            yes = \"Identity\", no = \"Split Identity\")) + cowplot::theme_cowplot()" #add package name
+newDef[95] = "                data.use <- data.use" # remove log
+newDef[146] = "        plot <- plot + scale_color_distiller(palette = cols,  direction = 1)"
+DotPlot.2 <- eval(parse(text=newDef))
+```
+
+# Programs dotplot
+
+```{r}
+# scale metagene and add to metadata
+for (i  in 1:ncol(all_metagenes)) {
+  metagene_metadata = all_metagenes[,i,drop=F] %>% scale()
+  xeno = AddMetaData(object = xeno,metadata = metagene_metadata,col.name = paste0(names(all_metagenes)[i],"_scaled"))
+}
+```
+
+
+```{r fig.height=4, fig.width=11}
+
+p = DotPlot.2(object = xeno, features =  paste0(names(all_metagenes),"_scaled"),group.by  = 'treatment',scale = F)+
+  guides(size = guide_legend(title = "Cells above average (%)"),color = guide_colorbar(title = "Average Score"))+ scale_x_discrete(labels= paste0(names(all_metagenes),"\n(",c("IFNa","TNFa-NFKb","HIF","Cell_Cycle"),")"))+
+    scale_y_discrete(limits = c("NT","OSI"))
+
+p
+```
+
+
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/xeno_NMF_programs_dotplot.rds")
+```
+
+
+
+
+
+# NMF programs regulation  {.tabset}
+
+```{r echo=TRUE, fig.height=4, fig.width=7, results='asis'}
+p = metagenes_violin_compare(dataset = xeno,prefix = "model",pre_on = c("NT","OSI"),test = "wilcox.test",programs = colnames(all_metagenes)[3], return_list = T)
+p = p[[1]]+xlab("Model")+ylab(paste( "Program 3 (HIF)\n Z-score"))
+
+p
+```
+
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/xeno_NMF_hypoxia_split_violin.rds")
+```
+
+```{r}
+program_names =  c("IFNa","TNFa", "cell cycle","EMT")
+```
+
+```{r fig.height=5, fig.width=11}
+# for sup:
+plt_list = metagenes_violin_compare(dataset = xeno,prefix = "model",pre_on = c("NT","OSI"),test = "wilcox.test",programs = colnames(all_metagenes)[-c(3)],return_list =  T)
+
+for (i in 1:length(plt_list)) {
+  plt_list[[i]] = plt_list[[i]]+xlab("Model")+ylab(paste0( "Program ",i," (",program_names[i],")\n Z-score"))
+}
+
+p = ggarrange(plotlist = plt_list,common.legend = T)
+p
+```
+
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/xeno_NMF_NOhypoxia_split_violin.rds")
+```
+
+
+
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/xeno_patient_hifTargets_split_violin.rds")
+```
+
+
+
+```{r fig.height=15}
+# heatmap with clutering per model and time point
+data = FetchData(object = xeno, vars = c(hif_targets,"orig.ident"))
+data[] <- data %>%  group_by(orig.ident) %>%
+  mutate(across(is.numeric, ~ as.numeric(scale(.)))) %>% ungroup() # scale per model
+data = data %>% select(-orig.ident) # remove ident var
+data = data %>% t() %>% as.data.frame()
+
+annotation_data = FetchData(object = xeno, vars = c("orig.ident","treatment")) %>% dplyr::arrange(orig.ident,treatment)
+column_ha = HeatmapAnnotation(Treatment = annotation_data[,2], #set annotation
+                              col = list(Treatment = c("NT" = "red", "OSI" = "green", "res" = "blue"))) 
+data = data[,rownames(annotation_data)] #order data like annotation
+data = na.omit(data)
+column_split = paste(annotation_data$orig.ident,annotation_data$treatment,sep = "\n") #split by ident+tp
+column_names = unique(column_split) %>% gsub(pattern = "119\nOSI",replacement = "      119\n      OSI") #adujst location to avoid overlap
+
+p = ComplexHeatmap::Heatmap(
+  data,
+  show_column_names = F,
+  row_names_gp = grid::gpar(fontsize = 10),
+  cluster_rows = T,
+  top_annotation = column_ha,
+  name = "Z-score expression",use_raster = F,cluster_columns = T,column_split = column_split,
+  column_title = column_names,
+  column_gap = unit(2, "mm"), border = TRUE,show_parent_dend_line = FALSE, show_column_dend = F,cluster_column_slices = F)
+
+  
+p
+```
+
+
+```{r fig.height=15}
+
+data = FetchData(object = xeno, vars = c(hif_targets,"orig.ident"))
+data[] <- data %>%  group_by(orig.ident) %>% mutate(across(is.numeric, ~ as.numeric(scale(.)))) %>% ungroup() %>% select(-orig.ident) 
+data = data %>% t() %>% as.data.frame()
+
+annotation_data = FetchData(object = xeno, vars = c("orig.ident","treatment")) %>% dplyr::arrange(orig.ident,treatment)
+column_ha = HeatmapAnnotation(df = annotation_data[,2])
+data = data[,rownames(annotation_data)] #order data like annotation
+data = na.omit(data)
+p = ComplexHeatmap::Heatmap(
+  data,
+  show_column_names = F,
+  row_names_gp = grid::gpar(fontsize = 7),
+  cluster_rows = T,
+  top_annotation = column_ha,
+  name = "Z-score expression",use_raster = F,cluster_columns = F,column_split   = annotation_data$orig.ident,
+  column_gap = unit(2, "mm"), border = TRUE,show_parent_dend_line = FALSE, show_column_dend = FALSE,cluster_column_slices = F
+)
+  
+p
+```
+
+```{r fig.height=7, fig.width=10}
+p = DoHeatmap(object = xeno,features = hif_targets,group.by = "treatment")
+p
+
+```
+
+# known genes score
+```{r}
+
+ranked_vec = gep_scores[,1] %>% setNames(rownames(gep_scores)) %>% sort(decreasing = TRUE) 
+hyp_obj <- hypeR_fgsea(ranked_vec, genesets)
+le_genes_ifna =  hyp_obj$data %>% filter(label == "HALLMARK_INTERFERON_ALPHA_RESPONSE") %>% pull("le") %>% strsplit(",") %>% unlist()
+
+ranked_vec = gep_scores[,2] %>% setNames(rownames(gep_scores)) %>% sort(decreasing = TRUE) 
+hyp_obj <- hypeR_fgsea(ranked_vec, genesets)
+le_genes_tnfa =  hyp_obj$data %>% filter(label == "HALLMARK_TNFA_SIGNALING_VIA_NFKB") %>% pull("le") %>% strsplit(",") %>% unlist()
+
+ranked_vec = gep_scores[,3] %>% setNames(rownames(gep_scores)) %>% sort(decreasing = TRUE) 
+hyp_obj <- hypeR_fgsea(ranked_vec, genesets)
+le_genes_hif =  hyp_obj$data %>% filter(label == "HIF_targets") %>% pull("le") %>% strsplit(",") %>% unlist()
+
+
+gene_list = list(IFNa_genes = genesets$HALLMARK_INTERFERON_ALPHA_RESPONSE, TNFa_genes = genesets$HALLMARK_TNFA_SIGNALING_VIA_NFKB, hif_targets = hif_targets,E2F_genes = genesets$HALLMARK_E2F_TARGETS,gep2_top = gep_scores  %>%  arrange(desc(gep_scores[2])) %>% rownames() %>% head(200),TNFa_le = le_genes_tnfa,hif_le = le_genes_hif,IFNa_le  = le_genes_ifna)
+# xeno = ScaleData(object = xeno,features = unlist(gene_list))
+for (i in seq_along(gene_list)) {
+  genes = gene_list[[i]]
+  name = names(gene_list)[i]
+  scores = FetchData(object = xeno,vars = genes,slot = "data")  %>%  expm1()  %>%  rowMeans() #use  TPM
+    # scores = FetchData(object = xeno,vars = genes,slot = "data")  %>%  rowMeans() #use  TPM
+
+  xeno %<>% AddMetaData(metadata = scores,col.name = name)
+
+}
+
+
+
+```
+
+
+
+# known genes score
+```{r}
+
+gene_list = list(IFNa_genes = genesets$HALLMARK_INTERFERON_ALPHA_RESPONSE, TNFa_genes = genesets$HALLMARK_TNFA_SIGNALING_VIA_NFKB, hif_targets = hif_targets,E2F_genes = genesets$HALLMARK_E2F_TARGETS)
+patient_var = "orig.ident"
+# xeno = ScaleData(object = xeno,features = unlist(gene_list))
+for (i in seq_along(gene_list)) {
+  genes = gene_list[[i]]
+  name = names(gene_list)[i]
+  genes = genes[genes %in% rownames(xeno)]
+  scores = FetchData(object = xeno,vars = c(genes,patient_var))
+  scores = scores %>% mutate(r = rowMeans(dplyr::select_at(scores,vars(-contains(patient_var))))) %>% # z score every patient separately 
+    group_by_at(patient_var) %>% summarise(r = scale(r)) %>% pull(r) %>% as.data.frame() 
+  print(name)
+  xeno %<>% AddMetaData(metadata = scores,col.name = name)
+}
+
+
+
+
+
+```
+
+
+
+```{r}
+
+p1 = metagenes_violin_compare(dataset = xeno,prefix = "Model",pre_on = c("NT","OSI"),test = "wilcox.test",programs = "hif_targets", return_list = T)[[1]]
+p1
+```
+
+```{r}
+saveRDS(object = as.grob(p1),file = "./Figures/xeno_hif_targets_violin.rds")
+```
+
+
+```{r fig.height=4, fig.width=11}
+
+p = DotPlot.2(object = xeno, features =   names(gene_list),group.by  = 'treatment',scale = F)+
+  guides(size = guide_legend(title = "Cells above average (%)"),color = guide_colorbar(title = "Average Score"))
+p
+```
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/xeno_signtures_dotplot.rds")
+```
+
+
+# new
+
+
+# known genes signatures log TPM
+```{r}
+
+gene_list = list(IFNa_genes = genesets$HALLMARK_INTERFERON_ALPHA_RESPONSE, TNFa_genes = genesets$HALLMARK_TNFA_SIGNALING_VIA_NFKB, hif_targets = hif_targets,E2F_genes = genesets$HALLMARK_E2F_TARGETS)
+patient_var = "orig.ident"
+for (i in seq_along(gene_list)) {
+  genes = gene_list[[i]]
+  name = names(gene_list)[i]
+  genes = genes[genes %in% rownames(xeno)]
+  scores = FetchData(object = xeno,vars = c(genes,patient_var))
+  scores = scores %>% mutate(r = rowMeans(dplyr::select_at(scores,vars(-contains(patient_var))))) %>% # z score every patient separately 
+    group_by_at(patient_var) %>% summarise(r = scale(r)) %>% pull(r) %>% as.data.frame() 
+  print(name)
+  xeno %<>% AddMetaData(metadata = scores,col.name = name)
+}
+
+```
+
+
+## violin
+```{r}
+p2 = metagenes_violin_compare(dataset = xeno,prefix = "Modek",pre_on = c("OSI","NT"),test = "wilcox.test",programs = "hif_targets", return_list = T)[[1]] + xlab("Model")+
+  ylab("HIF targets Z-score")
+p2
+```
+
+```{r}
+saveRDS(object = as.grob(p2),file = "./Figures/xeno_hif_targets_violin.rds")
+```
+
+## Dotplot
+
+```{r}
+# scale for all cells
+for (i in seq_along(gene_list)) {
+  genes = gene_list[[i]]
+  name = paste0(names(gene_list)[i],"_scaled")
+  genes = genes[genes %in% rownames(xeno)]
+  scores = FetchData(object = xeno,vars = c(genes)) %>% rowMeans() %>% scale()
+  xeno %<>% AddMetaData(metadata = scores,col.name = name)
+}
+```
+
+```{r warning=FALSE}
+# modify dotplot to be without exponent of the expression
+newDef <- deparse(DotPlot)
+newDef[57] =  "            return(mean(x =  x))" # remove exponent
+newDef[136] =  "            yes = \"Identity\", no = \"Split Identity\")) + cowplot::theme_cowplot()" #add package name
+newDef[95] = "                data.use <- data.use" # remove log
+newDef[146] = "        plot <- plot + scale_color_distiller(palette = cols,  direction = 1)"
+DotPlot.2 <- eval(parse(text=newDef))
+```
+
+
+```{r fig.height=4, fig.width=11}
+
+p = DotPlot.2(object = xeno, features =  paste0(names(gene_list),"_scaled"),group.by  = 'treatment',scale = F)+
+  guides(size = guide_legend(title = "Cells above average (%)"),
+         color = guide_colorbar(title = "Average Score"))+ 
+  scale_y_discrete(limits = c("NT","OSI"))+
+  scale_x_discrete(labels= names(gene_list))
+p
+```
+
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/xeno_signtures_dotplot.rds")
+```
+
+
+# known genes signatures TPM
+```{r}
+patient_var = "orig.ident"
+for (i in seq_along(gene_list)) {
+  genes = gene_list[[i]]
+  name = names(gene_list)[i]
+  genes = genes[genes %in% rownames(xeno)]
+  scores = FetchData(object = xeno,vars = c(genes,patient_var))
+  scores[,1:(ncol(scores)-1)] = (2^scores[,1:(ncol(scores)-1)])-1 # log(tpm+1)to tpm without last col (patients idents)
+  scores = scores %>% mutate(r = rowMeans(dplyr::select_at(scores,vars(-contains(patient_var))))) %>% # z score every patient separately 
+    group_by_at(patient_var) %>% summarise(r = scale(r)) %>% pull(r) %>% as.data.frame() 
+  print(name)
+  xeno %<>% AddMetaData(metadata = scores,col.name = name)
+}
+
+```
+
+
+## violin
+```{r}
+p2 = metagenes_violin_compare(dataset = xeno,prefix = "Model",pre_on = c("NT","OSI"),test = "wilcox.test",programs = "hif_targets", return_list = T)[[1]] + xlab("Model")+
+  ylab("HIF targets Z-score")
+p2
+```
+
+```{r}
+saveRDS(object = as.grob(p2),file = "./Figures/xeno_hif_targets_TPM_violin.rds")
+```
+
+## Dotplot
+
+```{r}
+# scale for all cells
+for (i in seq_along(gene_list)) {
+  genes = gene_list[[i]]
+  name = paste0(names(gene_list)[i],"_scaled")
+  genes = genes[genes %in% rownames(xeno)]
+  scores = FetchData(object = xeno,vars = c(genes))
+  scores = (2^scores)-1 
+  scores = scores %>%  rowMeans() %>% scale() #log(tpm+1)to tpm
+  xeno %<>% AddMetaData(metadata = scores,col.name = name)
+}
+```
+
+
+```{r fig.height=4, fig.width=11}
+
+p = DotPlot.2(object = xeno, features =  paste0(names(gene_list),"_scaled"),group.by  = 'treatment',scale = F)+
+  guides(size = guide_legend(title = "Cells above average (%)"),
+         color = guide_colorbar(title = "Average Score"))+ 
+  scale_y_discrete(limits = c("NT","OSI"))+
+  scale_x_discrete(labels= names(gene_list))
+p
+```
+
+
+```{r}
+saveRDS(object = as.grob(p),file = "./Figures/xeno'_signtures_TPM_dotplot.rds")
+```
+
+

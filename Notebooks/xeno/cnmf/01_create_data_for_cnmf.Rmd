@@ -1,0 +1,55 @@
+---
+title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: FALSE
+    number_sections: true
+    toc_depth: 1
+---
+
+
+
+# Functions
+
+```{r warning=FALSE}
+```
+
+# Data
+
+```{r}
+xeno = readRDS("./Data/10x_xeno_1000.Rds")
+xeno = DietSeurat(object = xeno)
+gc()
+```
+
+
+## Convert seurat to scanpy
+```{r}
+library(reticulate)
+sc <- import('scanpy', convert = FALSE)
+gene_expression = t(as.matrix(GetAssayData(xeno,slot='counts'))) 
+gene_expression = gene_expression[,colSums(gene_expression) != 0] #remove genes with 0 expression in all cells
+
+xeno_filtered  = xeno[colnames(gene_expression),]
+adata <- sc$AnnData(
+  X   = gene_expression,
+  obs = xeno_filtered[[]],
+  var = GetAssay(xeno_filtered)[[]]
+)
+rm(gene_expression)
+gc()
+```
+
+```{python}
+import scanpy as sc
+adata = r.adata
+adata.var['highly_variable'] = adata.var['vst.variable'] # rename seurat var genes to scanpy var genes
+adata.write_h5ad("./Data/cnmf_V2/xeno_counts_filtered.h5ad")
+```
+
