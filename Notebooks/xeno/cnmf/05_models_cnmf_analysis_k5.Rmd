@@ -41,7 +41,7 @@ xeno <- qs::qread("./raw_data/xeno.qs")
 hif_targets = scan("./raw_data/HIF_targets_Lombardi_PMC9869179.txt", character(), quote = "")
 genesets = getGmt("./raw_data/h.all.v2023.2.Hs.symbols.gmt") %>% geneIds()
 genesets[["HIF_targets"]] = hif_targets
-
+all_metagenes = readRDS("./output_data/xeno/04_calculate_programs/cell_usage_by_TPM.RDS")
 gep_scores = readRDS("./output_data/xeno/04_calculate_programs/gep_scores.RDS")
 ```
 
