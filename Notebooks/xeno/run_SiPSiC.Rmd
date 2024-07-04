@@ -85,7 +85,5 @@ pathwayScoresMatrix <- as.data.frame(do.call("rbind", pathwayScoreLists))
 
 ```{r}
 # save
-
 saveRDS(object = pathwayScoresMatrix,file = "./output_data/run_SiPSiC/pathwayScoresMatrix.RDS")
-
 ```
