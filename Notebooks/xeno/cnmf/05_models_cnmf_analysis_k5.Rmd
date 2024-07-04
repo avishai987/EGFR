@@ -155,7 +155,49 @@ saveRDS(object = as.grob(p),file = "./Figures/xeno_NMF_programs_heatmap.rds")
  
 ```{r fig.height=12, fig.width=12} 
 # Description
-grid.arrange(as.grob(p))
+p
+```
+
+#  per patient programs heatmap
+```{r fig.height=6, fig.width=17}
+for (model in unique(xeno$orig.ident)) {
+  model_data = subset(x = xeno,subset = orig.ident == model)
+  data = FetchData(object = model_data, vars = c(paste0("Program.", 1:4),"treatment"))
+  colnames(data)[1:4] = paste(c("IFNa","TNFa-NFKb","HIF","CC"),"program")
+
+  # data = data[1:100, ]
+  col_dend = hclust(dist(data[,1:4],), method = "average") # cluster cells by program expression
+  # col_dend = hclust(as.dist(cor(t(data[,1:4]))), method = "complete")
+
+  data = data[col_dend$order, ] #reorder cells by dendogram
+
+  
+  cols <- c("NT" = "red", "OSI" = "green") #make colors
+  if ("res" %in% unique(data$treatment)) {
+    cols = c(cols,c("res" = "blue"))
+  }
+  
+  
+data_to_plot = t(data)[1:4,] %>% as.data.frame()
+data_to_plot <- mutate_all(data_to_plot, function(x) as.numeric(x))
+library(circlize)
+column_ha = HeatmapAnnotation(df = data[,5,drop=F], col = list(treatment  = c(NT = "red",OSI = "green",res = "blue")))
+
+col_fun = colorRamp2(c(0,1), c("white", "red"))
+
+p = ComplexHeatmap::Heatmap(
+  data_to_plot,
+  show_column_names = F,show_row_names = T,
+  row_names_gp = grid::gpar(fontsize = 7),
+  cluster_rows = F,
+  name = "score",use_raster = F,cluster_columns = T, col = col_fun,column_title = model,top_annotation = column_ha,clustering_method_columns = "average"
+)
+
+print(p)
+  }
+
+
+
 ```
 
 #  line plots
