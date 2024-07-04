@@ -122,13 +122,17 @@ for (i in 1:(ncol(gep_scores)-1)) {
 }
 
 data = FetchData(object = xeno, vars = all_programs_top_genes) %>% scale() %>% t()
-data = data
-annotation_data = FetchData(object = xeno, vars =names(all_metagenes)[1:4])
-annotation_data = annotation_data
-col_dend = as.dendrogram(hclust(dist(annotation_data),method = "complete"))
+
+annotation_data = FetchData(object = xeno, vars = c(names(all_metagenes)[1:4],"treatment","orig.ident"))
+# annotation_data = FetchData(object = xeno, vars =names(all_metagenes)[1:4])
+
+# data = data[,1:1000] #debug
+# annotation_data = annotation_data [1:1000,] #debug
+col_dend = as.dendrogram(hclust(dist(annotation_data[,1:4]),method = "complete")) # cluster based on 4 programs
 
 col_fun = circlize::colorRamp2(c(0, 1), c("white", "red"))
-column_ha = HeatmapAnnotation(df = annotation_data, col = list(Program.1 = col_fun,Program.2 = col_fun,Program.3 = col_fun,Program.4 = col_fun,unknown = col_fun))
+models_colors = rainbow(6,alpha = 1) %>% set_names(unique(xeno$orig.ident))
+column_ha = HeatmapAnnotation(df = annotation_data, col = list(Program.1 = col_fun,Program.2 = col_fun,Program.3 = col_fun,Program.4 = col_fun,unknown = col_fun, treatment  = c(NT = "red",OSI = "green",res = "blue"),orig.ident = models_colors))
 row_annotation_data = data.frame(row.names = all_programs_top_genes,top_genes = as.character(rep(paste("program",c(1,2,3,4)), each=20)))
 row_ha = rowAnnotation(df = row_annotation_data)
 
