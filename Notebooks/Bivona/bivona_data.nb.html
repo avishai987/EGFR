@@ -2916,7 +2916,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">bivona_data</h1>
 <h4 class="author">Avishai Wizel</h4>
-<h4 class="date">2024-06-06 13:15:42</h4>
+<h4 class="date">2024-06-17 17:30:51</h4>
 
 </div>
 
@@ -2926,24 +2926,52 @@ div.tocify {
 <h1><span class="header-section-number">1</span> Functions</h1>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxucmV0aWN1bGF0ZTo6dXNlX3ZpcnR1YWxlbnYoXCIvc2NpL2xhYnMveW90YW1kL2xhYl9zaGFyZS9hdmlzaGFpLndpemVsL3B5dGhvbl9lbnZzL1ZpcnR1YWxfZW52L2NubWZfZGV2L1wiLHJlcXVpcmVkID0gVClcbnJldGljdWxhdGU6OnB5X2NvbmZpZygpICMgaWYgeW91IHNlZSB0aGF0IHItY25tZl9kZXYgaGFzIG5vdCBiZWVuIGxvYWRlZCwgcmVzdGFydC90ZXJtaW5hdGUgciBhbmQgdHJ5IGFnYWluLiBEbyBub3QgbG9hZCByZXRpY3VsYXRlIGJlZm9yZS5cbmhpZl90YXJnZXRzID0gc2NhbihcIi4vcmF3X2RhdGEvSElGX3RhcmdldHNfTG9tYmFyZGlfUE1DOTg2OTE3OS50eHRcIiwgY2hhcmFjdGVyKCksIHF1b3RlID0gXCJcIilcblxuYGBgIn0= -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxucmV0aWN1bGF0ZTo6dXNlX3ZpcnR1YWxlbnYoXCIvc2NpL2xhYnMveW90YW1kL2xhYl9zaGFyZS9hdmlzaGFpLndpemVsL3B5dGhvbl9lbnZzL1ZpcnR1YWxfZW52L2NubWZfZGV2L1wiLHJlcXVpcmVkID0gVClcbnJldGljdWxhdGU6OnB5X2NvbmZpZygpICMgaWYgeW91IHNlZSB0aGF0IHItY25tZl9kZXYgaGFzIG5vdCBiZWVuIGxvYWRlZCwgcmVzdGFydC90ZXJtaW5hdGUgciBhbmQgdHJ5IGFnYWluLiBEbyBub3QgbG9hZCByZXRpY3VsYXRlIGJlZm9yZS5cbmBgYCJ9 -->
 <pre class="r"><code>reticulate::use_virtualenv(&quot;/sci/labs/yotamd/lab_share/avishai.wizel/python_envs/Virtual_env/cnmf_dev/&quot;,required = T)
-reticulate::py_config() # if you see that r-cnmf_dev has not been loaded, restart/terminate r and try again. Do not load reticulate before.
-hif_targets = scan(&quot;./raw_data/HIF_targets_Lombardi_PMC9869179.txt&quot;, character(), quote = &quot;&quot;)
-</code></pre>
+reticulate::py_config() # if you see that r-cnmf_dev has not been loaded, restart/terminate r and try again. Do not load reticulate before.</code></pre>
 <!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoicHl0aG9uOiAgICAgICAgIC9zY2kvbGFicy95b3RhbWQvbGFiX3NoYXJlL2F2aXNoYWkud2l6ZWwvcHl0aG9uX2VudnMvVmlydHVhbF9lbnYvY25tZl9kZXYvYmluL3B5dGhvblxubGlicHl0aG9uOiAgICAgIC9zY2kvaG9tZS9hdmlzaGFpdy8ubG9jYWwvc2hhcmUvci1taW5pY29uZGEvZW52cy9yLXJldGljdWxhdGUvbGliL2xpYnB5dGhvbjMuOC5zb1xucHl0aG9uaG9tZTogICAgIC9zY2kvbGFicy95b3RhbWQvbGFiX3NoYXJlL2F2aXNoYWkud2l6ZWwvcHl0aG9uX2VudnMvVmlydHVhbF9lbnYvY25tZl9kZXY6L3NjaS9sYWJzL3lvdGFtZC9sYWJfc2hhcmUvYXZpc2hhaS53aXplbC9weXRob25fZW52cy9WaXJ0dWFsX2Vudi9jbm1mX2RldlxudmVyc2lvbjogICAgICAgIDMuOC4xNSB8IHBhY2thZ2VkIGJ5IGNvbmRhLWZvcmdlIHwgKGRlZmF1bHQsIE5vdiAyMiAyMDIyLCAwODo0OTozNSkgIFtHQ0MgMTAuNC4wXVxubnVtcHk6ICAgICAgICAgIC9zY2kvbGFicy95b3RhbWQvbGFiX3NoYXJlL2F2aXNoYWkud2l6ZWwvcHl0aG9uX2VudnMvVmlydHVhbF9lbnYvY25tZl9kZXYvbGliL3B5dGhvbjMuOC9zaXRlLXBhY2thZ2VzL251bXB5XG5udW1weV92ZXJzaW9uOiAgMS4yNC40XG5cbk5PVEU6IFB5dGhvbiB2ZXJzaW9uIHdhcyBmb3JjZWQgYnkgdXNlX3B5dGhvbiBmdW5jdGlvblxuIn0= -->
+<pre><code>python:         /sci/labs/yotamd/lab_share/avishai.wizel/python_envs/Virtual_env/cnmf_dev/bin/python
+libpython:      /sci/home/avishaiw/.local/share/r-miniconda/envs/r-reticulate/lib/libpython3.8.so
+pythonhome:     /sci/labs/yotamd/lab_share/avishai.wizel/python_envs/Virtual_env/cnmf_dev:/sci/labs/yotamd/lab_share/avishai.wizel/python_envs/Virtual_env/cnmf_dev
+version:        3.8.15 | packaged by conda-forge | (default, Nov 22 2022, 08:49:35)  [GCC 10.4.0]
+numpy:          /sci/labs/yotamd/lab_share/avishai.wizel/python_envs/Virtual_env/cnmf_dev/lib/python3.8/site-packages/numpy
+numpy_version:  1.24.4
+
+NOTE: Python version was forced by use_python function</code></pre>
+<!-- rnb-output-end -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuaGlmX3RhcmdldHMgPSBzY2FuKFwiLi9yYXdfZGF0YS9ISUZfdGFyZ2V0c19Mb21iYXJkaV9QTUM5ODY5MTc5LnR4dFwiLCBjaGFyYWN0ZXIoKSwgcXVvdGUgPSBcIlwiKVxuYGBgIn0= -->
+<pre class="r"><code>hif_targets = scan(&quot;./raw_data/HIF_targets_Lombardi_PMC9869179.txt&quot;, character(), quote = &quot;&quot;)</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiUmVhZCA0OCBpdGVtc1xuIn0= -->
+<pre><code>Read 48 items</code></pre>
+<!-- rnb-output-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxubGlicmFyeShzdHJpbmdpKVxubGlicmFyeShyZXRpY3VsYXRlKVxuc291cmNlX2Zyb21fZ2l0aHViKHJlcG9zaXRveSA9IFwiREVHX2Z1bmN0aW9uc1wiLHZlcnNpb24gPSBcIjAuMi41M1wiKVxuc291cmNlX2Zyb21fZ2l0aHViKHJlcG9zaXRveSA9IFwiY05NRl9mdW5jdGlvbnNcIix2ZXJzaW9uID0gXCIwLjQuMjNcIixzY3JpcHRfbmFtZSA9IFwiY25tZl9mdW5jdGlvbnNfVjMuUlwiKVxuc291cmNlX2Zyb21fZ2l0aHViKHJlcG9zaXRveSA9IFwic2NfZ2VuZXJhbF9mdW5jdGlvbnNcIix2ZXJzaW9uID0gXCIwLjEuMzRcIixzY3JpcHRfbmFtZSA9IFwiZnVuY3Rpb25zLlJcIilcblxuYGBgIn0= -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxubGlicmFyeShzdHJpbmdpKVxubGlicmFyeShyZXRpY3VsYXRlKVxuc291cmNlX2Zyb21fZ2l0aHViKHJlcG9zaXRveSA9IFwiREVHX2Z1bmN0aW9uc1wiLHZlcnNpb24gPSBcIjAuMi41M1wiKVxuYGBgIn0= -->
 <pre class="r"><code>library(stringi)
 library(reticulate)
-source_from_github(repositoy = &quot;DEG_functions&quot;,version = &quot;0.2.53&quot;)
-source_from_github(repositoy = &quot;cNMF_functions&quot;,version = &quot;0.4.23&quot;,script_name = &quot;cnmf_functions_V3.R&quot;)
-source_from_github(repositoy = &quot;sc_general_functions&quot;,version = &quot;0.1.34&quot;,script_name = &quot;functions.R&quot;)
-</code></pre>
+source_from_github(repositoy = &quot;DEG_functions&quot;,version = &quot;0.2.53&quot;)</code></pre>
 <!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoi4oS5IFNIQS0xIGhhc2ggb2YgZmlsZSBpcyA4ZWQ0ZTkwMTdjZWFkODk3YTdkMzUyMjI2YTU0MTNmMWI1ZmMwY2I3XG5XZWxjb21lIHRvIGVucmljaFJcbkNoZWNraW5nIGNvbm5lY3Rpb24gLi4uIFxuRW5yaWNociAuLi4gQ29ubmVjdGlvbiBpcyBMaXZlIVxuRmx5RW5yaWNociAuLi4gQ29ubmVjdGlvbiBpcyBhdmFpbGFibGUhXG5Xb3JtRW5yaWNociAuLi4gQ29ubmVjdGlvbiBpcyBhdmFpbGFibGUhXG5ZZWFzdEVucmljaHIgLi4uIENvbm5lY3Rpb24gaXMgYXZhaWxhYmxlIVxuRmlzaEVucmljaHIgLi4uIENvbm5lY3Rpb24gaXMgYXZhaWxhYmxlIVxuIn0= -->
+<pre><code>ℹ SHA-1 hash of file is 8ed4e9017cead897a7d352226a5413f1b5fc0cb7
+Welcome to enrichR
+Checking connection ... 
+Enrichr ... Connection is Live!
+FlyEnrichr ... Connection is available!
+WormEnrichr ... Connection is available!
+YeastEnrichr ... Connection is available!
+FishEnrichr ... Connection is available!</code></pre>
+<!-- rnb-output-end -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuc291cmNlX2Zyb21fZ2l0aHViKHJlcG9zaXRveSA9IFwiY05NRl9mdW5jdGlvbnNcIix2ZXJzaW9uID0gXCIwLjQuMjNcIixzY3JpcHRfbmFtZSA9IFwiY25tZl9mdW5jdGlvbnNfVjMuUlwiKVxuYGBgIn0= -->
+<pre class="r"><code>source_from_github(repositoy = &quot;cNMF_functions&quot;,version = &quot;0.4.23&quot;,script_name = &quot;cnmf_functions_V3.R&quot;)</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoi4oS5IFNIQS0xIGhhc2ggb2YgZmlsZSBpcyA4YjFlMWExMGY3YWY5NzI0ZDhiNjIzZjM5MjJlMDkwZWVlZWU0MTk2XG5Mb2FkaW5nIHJlcXVpcmVkIHBhY2thZ2U6IGZhY2VmdW5zXG4ifQ== -->
+<pre><code>ℹ SHA-1 hash of file is 8b1e1a10f7af9724d8b623f3922e090eeeee4196
+Loading required package: facefuns</code></pre>
+<!-- rnb-output-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 </div>
@@ -2951,55 +2979,23 @@ source_from_github(repositoy = &quot;sc_general_functions&quot;,version = &quot;
 <h1><span class="header-section-number">2</span> Data</h1>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxubG9hZChcIi4vcmF3X2RhdGEvQml2b25hX3NjUk5Bc2VxL05JMDRfdHVtb3Jfc2V1cmF0X29iamVjdC5SRGF0YVwiKVxudGlzc19zdWJzZXRfdHVtb3IyID0gVXBkYXRlU2V1cmF0T2JqZWN0KHRpc3Nfc3Vic2V0X3R1bW9yMilcbnRpc3Nfc3Vic2V0X3R1bW9yMiR0cmVhdG1lbnQgPSBOVUxMXG50aXNzX3N1YnNldF90dW1vcjJAbWV0YS5kYXRhW1tcInRyZWF0bWVudFwiXV0gPSBmYWN0b3IodGlzc19zdWJzZXRfdHVtb3IyJGFuYWx5c2lzLCBsZXZlbHMgPSBjKFwibmFpdmVcIiwgXCJncm91cGVkX3ByXCIsXCJncm91cGVkX3BkXCIpKVxudGlzc19zdWJzZXRfdHVtb3IyJHRyZWF0bWVudCA9IHRpc3Nfc3Vic2V0X3R1bW9yMiR0cmVhdG1lbnQgJT4lIGdzdWIocGF0dGVybiA9IFwiZ3JvdXBlZF9wclwiLHJlcGxhY2VtZW50ID0gXCJSRFwiKSU+JVxuICBnc3ViKHBhdHRlcm4gPSBcImdyb3VwZWRfcGRcIixyZXBsYWNlbWVudCA9IFwiUERcIikgJT4lIGZhY3RvcihsZXZlbHMgPSBjKFwibmFpdmVcIixcIlJEXCIsXCJQRFwiKSlcbmBgYCJ9 -->
-<pre class="r"><code>load(&quot;./raw_data/Bivona_scRNAseq/NI04_tumor_seurat_object.RData&quot;)
-tiss_subset_tumor2 = UpdateSeuratObject(tiss_subset_tumor2)
-tiss_subset_tumor2$treatment = NULL
-tiss_subset_tumor2@meta.data[[&quot;treatment&quot;]] = factor(tiss_subset_tumor2$analysis, levels = c(&quot;naive&quot;, &quot;grouped_pr&quot;,&quot;grouped_pd&quot;))
-tiss_subset_tumor2$treatment = tiss_subset_tumor2$treatment %&gt;% gsub(pattern = &quot;grouped_pr&quot;,replacement = &quot;RD&quot;)%&gt;%
-  gsub(pattern = &quot;grouped_pd&quot;,replacement = &quot;PD&quot;) %&gt;% factor(levels = c(&quot;naive&quot;,&quot;RD&quot;,&quot;PD&quot;))</code></pre>
-<!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxudGlzc19zdWJzZXRfdHVtb3IyX3ByaSA9IHN1YnNldCh0aXNzX3N1YnNldF90dW1vcjIsIHN1YnNldCA9IHByaW1hcnlfb3JfbWV0YXN0YWljICVpbiUgYyhcIlByaW1hcnlcIikpXG50aXNzX3N1YnNldF90dW1vcjJfcHJpX2VnZnIgPSBzdWJzZXQodGlzc19zdWJzZXRfdHVtb3IyX3ByaSwgc3Vic2V0ID0gZHJpdmVyX2dlbmUgPT0gXCJFR0ZSXCIpICU+JVxuICBzdWJzZXQoc3Vic2V0ID0gaGlzdG9sZ3kgPT0gXCJBZGVub2NhcmNpbm9tYVwiKSBcbmBgYCJ9 -->
-<pre class="r"><code>tiss_subset_tumor2_pri = subset(tiss_subset_tumor2, subset = primary_or_metastaic %in% c(&quot;Primary&quot;))
-tiss_subset_tumor2_pri_egfr = subset(tiss_subset_tumor2_pri, subset = driver_gene == &quot;EGFR&quot;) %&gt;%
-  subset(subset = histolgy == &quot;Adenocarcinoma&quot;) </code></pre>
-<!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuIyByZSBydW4gdW1hcFxudGlzc19zdWJzZXRfdHVtb3IyX3ByaV9lZ2ZyID0gRmluZFZhcmlhYmxlRmVhdHVyZXMob2JqZWN0ID0gdGlzc19zdWJzZXRfdHVtb3IyX3ByaV9lZ2ZyKVxudGlzc19zdWJzZXRfdHVtb3IyX3ByaV9lZ2ZyID0gU2NhbGVEYXRhKG9iamVjdCA9IHRpc3Nfc3Vic2V0X3R1bW9yMl9wcmlfZWdmcilcbnRpc3Nfc3Vic2V0X3R1bW9yMl9wcmlfZWdmciA9IFJ1blBDQShvYmplY3QgPSB0aXNzX3N1YnNldF90dW1vcjJfcHJpX2VnZnIsdmVyYm9zZSA9IEYpXG50aXNzX3N1YnNldF90dW1vcjJfcHJpX2VnZnIgPSBSdW5VTUFQKHRpc3Nfc3Vic2V0X3R1bW9yMl9wcmlfZWdmciwgZGltcyA9IDE6NSx2ZXJib3NlID0gRilcbmBgYCJ9 -->
-<pre class="r"><code># re run umap
-tiss_subset_tumor2_pri_egfr = FindVariableFeatures(object = tiss_subset_tumor2_pri_egfr)
-tiss_subset_tumor2_pri_egfr = ScaleData(object = tiss_subset_tumor2_pri_egfr)
-tiss_subset_tumor2_pri_egfr = RunPCA(object = tiss_subset_tumor2_pri_egfr,verbose = F)
-tiss_subset_tumor2_pri_egfr = RunUMAP(tiss_subset_tumor2_pri_egfr, dims = 1:5,verbose = F)</code></pre>
-<!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 <p>calculate nmf metagenes</p>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgcHl0aG9uXG5mcm9tIGNubWYgaW1wb3J0IGNOTUZcbmltcG9ydCBwaWNrbGVcbmYgPSBvcGVuKCcuL3Byb2Nlc3NlZF9kYXRhL2NubWZfVjIvbm9UUE1fMTAwaXRlci8vbW9kZWxzXzJLdmFyZ2VuZXNfY29ycmVjdGVkX25vVFBNX2NubWZfb2JqLnBja2wnLCAncmInKVxuY25tZl9vYmogPSBwaWNrbGUubG9hZChmKVxuZi5jbG9zZSgpXG5gYGAifQ== -->
-<pre class="python"><code>from cnmf import cNMF
-import pickle
-f = open(&#39;./processed_data/cnmf_V2/noTPM_100iter//models_2Kvargenes_corrected_noTPM_cnmf_obj.pckl&#39;, &#39;rb&#39;)
-cnmf_obj = pickle.load(f)
-f.close()</code></pre>
-<!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgcHl0aG9uXG5rID0gNVxuZGVuc2l0eV90aHJlc2hvbGQgPSAwLjEgXG5fLCBnZXBfc2NvcmVzLCBfLCBfID0gY25tZl9vYmoubG9hZF9yZXN1bHRzKEs9aywgZGVuc2l0eV90aHJlc2hvbGQ9ZGVuc2l0eV90aHJlc2hvbGQpXG5gYGAifQ== -->
-<pre class="python"><code>k = 5
-density_threshold = 0.1 
-_, gep_scores, _, _ = cnmf_obj.load_results(K=k, density_threshold=density_threshold)</code></pre>
-<!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 </div>
@@ -3008,46 +3004,18 @@ _, gep_scores, _, _ = cnmf_obj.load_results(K=k, density_threshold=density_thres
 bivona counts</h1>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuIyBnZXQgZXhwcmVzc2lvbiB3aXRoIGdlbmVzIGluIGNubWYgaW5wdXRcbmdlbmVzID0gcm93bmFtZXMocHkkZ2VwX3Njb3JlcylcbmdlbmVzID0gZ2VuZXMgW2dlbmVzICVpbiUgcm93bmFtZXModGlzc19zdWJzZXRfdHVtb3IyX3ByaV9lZ2ZyKV1cbmJpdm9uYV9leHByZXNzaW9uID0gdChhcy5tYXRyaXgoR2V0QXNzYXlEYXRhKHRpc3Nfc3Vic2V0X3R1bW9yMl9wcmlfZWdmcixzbG90PSdkYXRhJykpKSBcbmJpdm9uYV9leHByZXNzaW9uID0gMioqYml2b25hX2V4cHJlc3Npb24gI2NvbnZlcnQgZnJvbSBsb2cyKHRwbSsxKSB0byB0cG1cbmJpdm9uYV9leHByZXNzaW9uID0gYml2b25hX2V4cHJlc3Npb24tMVxuYml2b25hX2V4cHJlc3Npb24gPSBiaXZvbmFfZXhwcmVzc2lvblssZ2VuZXNdICU+JSBhcy5kYXRhLmZyYW1lKClcblxuYWxsXzBfZ2VuZXMgPSBjb2xuYW1lcyhiaXZvbmFfZXhwcmVzc2lvbilbY29sU3VtcyhiaXZvbmFfZXhwcmVzc2lvbj09MCwgbmEucm09VFJVRSk9PW5yb3coYml2b25hX2V4cHJlc3Npb24pXSAjZGVsZXRlIHJvd3MgdGhhdCBoYXZlIGFsbCAwXG5nZW5lcyA9IGdlbmVzWyFnZW5lcyAlaW4lIGFsbF8wX2dlbmVzXVxuYml2b25hX2V4cHJlc3Npb24gPSBiaXZvbmFfZXhwcmVzc2lvblssIWNvbG5hbWVzKGJpdm9uYV9leHByZXNzaW9uKSAlaW4lIGFsbF8wX2dlbmVzXVxuZ2ModmVyYm9zZSA9IEYpXG5gYGAifQ== -->
-<pre class="r"><code># get expression with genes in cnmf input
-genes = rownames(py$gep_scores)
-genes = genes [genes %in% rownames(tiss_subset_tumor2_pri_egfr)]
-bivona_expression = t(as.matrix(GetAssayData(tiss_subset_tumor2_pri_egfr,slot=&#39;data&#39;))) 
-bivona_expression = 2**bivona_expression #convert from log2(tpm+1) to tpm
-bivona_expression = bivona_expression-1
-bivona_expression = bivona_expression[,genes] %&gt;% as.data.frame()
-
-all_0_genes = colnames(bivona_expression)[colSums(bivona_expression==0, na.rm=TRUE)==nrow(bivona_expression)] #delete rows that have all 0
-genes = genes[!genes %in% all_0_genes]
-bivona_expression = bivona_expression[,!colnames(bivona_expression) %in% all_0_genes]
-gc(verbose = F)</code></pre>
-<!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgcHl0aG9uXG5iaXZvbmFfZXhwcmVzc2lvbiA9IHIuYml2b25hX2V4cHJlc3Npb25cbmdlbmVzID0gci5nZW5lc1xudXNhZ2VfYnlfY2FsYyA9IGdldF91c2FnZV9mcm9tX3Njb3JlKGNvdW50cz1iaXZvbmFfZXhwcmVzc2lvbix0cG09Yml2b25hX2V4cHJlc3Npb24sZ2VuZXM9Z2VuZXMsY25tZl9vYmo9Y25tZl9vYmosaz01LHN1bVRvMT1UcnVlKVxuXG5gYGAifQ== -->
-<pre class="python"><code>bivona_expression = r.bivona_expression
-genes = r.genes
-usage_by_calc = get_usage_from_score(counts=bivona_expression,tpm=bivona_expression,genes=genes,cnmf_obj=cnmf_obj,k=5,sumTo1=True)
-</code></pre>
-<!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuYml2b25hXzVfbWV0YWdlbmVzID0gcHkkdXNhZ2VfYnlfY2FsY1xuYGBgIn0= -->
-<pre class="r"><code>bivona_5_metagenes = py$usage_by_calc</code></pre>
-<!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuYWxsX21ldGFnZW5lcyA9IGJpdm9uYV81X21ldGFnZW5lc1xuY29sbmFtZXMoYWxsX21ldGFnZW5lcykgPSBwYXN0ZTAoXCJQcm9ncmFtLlwiLDE6NSlcblxuYGBgIn0= -->
-<pre class="r"><code>all_metagenes = bivona_5_metagenes
-colnames(all_metagenes) = paste0(&quot;Program.&quot;,1:5)
-</code></pre>
-<!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 </div>
@@ -3056,25 +3024,10 @@ colnames(all_metagenes) = paste0(&quot;Program.&quot;,1:5)
 expression</h1>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuXG4jYWRkIGVhY2ggbWV0YWdlbmUgdG8gbWV0YWRhdGFcbmZvciAoaSAgaW4gMTpuY29sKGFsbF9tZXRhZ2VuZXMpKSB7XG4gIG1ldGFnZW5lX21ldGFkYXRhID0gYWxsX21ldGFnZW5lc1ssaSxkcm9wPUZdXG4gIHRpc3Nfc3Vic2V0X3R1bW9yMl9wcmlfZWdmciA9IEFkZE1ldGFEYXRhKG9iamVjdCA9IHRpc3Nfc3Vic2V0X3R1bW9yMl9wcmlfZWdmcixtZXRhZGF0YSA9IG1ldGFnZW5lX21ldGFkYXRhLGNvbC5uYW1lID0gbmFtZXMoYWxsX21ldGFnZW5lcylbaV0pXG59XG5cbnAgPSBGZWF0dXJlUGxvdChvYmplY3QgPSB0aXNzX3N1YnNldF90dW1vcjJfcHJpX2VnZnIsZmVhdHVyZXMgPSBjb2xuYW1lcyhhbGxfbWV0YWdlbmVzKSxuY29sID0gMykrRGltUGxvdChvYmplY3QgPSB0aXNzX3N1YnNldF90dW1vcjJfcHJpX2VnZnIsZ3JvdXAuYnkgPSBcInRyZWF0bWVudFwiKVxuXG5wXG5gYGAifQ== -->
-<pre class="r"><code>
-#add each metagene to metadata
-for (i  in 1:ncol(all_metagenes)) {
-  metagene_metadata = all_metagenes[,i,drop=F]
-  tiss_subset_tumor2_pri_egfr = AddMetaData(object = tiss_subset_tumor2_pri_egfr,metadata = metagene_metadata,col.name = names(all_metagenes)[i])
-}
-
-p = FeaturePlot(object = tiss_subset_tumor2_pri_egfr,features = colnames(all_metagenes),ncol = 3)+DimPlot(object = tiss_subset_tumor2_pri_egfr,group.by = &quot;treatment&quot;)
-
-p</code></pre>
-<!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuc2F2ZVJEUyhvYmplY3QgPSBhcy5ncm9iKHApLGZpbGUgPSBcIi4vRmlndXJlcy9iaXZvbmFfbm1mX3VzYWdlX3VtYXAucmRzXCIpXG5gYGAifQ== -->
-<pre class="r"><code>saveRDS(object = as.grob(p),file = &quot;./Figures/bivona_nmf_usage_umap.rds&quot;)</code></pre>
-<!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 </div>
@@ -3082,80 +3035,28 @@ p</code></pre>
 <h1><span class="header-section-number">5</span> NMF programs</h1>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxucCA9IG1ldGFnZW5lc192aW9saW5fY29tYmluZV9wYXRpZW50cyhkYXRhc2V0ID0gdGlzc19zdWJzZXRfdHVtb3IyX3ByaV9lZ2ZyLHByZWZpeCA9IFwicGF0aWVudFwiLHByZV9vbiA9IGMoXCJuYWl2ZVwiLFwiUkRcIiksdGVzdCA9IFwid2lsY294LnRlc3RcIixwcm9ncmFtcyA9IGNvbG5hbWVzKGFsbF9tZXRhZ2VuZXMpLCByZXR1cm5fbGlzdCA9IEYpXG5cbnBcbmBgYCJ9 -->
-<pre class="r"><code>p = metagenes_violin_combine_patients(dataset = tiss_subset_tumor2_pri_egfr,prefix = &quot;patient&quot;,pre_on = c(&quot;naive&quot;,&quot;RD&quot;),test = &quot;wilcox.test&quot;,programs = colnames(all_metagenes), return_list = F)
-
-p</code></pre>
-<!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuIyBwbG90IHZpb2xpblxuZGF0YSA9IEZldGNoRGF0YShvYmplY3QgPSB0aXNzX3N1YnNldF90dW1vcjJfcHJpX2VnZnIsdmFycyA9IGMoY29sbmFtZXMoYWxsX21ldGFnZW5lcylbM10sXCJ0cmVhdG1lbnRcIikpXG5mb3JtdWxhID0gYXMuZm9ybXVsYShwYXN0ZTAoY29sbmFtZXMoYWxsX21ldGFnZW5lcylbM10sXCJ+dHJlYXRtZW50XCIpKVxuc3RhdC50ZXN0ID0gd2lsY294X3Rlc3QoZm9ybXVsYSA9IGZvcm11bGEsZGF0YSA9IGRhdGEsIHAuYWRqdXN0Lm1ldGhvZCA9IFwiZmRyXCIpICU+JSBcbiAgYWRkX3h5X3Bvc2l0aW9uKHggPSBcInRyZWF0bWVudFwiLCBkb2RnZSA9IDAuOCxzdGVwLmluY3JlYXNlID0gMC4zKVxuXG5cbnAgPSBnZ3Bsb3QoZGF0YSwgYWVzX3N0cmluZyh4PVwidHJlYXRtZW50XCIsIHk9Y29sbmFtZXMoYWxsX21ldGFnZW5lcylbM10pKSArIFxuICAgIGdlb21fdmlvbGluKHRyaW09RkFMU0UsYWVzKGZpbGwgPSB0cmVhdG1lbnQpKStnZW9tX2JveHBsb3Qod2lkdGggPSAwLjE1KStcbiAgdGhlbWVfbWluaW1hbCgpK1xuICBzY2FsZV9maWxsX21hbnVhbCh2YWx1ZXMgPSBjKFwiIzAwQUZCQlwiLCBcIiNFN0I4MDBcIiwgXCIjRkM0RTA3XCIpKStcbiAgdGhlbWUobGVnZW5kLnBvc2l0aW9uID0gXCJub25lXCIpK3N0YXRfcHZhbHVlX21hbnVhbChzdGF0LnRlc3QsIGxhYmVsID0gXCJ7cC5hZGp9XCIpK1xuICB5bGFiKFwiUHJvZ3JhbSAzIFotc2NvcmVcIilcblxucFxuXG5gYGAifQ== -->
-<pre class="r"><code># plot violin
-data = FetchData(object = tiss_subset_tumor2_pri_egfr,vars = c(colnames(all_metagenes)[3],&quot;treatment&quot;))
-formula = as.formula(paste0(colnames(all_metagenes)[3],&quot;~treatment&quot;))
-stat.test = wilcox_test(formula = formula,data = data, p.adjust.method = &quot;fdr&quot;) %&gt;% 
-  add_xy_position(x = &quot;treatment&quot;, dodge = 0.8,step.increase = 0.3)
-
-
-p = ggplot(data, aes_string(x=&quot;treatment&quot;, y=colnames(all_metagenes)[3])) + 
-    geom_violin(trim=FALSE,aes(fill = treatment))+geom_boxplot(width = 0.15)+
-  theme_minimal()+
-  scale_fill_manual(values = c(&quot;#00AFBB&quot;, &quot;#E7B800&quot;, &quot;#FC4E07&quot;))+
-  theme(legend.position = &quot;none&quot;)+stat_pvalue_manual(stat.test, label = &quot;{p.adj}&quot;)+
-  ylab(&quot;Program 3 Z-score&quot;)
-
-p
-</code></pre>
-<!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuc2F2ZVJEUyhvYmplY3QgPSBhcy5ncm9iKHApLGZpbGUgPSBcIi4vRmlndXJlcy9iaXZvbmFfbm1mX3Zpb2xpbi5yZHNcIilcbmBgYCJ9 -->
-<pre class="r"><code>saveRDS(object = as.grob(p),file = &quot;./Figures/bivona_nmf_violin.rds&quot;)</code></pre>
-<!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuIyBtb2RpZnkgZG90cGxvdCB0byBiZSB3aXRob3V0IGV4cG9uZW50IG9mIHRoZSBleHByZXNzaW9uXG5uZXdEZWYgPC0gZGVwYXJzZShEb3RQbG90KVxubmV3RGVmWzU3XSA9ICBcIiAgICAgICAgICAgIHJldHVybihtZWFuKHggPSAgeCkpXCIgIyByZW1vdmUgZXhwb25lbnRcbm5ld0RlZlsxMzZdID0gIFwiICAgICAgICAgICAgeWVzID0gXFxcIklkZW50aXR5XFxcIiwgbm8gPSBcXFwiU3BsaXQgSWRlbnRpdHlcXFwiKSkgKyBjb3dwbG90Ojp0aGVtZV9jb3dwbG90KClcIiAjYWRkIHBhY2thZ2UgbmFtZVxubmV3RGVmWzk1XSA9IFwiICAgICAgICAgICAgICAgIGRhdGEudXNlIDwtIGRhdGEudXNlXCIgIyByZW1vdmUgbG9nXG5uZXdEZWZbMTQ2XSA9IFwiICAgICAgICBwbG90IDwtIHBsb3QgKyBzY2FsZV9jb2xvcl9kaXN0aWxsZXIocGFsZXR0ZSA9IGNvbHMsICBkaXJlY3Rpb24gPSAxKVwiXG5Eb3RQbG90LjIgPC0gZXZhbChwYXJzZSh0ZXh0PW5ld0RlZikpXG5gYGAifQ== -->
-<pre class="r"><code># modify dotplot to be without exponent of the expression
-newDef &lt;- deparse(DotPlot)
-newDef[57] =  &quot;            return(mean(x =  x))&quot; # remove exponent
-newDef[136] =  &quot;            yes = \&quot;Identity\&quot;, no = \&quot;Split Identity\&quot;)) + cowplot::theme_cowplot()&quot; #add package name
-newDef[95] = &quot;                data.use &lt;- data.use&quot; # remove log
-newDef[146] = &quot;        plot &lt;- plot + scale_color_distiller(palette = cols,  direction = 1)&quot;
-DotPlot.2 &lt;- eval(parse(text=newDef))</code></pre>
-<!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuIyBzY2FsZSBtZXRhZ2VuZSBhbmQgYWRkIHRvIG1ldGFkYXRhXG5mb3IgKGkgIGluIDE6bmNvbChhbGxfbWV0YWdlbmVzKSkge1xuICBtZXRhZ2VuZV9tZXRhZGF0YSA9IGFsbF9tZXRhZ2VuZXNbLGksZHJvcD1GXSAlPiUgc2NhbGUoKVxuICB0aXNzX3N1YnNldF90dW1vcjJfcHJpX2VnZnIgPSBBZGRNZXRhRGF0YShvYmplY3QgPSB0aXNzX3N1YnNldF90dW1vcjJfcHJpX2VnZnIsbWV0YWRhdGEgPSBtZXRhZ2VuZV9tZXRhZGF0YSxjb2wubmFtZSA9IHBhc3RlMChuYW1lcyhhbGxfbWV0YWdlbmVzKVtpXSxcIl9zY2FsZWRcIikpXG59XG5gYGAifQ== -->
-<pre class="r"><code># scale metagene and add to metadata
-for (i  in 1:ncol(all_metagenes)) {
-  metagene_metadata = all_metagenes[,i,drop=F] %&gt;% scale()
-  tiss_subset_tumor2_pri_egfr = AddMetaData(object = tiss_subset_tumor2_pri_egfr,metadata = metagene_metadata,col.name = paste0(names(all_metagenes)[i],&quot;_scaled&quot;))
-}</code></pre>
-<!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuXG5wID0gRG90UGxvdC4yKG9iamVjdCA9IHRpc3Nfc3Vic2V0X3R1bW9yMl9wcmlfZWdmciwgZmVhdHVyZXMgPSAgcGFzdGUwKG5hbWVzKGFsbF9tZXRhZ2VuZXMpLFwiX3NjYWxlZFwiKSxncm91cC5ieSAgPSAndHJlYXRtZW50JyxzY2FsZSA9IEYpK1xuICBndWlkZXMoc2l6ZSA9IGd1aWRlX2xlZ2VuZCh0aXRsZSA9IFwiQ2VsbHMgYWJvdmUgYXZlcmFnZSAoJSlcIiksY29sb3IgPSBndWlkZV9jb2xvcmJhcih0aXRsZSA9IFwiQXZlcmFnZSBTY29yZVwiKSkrXG4gIHNjYWxlX3hfZGlzY3JldGUobGFiZWxzPSBwYXN0ZTAobmFtZXMoYWxsX21ldGFnZW5lcyksXCJcXG4oXCIsYyhcIklGTmFcIixcIlRORmEtTkZLYlwiLFwiSElGXCIsXCJDZWxsX0N5Y2xlXCIpLFwiKVwiKSlcbnBcbmBgYCJ9 -->
-<pre class="r"><code>
-p = DotPlot.2(object = tiss_subset_tumor2_pri_egfr, features =  paste0(names(all_metagenes),&quot;_scaled&quot;),group.by  = &#39;treatment&#39;,scale = F)+
-  guides(size = guide_legend(title = &quot;Cells above average (%)&quot;),color = guide_colorbar(title = &quot;Average Score&quot;))+
-  scale_x_discrete(labels= paste0(names(all_metagenes),&quot;\n(&quot;,c(&quot;IFNa&quot;,&quot;TNFa-NFKb&quot;,&quot;HIF&quot;,&quot;Cell_Cycle&quot;),&quot;)&quot;))
-p</code></pre>
-<!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuc2F2ZVJEUyhvYmplY3QgPSBhcy5ncm9iKHApLGZpbGUgPSBcIi4vRmlndXJlcy9iaXZvbmFfbm1mX2RvdHBsb3QucmRzXCIpXG5gYGAifQ== -->
-<pre class="r"><code>saveRDS(object = as.grob(p),file = &quot;./Figures/bivona_nmf_dotplot.rds&quot;)</code></pre>
-<!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 </div>
@@ -3163,71 +3064,24 @@ p</code></pre>
 <h1><span class="header-section-number">6</span> known genesets</h1>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuZ2VuZXNldHMgPC0gbXNpZ2RiX2Rvd25sb2FkKFwiSG9tbyBzYXBpZW5zXCIsY2F0ZWdvcnk9XCJIXCIpIFxuZ2VuZV9saXN0ID0gbGlzdChJRk5hX2dlbmVzID0gZ2VuZXNldHMkSEFMTE1BUktfSU5URVJGRVJPTl9BTFBIQV9SRVNQT05TRSwgVE5GYV9nZW5lcyA9IGdlbmVzZXRzJEhBTExNQVJLX1RORkFfU0lHTkFMSU5HX1ZJQV9ORktCLCBoaWZfdGFyZ2V0cyA9IGhpZl90YXJnZXRzLEUyRl9nZW5lcyA9IGdlbmVzZXRzJEhBTExNQVJLX0UyRl9UQVJHRVRTKVxuZm9yIChpIGluIHNlcV9hbG9uZyhnZW5lX2xpc3QpKSB7XG4gIGdlbmVzID0gZ2VuZV9saXN0W1tpXV1cbiAgZ2VuZXMgPSBnZW5lc1tnZW5lcyAlaW4lIHJvd25hbWVzKHRpc3Nfc3Vic2V0X3R1bW9yMl9wcmlfZWdmcildXG4gIG5hbWUgPSBuYW1lcyhnZW5lX2xpc3QpW2ldXG4gIHNjb3JlcyA9IEZldGNoRGF0YShvYmplY3QgPSB0aXNzX3N1YnNldF90dW1vcjJfcHJpX2VnZnIsdmFycyA9IGMoZ2VuZXMpKVxuICBzY29yZXMgPSBzY29yZXMgJT4lIHNlbGVjdCh3aGVyZSh+IHN1bSguKSAhPSAwKSkjIHJlbW92ZSBjb2xzIHdpdGggYWxsIG8gXG4gIHNjb3JlcyA9IHNjb3JlcyAlPiUgc2NhbGUoKSAlPiUgcm93TWVhbnMoKSAlPiUgYXMuZGF0YS5mcmFtZSgpXG4gIHRpc3Nfc3Vic2V0X3R1bW9yMl9wcmlfZWdmciAlPD4lIEFkZE1ldGFEYXRhKG1ldGFkYXRhID0gc2NvcmVzLGNvbC5uYW1lID0gbmFtZSlcbiAgXG59XG5gYGAifQ== -->
-<pre class="r"><code>genesets &lt;- msigdb_download(&quot;Homo sapiens&quot;,category=&quot;H&quot;) 
-gene_list = list(IFNa_genes = genesets$HALLMARK_INTERFERON_ALPHA_RESPONSE, TNFa_genes = genesets$HALLMARK_TNFA_SIGNALING_VIA_NFKB, hif_targets = hif_targets,E2F_genes = genesets$HALLMARK_E2F_TARGETS)
-for (i in seq_along(gene_list)) {
-  genes = gene_list[[i]]
-  genes = genes[genes %in% rownames(tiss_subset_tumor2_pri_egfr)]
-  name = names(gene_list)[i]
-  scores = FetchData(object = tiss_subset_tumor2_pri_egfr,vars = c(genes))
-  scores = scores %&gt;% select(where(~ sum(.) != 0))# remove cols with all o 
-  scores = scores %&gt;% scale() %&gt;% rowMeans() %&gt;% as.data.frame()
-  tiss_subset_tumor2_pri_egfr %&lt;&gt;% AddMetaData(metadata = scores,col.name = name)
-  
-}</code></pre>
-<!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuIyBwbG90IHZpb2xpblxuZGF0YSA9IEZldGNoRGF0YShvYmplY3QgPSB0aXNzX3N1YnNldF90dW1vcjJfcHJpX2VnZnIsdmFycyA9IGMoXCJoaWZfdGFyZ2V0c1wiLFwidHJlYXRtZW50XCIpKVxuc3RhdC50ZXN0ID0gd2lsY294X3Rlc3QoZm9ybXVsYSA9IGhpZl90YXJnZXRzICB+IHRyZWF0bWVudCxkYXRhID0gZGF0YSwgcC5hZGp1c3QubWV0aG9kID0gXCJmZHJcIikgJT4lIFxuICBhZGRfeHlfcG9zaXRpb24oeCA9IFwidHJlYXRtZW50XCIsIGRvZGdlID0gMC44LHN0ZXAuaW5jcmVhc2UgPSAwLjMpXG5cblxucCA9IGdncGxvdChkYXRhLCBhZXMoeD10cmVhdG1lbnQsIHk9aGlmX3RhcmdldHMpKSArIFxuICAgIGdlb21fdmlvbGluKHRyaW09RkFMU0UsYWVzKGZpbGwgPSB0cmVhdG1lbnQpKStnZW9tX2JveHBsb3Qod2lkdGggPSAwLjIpK1xuICB0aGVtZV9taW5pbWFsKCkrXG4gIHNjYWxlX2ZpbGxfbWFudWFsKHZhbHVlcyA9IGMoXCIjMDBBRkJCXCIsIFwiI0U3QjgwMFwiLCBcIiNGQzRFMDdcIikpK1xuICB0aGVtZShsZWdlbmQucG9zaXRpb24gPSBcIm5vbmVcIikrc3RhdF9wdmFsdWVfbWFudWFsKHN0YXQudGVzdCwgbGFiZWwgPSBcIntwLmFkan1cIikrXG4gIHlsYWIoXCJISUYgdGFyZ2V0cyBaLXNjb3JlXCIpXG5cbnBcblxuYGBgIn0= -->
-<pre class="r"><code># plot violin
-data = FetchData(object = tiss_subset_tumor2_pri_egfr,vars = c(&quot;hif_targets&quot;,&quot;treatment&quot;))
-stat.test = wilcox_test(formula = hif_targets  ~ treatment,data = data, p.adjust.method = &quot;fdr&quot;) %&gt;% 
-  add_xy_position(x = &quot;treatment&quot;, dodge = 0.8,step.increase = 0.3)
-
-
-p = ggplot(data, aes(x=treatment, y=hif_targets)) + 
-    geom_violin(trim=FALSE,aes(fill = treatment))+geom_boxplot(width = 0.2)+
-  theme_minimal()+
-  scale_fill_manual(values = c(&quot;#00AFBB&quot;, &quot;#E7B800&quot;, &quot;#FC4E07&quot;))+
-  theme(legend.position = &quot;none&quot;)+stat_pvalue_manual(stat.test, label = &quot;{p.adj}&quot;)+
-  ylab(&quot;HIF targets Z-score&quot;)
-
-p
-</code></pre>
-<!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuc2F2ZVJEUyhvYmplY3QgPSBhcy5ncm9iKHApLGZpbGUgPSBcIi4vRmlndXJlcy9iaXZvbmFfaGlmX3RhcmdldHNfdmlvbGluLnJkc1wiKVxuYGBgIn0= -->
-<pre class="r"><code>saveRDS(object = as.grob(p),file = &quot;./Figures/bivona_hif_targets_violin.rds&quot;)</code></pre>
-<!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxucCA9IG1ldGFnZW5lc192aW9saW5fY29tYmluZV9wYXRpZW50cyhkYXRhc2V0ID0gdGlzc19zdWJzZXRfdHVtb3IyX3ByaV9lZ2ZyLHByZWZpeCA9IFwicGF0aWVudFwiLHByZV9vbiA9IGMoXCJuYWl2ZVwiLFwiUkRcIiksdGVzdCA9IFwid2lsY294LnRlc3RcIixwcm9ncmFtcyA9IG5hbWVzKGdlbmVfbGlzdCksIHJldHVybl9saXN0ID0gRilcbnBcbmBgYCJ9 -->
-<pre class="r"><code>p = metagenes_violin_combine_patients(dataset = tiss_subset_tumor2_pri_egfr,prefix = &quot;patient&quot;,pre_on = c(&quot;naive&quot;,&quot;RD&quot;),test = &quot;wilcox.test&quot;,programs = names(gene_list), return_list = F)
-p</code></pre>
-<!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuXG5wID0gRG90UGxvdC4yKG9iamVjdCA9IHRpc3Nfc3Vic2V0X3R1bW9yMl9wcmlfZWdmciwgZmVhdHVyZXMgPSAgbmFtZXMoZ2VuZV9saXN0KSxncm91cC5ieSAgPSAndHJlYXRtZW50JyxzY2FsZSA9IEYpK1xuICBndWlkZXMoc2l6ZSA9IGd1aWRlX2xlZ2VuZCh0aXRsZSA9IFwiQ2VsbHMgYWJvdmUgYXZlcmFnZSAoJSlcIiksY29sb3IgPSBndWlkZV9jb2xvcmJhcih0aXRsZSA9IFwiQXZlcmFnZSBTY29yZVwiKSlcbnBcbmBgYCJ9 -->
-<pre class="r"><code>
-p = DotPlot.2(object = tiss_subset_tumor2_pri_egfr, features =  names(gene_list),group.by  = &#39;treatment&#39;,scale = F)+
-  guides(size = guide_legend(title = &quot;Cells above average (%)&quot;),color = guide_colorbar(title = &quot;Average Score&quot;))
-p</code></pre>
-<!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuc2F2ZVJEUyhvYmplY3QgPSBhcy5ncm9iKHApLGZpbGUgPSBcIi4vRmlndXJlcy9iaXZvbmFfa25vd25fZ2VuZXNfZG90cGxvdC5yZHNcIilcbmBgYCJ9 -->
-<pre class="r"><code>saveRDS(object = as.grob(p),file = &quot;./Figures/bivona_known_genes_dotplot.rds&quot;)</code></pre>
-<!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 </div>
 
