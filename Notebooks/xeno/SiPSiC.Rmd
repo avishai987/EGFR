@@ -103,10 +103,10 @@ untrace(Seurat:::FindMarkers.default)
 colors= c()
 for (row_num in 1:nrow(logFC_df)) {
   row = logFC_df[row_num,]
-  if (sum(row > 0.1)  >= 5) { # if at least x values are more than 0.1 FC
+  if (sum(row > 0.15)  >= 4) { # if at least x values are more than 0.1 log2FC
     colors <- c(colors, "red")
   }
-  else if (sum(row < -0.1)  >= 5) {
+  else if (sum(row < -0.15)  >= 4) {
     colors <- c(colors, "blue")
   }
   else{colors <- c(colors, "black")}
@@ -210,3 +210,331 @@ p = ComplexHeatmap::Heatmap(
   
 p
 ```
+
+```{r fig.width=10}
+# only nmf programs
+for (patient_name in unique(xeno$orig.ident)) {
+  
+  patient_data = subset(xeno,subset = orig.ident == patient_name)
+  pathways_names = c("HALLMARK-INTERFERON-ALPHA-RESPONSE","HALLMARK-TNFA-SIGNALING-VIA-NFKB", "HALLMARK-HYPOXIA","HALLMARK-E2F-TARGETS" )
+  
+  DefaultAssay(patient_data) = "sipsic"
+  data = FetchData(object = patient_data, vars = c(pathways_names))
+  data[] <- data %>% 
+    mutate(across(everything(), ~ as.numeric(scale(.))))  # scale per pathway
+  data = data %>% t() %>% as.data.frame()
+  
+  annotation_data = FetchData(object = patient_data, vars = c("treatment")) %>% dplyr::arrange(treatment)
+  column_ha = HeatmapAnnotation(Treatment = annotation_data[,1], #set annotation
+                                col = list(Treatment = c("NT" = "red", "OSI" = "green", "res" = "blue"))) 
+  data = data[,rownames(annotation_data)] #order data like annotation
+  data = na.omit(data)
+  DefaultAssay(xeno) = "RNA" #make RNA default again
+  
+  p = ComplexHeatmap::Heatmap(
+    data,
+    show_column_names = F,
+    row_names_gp = grid::gpar(fontsize = 10),
+    cluster_rows = T,
+    top_annotation = column_ha,
+    name = "Z-score expression",use_raster = F,cluster_columns = T,column_split = annotation_data$treatment,
+    column_gap = unit(2, "mm"), border = TRUE,show_parent_dend_line = FALSE, show_column_dend = T,cluster_column_slices = F,column_title = patient_name)
+  
+    
+  print(p)
+}
+```
+
+# Piechart
+```{r fig.height=6, fig.width=6}
+p_list = list()
+for (patient_name in unique(xeno$orig.ident)) {
+    #get data
+    patient_data = subset(xeno,subset = orig.ident == patient_name)
+    pathways_names = c("HALLMARK-INTERFERON-ALPHA-RESPONSE","HALLMARK-TNFA-SIGNALING-VIA-NFKB", "HALLMARK-HYPOXIA","HALLMARK-E2F-TARGETS" )
+    
+    DefaultAssay(patient_data) = "sipsic"
+    data = FetchData(object = patient_data, vars = c(pathways_names))
+    data[] <- data %>% 
+      mutate(across(everything(), ~ as.numeric(scale(.))))  # scale per pathway
+    data = data %>% t() %>% as.data.frame()
+    
+    #set annotaion
+    annotation_data = FetchData(object = patient_data, vars = c("treatment")) %>% dplyr::arrange(treatment)
+    column_ha = HeatmapAnnotation(Treatment = annotation_data[,1], #set annotation
+                                  col = list(Treatment = c("NT" = "red", "OSI" = "green", "res" = "blue"))) 
+    data = data[,rownames(annotation_data)] #order data like annotation
+    data = na.omit(data)
+    DefaultAssay(xeno) = "RNA" #make RNA default again
+    rownames(data) = c("H_INFa","H_TNFa_NFKb", "H_HYPOXIA","H_E2F" )
+  
+  # classify cells into groups 
+  cell_type <- data %>% 
+    mutate(across(everything(), 
+                  ~case_when(
+     . > 1  ~ "high",
+     . < -1  ~ "low",
+     TRUE  ~ "normal"
+     ))) %>% t() %>% as.data.frame()
+  
+  # take only osi cells
+  cell_type = cell_type[colnames(patient_data)[patient_data$treatment == "OSI"],]
+  
+  # create vector of of up/down pathways per cell
+  high_pathways = apply(cell_type, MARGIN = 1, function(x, pathways = colnames(cell_type)) {
+    subclone_up = paste(pathways[x =="high"], collapse = '+')}
+        )
+  low_pathways =  apply(cell_type, MARGIN = 1, function(x, pathways = colnames(cell_type)) {
+    subclone_up = paste(pathways[x =="low"], collapse = '+')})
+    
+  # remove empty pathways
+  high_pathways  = high_pathways[high_pathways!= ""] %>% as.data.frame() %>% rownames_to_column()
+  low_pathways  = low_pathways[low_pathways!= ""] %>% as.data.frame()%>% rownames_to_column()
+  
+  #join low and high df
+  all_persistors = full_join(x = high_pathways,y = low_pathways,by = c("rowname" = "rowname"))
+  rownames(all_persistors) = all_persistors$rowname
+  colnames(all_persistors) = c("rowname","high","low")
+  
+  #merge low and high pathways
+  all_persistors   %<>% mutate (subclone = 
+                                  case_when(is.na(high)  ~ paste0("low: ",low),
+                                            is.na(low)  ~ paste0("high: ",high),
+                                            TRUE ~ paste0("high: ",high,", low: ",low)
+                                            )
+                                )
+  
+  all_freq = all_persistors$subclone %>% table() %>%  as.data.frame() %>%
+    mutate(percentage = round(100*Freq/sum(Freq),digits = 1))
+  colnames(all_freq)[1] = "subclone"
+  
+  # combine small cubclones as "other"
+  freq = all_freq[all_freq$percentage >= 5,]
+  small_subclones = all_freq[all_freq$percentage < 5,c("Freq", "percentage")] %>% colSums() %>% t() %>% as.data.frame() %>% mutate(subclone = "other")
+  freq = rbind(freq, small_subclones)%>%
+    arrange(desc(subclone)) %>%
+    mutate(lab.ypos = cumsum(percentage) - 0.5*percentage)
+  
+  # Basic piechart
+  p = ggplot(freq, aes(x = "", y = percentage, fill = subclone)) +
+    geom_bar(stat = "identity",
+             width = 1,
+             color = "white") +
+    coord_polar("y", start = 0) +
+    theme_void() + # remove background, grid, numeric labels
+    scale_fill_manual(values = rainbow(nrow(freq))) +
+    geom_text(aes(y = lab.ypos, label = percentage), color = "white")+ ggtitle(patient_name)
+  p_list[[patient_name]] = p
+}
+
+```
+
+
+```{r fig.height=8, fig.width=10}
+# plot
+
+ggarrange(plotlist = p_list)
+
+```
+# Upset plot
+
+```{r}
+for (patient_name in unique(xeno$orig.ident)) {
+    #get data
+    patient_data = subset(xeno,subset = orig.ident == patient_name)
+    pathways_names = c("HALLMARK-INTERFERON-ALPHA-RESPONSE","HALLMARK-TNFA-SIGNALING-VIA-NFKB", "HALLMARK-HYPOXIA","HALLMARK-E2F-TARGETS" )
+    
+    DefaultAssay(patient_data) = "sipsic"
+    data = FetchData(object = patient_data, vars = c(pathways_names))
+    data[] <- data %>% 
+      mutate(across(everything(), ~ as.numeric(scale(.))))  # scale per pathway
+    data = data %>% t() %>% as.data.frame()
+    
+   
+    data = na.omit(data)
+    DefaultAssay(xeno) = "RNA" #make RNA default again
+    rownames(data) = c("H_INFa","H_TNFa_NFKb", "H_HYPOXIA","H_E2F" )
+  
+  # classify cells into groups 
+  cell_type <- data %>% 
+    mutate(across(everything(), 
+                  ~case_when(
+     . > 1  ~ "high",
+     . < -1  ~ "low",
+     TRUE  ~ "normal"
+     ))) %>% t() %>% as.data.frame()
+  
+  # take only osi cells
+  cell_type = cell_type[colnames(patient_data)[patient_data$treatment == "OSI"],]
+  
+  # create vector of of up/down pathways per cell
+  pathways_assign = apply(cell_type, MARGIN = 1, function(x, pathways = colnames(cell_type)) {
+    up_pathways =  pathways[x == "high"]
+    if (!is_empty(up_pathways)) {
+      up_pathways = paste("high", pathways[x == "high"])
+    }
+    down_pathways =  pathways[x == "low"]
+    if (!is_empty(down_pathways)) {
+      down_pathways = paste("low", pathways[x == "low"])
+    }
+    c(up_pathways, down_pathways)
+  })
+  
+cell_type$assignment = pathways_assign
+
+  
+p = cell_type %>%   ggplot(aes(x=assignment)) +
+    geom_bar() +
+    scale_x_upset(n_intersections = 20)+
+  ggtitle(patient_name)
+print(p)
+}
+```
+# Correlation
+
+```{r}
+# Description
+for (patient_name in unique(xeno$orig.ident)) {
+  
+  patient_data = subset(xeno, subset = orig.ident == patient_name)
+  pathways_names = c(
+    "HALLMARK-INTERFERON-ALPHA-RESPONSE",
+    "HALLMARK-TNFA-SIGNALING-VIA-NFKB",
+    "HALLMARK-HYPOXIA",
+    "HALLMARK-E2F-TARGETS"
+  )
+  
+  DefaultAssay(patient_data) = "sipsic"
+  data = FetchData(object = patient_data, vars = c(pathways_names))
+  data[] <- data %>%
+    mutate(across(everything(), ~ as.numeric(scale(.))))  # scale per pathway
+  
+  
+  data = na.omit(data)
+  DefaultAssay(xeno) = "RNA" #make RNA default again
+  colnames(data) = c("H_INFa", "H_TNFa_NFKb", "H_HYPOXIA", "H_E2F")
+  library(circlize)
+  data = cor(data)
+  col_fun = colorRamp2(c(-1, 0, 1), c("blue", "white", "red"))
+ p =  Heatmap(
+    data, name = "pearson", col = col_fun, show_row_names = F, column_title = patient_name,
+    cell_fun = function(j, i, x, y, width, height, fill) {
+      grid.text(as.character(round(data[i, j], digits = 2)), x, y, gp = gpar(fontsize = 10))
+    }
+  )
+ print(p)
+}
+```
+
+
+# Ternary plot
+
+```{r}
+# Description
+library(ggtern)
+p_list = list()
+
+for (patient_name in unique(xeno$orig.ident)) {
+  patient_data = subset(xeno,subset = orig.ident == patient_name)
+  pathways_names = c(
+    "HALLMARK-INTERFERON-ALPHA-RESPONSE",
+    "HALLMARK-TNFA-SIGNALING-VIA-NFKB",
+    "HALLMARK-HYPOXIA"
+  )
+  
+  DefaultAssay(patient_data) = "sipsic"
+  data = FetchData(object = patient_data, vars = c(pathways_names))
+  data[] <- data %>%
+    mutate(across(everything(), ~ as.numeric(min_max_normalize(.))))  # scale per pathway
+  data = data[colnames(patient_data)[patient_data$treatment == "OSI"],]
+  # data = apply(data, MARGIN = 2, min_max_normalize) %>% as.data.frame()
+  
+  colnames(data) = c("IFNa","TNFa_NFKb","HIF")
+  
+
+  p = ggtern(data,ggtern::aes(IFNa,TNFa_NFKb,HIF)) +geom_point()+
+  ggtitle(paste("Model",patient_name))+
+  theme_tropical(base_size=14)
+  
+
+  p_list[[patient_name]] = p
+
+}
+
+```
+
+
+```{r}
+# Description
+library(ggtern)
+p_list = list()
+
+for (patient_name in unique(xeno$orig.ident)) {
+  # patient_name = "119"
+  patient_data = subset(xeno,subset = orig.ident == patient_name)
+  pathways_names = c(
+    "HALLMARK-INTERFERON-ALPHA-RESPONSE",
+    "HALLMARK-TNFA-SIGNALING-VIA-NFKB",
+    "HALLMARK-HYPOXIA"
+  )
+  
+  DefaultAssay(patient_data) = "sipsic"
+  data = FetchData(object = patient_data, vars = c(pathways_names))
+  # data[] <- data %>%
+  #   mutate(across(everything(), ~ as.numeric(min_max_normalize(.))))  # scale per pathway
+  data$treatment = patient_data$treatment
+  colnames(data) = c("IFNa","TNFa_NFKb","HIF","treatment")
+  
+
+  p = ggtern(data,ggtern::aes(IFNa,TNFa_NFKb,HIF)) +
+geom_point(ggtern::aes(fill=treatment,shape=treatment),color='black') +
+scale_shape_manual(values=c(21,22),breaks = c("OSI"))+
+    ggtitle(paste("Model",patient_name))+
+  theme_tropical(base_size=14)
+    
+
+  p_list[[patient_name]] = p
+
+}
+
+```
+```{r}
+# Description
+View(p1$data)
+p_list
+```
+
+```{r}
+
+# Description
+df = data.frame(x=c(0.8,0.06),y=c(0.2,0.87),z=c(0.1,0.03))
+labFnc <- function(x,digits=2) format(round(unique(x),digits),digits=digits)
+breaks = seq(from = 0, to = 1, by = 0.1)
+p1 = ggtern(data=df,ggtern::aes(x,y,z)) + geom_point()+
+  theme_tropical(base_size=14) +
+  scale_T_continuous(breaks=unique(df$y),labels = labFnc(df$y)) +
+  scale_L_continuous(breaks=unique(df$x),labels=labFnc(df$x)) +
+  scale_R_continuous(breaks=unique(df$z),labels=labFnc(df$y)) 
+
+crd = coord_tern()
+df
+debugonce(tlr2xy)
+tlr2xy(df,crd,scale = F)
+
+
+debugonce(coord_tern)
+
+  ggplot(data = Feldspar, mapping = ggtern::aes(Ab,An,Or)) + coord_tern(Tlim  = c(0,0.2),Llim = c(0,0.5))
+
+
+ggtern(data=Feldspar,ggtern::aes(Ab,An,Or)) + 
+  geom_point(ggtern::aes(fill=Feldspar,shape=Feldspar,size=P.Gpa),color='black') + 
+  scale_shape_manual(values=c(21,22),breaks = c("Alkalai"))
+```
+
+```{r fig.height=10, fig.width=15}
+# plot
+do.call(ggtern::grid.arrange,args = c(p_list,ncol=3))
+```
+
+
