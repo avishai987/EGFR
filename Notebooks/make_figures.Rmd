@@ -21,7 +21,7 @@ output:
 ```{r}
 xeno_umap_patients = readRDS("./Figures/xeno_patient_umap.rds")
 xeno_umap_treatment = readRDS("./Figures/xeno_treatment_umap.rds")
-xeno_deg = readRDS("./Figures/xeno_DEG.rds")
+xeno_deg = readRDS("./Figures/xeno_DEG_GSEA_up.rds")
 xeno_sipsic_heatmap = readRDS("./Figures/xeno_sipsic_heatmap.rds")
 
 ```
@@ -40,6 +40,44 @@ pdf("./final_figures/fig1.pdf",width = 15,height = 15)
 p3
 dev.off()
 ```
+# Figure 1 sup
+
+```{r fig.height=15, fig.width=15}
+patients_patient_id_umap = readRDS("./Figures/patients_patient_id_umap.rds")
+patients_treatment_umap = readRDS("./Figures/patients_treatment_umap.rds")
+patients_overview = readRDS("./Figures/patients_overview.rds")
+
+xeno_patient_umap = readRDS("./Figures/xeno_patient_umap.rds")
+xeno_treatment_umap = readRDS("./Figures/xeno_treatment_umap.rds")
+xeno_overview = readRDS("./Figures/xeno_overview.rds")
+
+
+p1 = cowplot::plot_grid(xeno_patient_umap,xeno_treatment_umap,ncol = 2,nrow = 1,labels = c("A",""))
+p2 = cowplot::plot_grid(patients_patient_id_umap,patients_treatment_umap,ncol = 2,nrow = 1,labels = c("B",""))
+p3 = cowplot::plot_grid(xeno_overview,patients_overview, ncol = 2,nrow = 1,labels = c("C","D"))
+p4 = cowplot::plot_grid(p1,p2,p3, ncol = 1,nrow = 3,rel_heights = c(1,1,0.6))
+p4
+```
+
+
+```{r}
+pdf("./final_figures/fig1_sup.pdf",width = 15,height = 15)
+p4
+dev.off()
+```
+# Figure 1 sup
+
+```{r fig.height=8, fig.width=15}
+patients_DEG_GSEA_down = readRDS("./Figures/patients_DEG_GSEA_down.rds")
+lung_sipsic_heatmap = readRDS("./Figures/lung_sipsic_heatmap.rds")
+p = cowplot::plot_grid(patients_DEG_GSEA_down,lung_sipsic_heatmap,ncol = 2,labels = "AUTO")
+p
+```
+```{r}
+pdf("./final_figures/fig2_sup.pdf",width = 15,height = 8)
+p
+dev.off()
+```
 
 # Figure 2
 
@@ -55,6 +93,7 @@ xeno_nmf_usage_UMAP = readRDS("./Figures/xeno_NMF_usage_UMAP.rds")
 p = cowplot::plot_grid(xeno_nmf_usage_UMAP,xeno_nmf_heatmap,ncol = 1,labels = "AUTO")
 p
 ```
+
 ```{r}
 pdf("./final_figures/fig2.pdf",width = 12,height = 17)
 p
@@ -69,6 +108,7 @@ xeno_NMF_hypoxia_split_violin = readRDS("./Figures/xeno_NMF_hypoxia_split_violin
 ```
 
 ```{r fig.height=12, fig.width=21}
+
 p1 = cowplot::plot_grid(xeno_NMF_programs_dotplot,xeno_NMF_hypoxia_split_violin, ncol = 1,labels = c("B","C"))
 p = cowplot::plot_grid(xeno_nmf_GSEA,p1, ncol = 2,labels = c("A",NULL,NULL), rel_widths = c(1.5, 1))
 p
