@@ -35,17 +35,15 @@ genesets = getGmt("./raw_data/h.all.v2023.2.Hs.symbols.gmt") %>% geneIds()
 
 ```
 
-```{r}
-trace(Seurat:::FindMarkers.default,edit = T) #replace "bonferroni" with "fdr"
 
-```
 
 
 ## Xeno DEG regress patients
 
 ```{r}
 xeno = SetIdent(object = xeno,value = "treatment")
-xeno = FindVariableFeatures(object = xeno,nfeatures = 5000)
+nfeatures = 5000
+xeno = FindVariableFeatures(object = xeno,nfeatures = nfeatures)
 deg_df = FindMarkers(
   object = xeno,
   ident.1 = "NT",
@@ -60,14 +58,11 @@ deg_df = FindMarkers(
   test.use = "poisson",
   latent.vars = "orig.ident"
 )
-
+deg_df$fdr = p.adjust(deg_df$p_val,method = "fdr",n = nfeatures)
 p = volcano_plot(deg_df,top_genes_text = 5,ident1 = "NT",ident2 = "OSI",fc_cutoff = 1.5)+coord_cartesian(clip = "off")
 p
 ```
 
-```{r}
-untrace(Seurat:::FindMarkers.default)
-```
 
 ```{r}
 # GSEA
@@ -78,20 +73,33 @@ plt = hyp_dots(hyp_obj,merge = F,fdr = 0.2)
 
 ```
 
-```{r fig.height=5, fig.width=12}
+```{r fig.height=5, fig.width=15}
 # 
 p1 = plt[[1]]+ aes(size=nes)+ 
   guides(
-    size = guide_legend(title="NES",reverse=T))+scale_x_discrete(expand = expansion(add = c(1,2))) + ggtitle("NT")
+    size = guide_legend(title="NES",reverse=T))+scale_x_discrete(expand = expansion(add = c(1,2))) + ggtitle("NT")+
+  scale_y_continuous(trans = hypeR:::.reverselog_trans(10), 
+        breaks =exp(-seq(-log(min(plt[[1]]$data$fdr)), -log(max(plt[[1]]$data$fdr)), 
+            length.out = 6)) %>% signif(digits = 2))+ ggtitle("OSI down")
 
 # 
 p2 = plt[[2]]+ aes(size=nes)+
 scale_size(trans = 'reverse')+  
   guides(
-    size = guide_legend(title="NES",reverse=T))+scale_x_discrete(expand = expansion(add = c(1,2)))+ ggtitle("OSI") 
+    size = guide_legend(title="NES",reverse=T))+scale_x_discrete(expand = expansion(add = c(1,2)))+ ggtitle("OSI") +
+  scale_y_continuous(trans = hypeR:::.reverselog_trans(10), 
+        breaks =exp(-seq(-log(min(plt[[2]]$data$fdr)), -log(max(plt[[2]]$data$fdr)), 
+            length.out = 6)) %>% signif(digits = 2)) + ggtitle("OSI up")
 
 p1+p2
 ```
+```{r}
+saveRDS(object = as.grob(p1),file = "./Figures/xeno_DEG_GSEA_up.rds")
+saveRDS(object = as.grob(p2),file = "./Figures/xeno_DEG_GSEA_down.rds")
+
+```
+
+
 ## Xeno DEG per patient
 
 ```{r fig.height=8, fig.width=14}
