@@ -48,11 +48,35 @@ source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_
 
 ```
 
+
+```{r fig.height=6, fig.width=14}
+p1  = DimPlot(lung,group.by = "patient.ident")+ggtitle("")+ guides(color=guide_legend(title="Patient",override.aes = list(size=3)))
+p2  =  DimPlot(lung,group.by = "time.point",shuffle = T)+ggtitle("")+ guides(color=guide_legend(title="Time.point",override.aes = list(size=3)))
+p1+p2
+
+df = FetchData(lung,vars = c("time.point","patient.ident"))
+
+p = ggplot(df, aes(x = patient.ident, fill = time.point)) +
+  geom_bar(position = "stack") +
+  labs(title = "Patients data",
+       x = "Patient ID",
+       y = "Count",
+       fill = "Time Point") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+p
+```
+```{r}
+saveRDS(object = as.grob(p1),file = "./Figures/patients_patient_id_umap.rds")
+saveRDS(object = as.grob(p2),file = "./Figures/patients_treatment_umap.rds")
+saveRDS(object = as.grob(p),file = "./Figures/patients_overview.rds")
+
+```
+
 calculate nmf metagenes
 ```{python}
 from cnmf import cNMF
 import pickle
-f = open('./processed_data/cnmf_V2/noTPM_100iter/models_2Kvargenes_corrected_noTPM_cnmf_obj.pckl', 'rb')
+f = open('./Data/cnmf_V2/noTPM_100iter/models_2Kvargenes_corrected_noTPM_cnmf_obj.pckl', 'rb')
 cnmf_obj = pickle.load(f)
 f.close()
 ```
@@ -150,10 +174,44 @@ p = DotPlot.2(object = lung, features =  paste0(names(all_metagenes),"_scaled"),
               group.by  = 'treatment',scale = F)+
   guides(size = guide_legend(title = "Cells above average (%)"),
          color = guide_colorbar(title = "Average Score"))+
-  scale_x_discrete(labels= paste0(names(all_metagenes),"\n(",c("IFNa","TNFa-NFKb","HIF","Cell_Cycle"),")"))+ 
+  scale_x_discrete(labels= paste0(names(all_metagenes),"\n(",c("IFNa","TNFa-NFKb","HIF","Cell_Cycle","EMT"),")"))+ 
   scale_y_discrete(limits = c("pre-treatment","on-treatment"))
 p
 ```
+
+```{r fig.height=4, fig.width=11}
+lung = program_assignment(dataset = lung,program_names = names(all_metagenes),larger_by = 2)
+lung$program.assignment %>% head()
+ 
+
+data = FetchData(object = lung,vars = c(paste0(names(all_metagenes),"_scaled"),"time.point","program.assignment"))%>%
+  group_by(time.point) %>% 
+  summarize(
+    across(c(-program.assignment), mean), # 
+    program.1  = sum(program.assignment == "Program.1"),
+    program.2  = sum(program.assignment == "Program.2"),
+    program.3  = sum(program.assignment == "Program.3"),
+    program.4  = sum(program.assignment == "Program.4"),
+    program.5  = sum(program.assignment == "Program.5")
+  ) %>% ungroup() %>% 
+  t() %>% as.data.frame() %>% janitor::row_to_names(1) %>% rownames_to_column("program") %>% 
+  pivot_longer(!program, names_to = "time.point", values_to = "value")
+data2 = cbind(data[1:15,],data[16:30,])
+data2 = data2[,-c(1,2)] %>% dplyr::rename(assigned_cells = value.1,z_score_level = value)%>%
+  mutate(
+    z_score_level = as.numeric(z_score_level),
+    assigned_cells = as.numeric(assigned_cells)
+  )
+
+p = ggplot(data = data2, mapping = aes_string(x = "program", 
+    y = "time.point")) + geom_point(mapping = aes_string(size = "assigned_cells", 
+    color = 'z_score_level')) + scale_size(range = c(0, 6)) + theme(axis.title.x = element_blank(), 
+    axis.title.y = element_blank()) + guides(size = guide_legend(title = "assigned_cells")) + 
+    labs(x = "Features", y = "time.point") + cowplot::theme_cowplot()+
+  scale_color_gradient(low = "lightblue", high = "darkblue")
+p
+```
+
 ```{r}
 saveRDS(object = as.grob(p),file = "./Figures/patients_nmf_usage_dotplot.rds")
 ```
