@@ -1,0 +1,493 @@
+---
+title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: FALSE
+    number_sections: true
+    toc_depth: 1
+---
+
+
+
+# Functions
+
+```{r}
+library(stringi)
+library(reticulate)
+library(ggplotify)
+
+source_from_github(repositoy = "DEG_functions",version = "0.2.47")
+source_from_github(repositoy = "cNMF_functions",version = "0.4.04",script_name = "cnmf_functions_V3.R")
+source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_name = "functions.R")
+
+
+```
+
+# Data
+
+
+```{r}
+lung = readRDS("./raw_data/lung_cancercells_withTP_onlyPatients.rds")
+lung_patients = lung$patient.ident %>% unique() %>% as.character()
+lung_patients_filtered = lung_patients[!(lung_patients %in% c("X1055new","X1099"))] # remove patients with less than 100 malignant cells
+lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
+```
+
+
+# DE pathways
+
+
+```{r}
+pathwayScoresMatrix = read_rds(file = "./output_data/run_SiPSiC/patients_pathwayScoresMatrix.RDS")
+lung[["sipsic"]] = CreateAssayObject(counts = pathwayScoresMatrix)
+
+```
+
+```{r}
+trace(Seurat:::FindMarkers.default,edit = T) #replace "bonferroni" with "fdr"
+
+```
+
+```{r}
+lung = SetIdent(lung, value = "time.point")
+pathways_names = gsub(rownames(pathwayScoresMatrix), pattern = "_", replacement = "-")
+
+
+logFC_df = data.frame(row.names = pathways_names)
+fdr_df = data.frame(row.names = pathways_names)
+
+for (model in unique(lung$patient.ident)) {
+  model_data = subset(lung, subset = patient.ident == model)
+  pathway_markers = FindMarkers(
+    object = model_data,
+    ident.1 = "on-treatment",
+    ident.2 = "pre-treatment",
+    assay = "sipsic",
+    slot = "counts",
+    logfc.threshold = 0,
+    densify = T,
+    pseudocount.use = 0.001,
+    features = pathways_names
+  )
+  avg_log2FC = pathway_markers[pathways_names, "avg_log2FC", drop = F]
+  colnames(avg_log2FC) = model
+  pathway_markers  %<>%  dplyr::rename(fdr = p_val_adj)
+  fdr = pathway_markers[pathways_names, "fdr", drop = F]
+  colnames(fdr) = model
+  
+  logFC_df = cbind(logFC_df, avg_log2FC)
+  fdr_df = cbind(fdr_df, fdr)
+}
+fdr_df_raw = fdr_df
+fdr_df = apply(fdr_df, 1:2, \(x) format(x, digits=1)) %>% as.data.frame() #round p values 
+fdr_df[fdr_df == 0] = paste0("<",format(.Machine$double.xmin,digits = 1)) # replace p=0 with p<min float
+```
+
+
+```{r}
+untrace(Seurat:::FindMarkers.default)
+
+```
+
+
+
+```{r}
+# color row name if consistent across patients/models
+colors= c()
+for (row_num in 1:nrow(logFC_df)) {
+  row = logFC_df[row_num,]
+  if (sum(row > 0.15)  >= 4) { # if at least x values are more than 0.1 log2FC
+    colors <- c(colors, "red")
+  }
+  else if (sum(row < -0.15)  >= 4) {
+    colors <- c(colors, "blue")
+  }
+  else{colors <- c(colors, "black")}
+}
+
+```
+
+```{r fig.height=7, fig.width=8}
+col_fun = circlize::colorRamp2(c(-1, 0, 1), c("blue", "white", "red"))
+p = ComplexHeatmap::Heatmap(logFC_df, name = "log2FC on/pre", col = col_fun,
+    cell_fun = function(j, i, x, y, width, height, fill) {
+        grid.text(fdr_df[i, j], x, y, gp = gpar(fontsize = 8))
+}, row_names_gp = gpar(fontsize = 8,col =colors), clustering_method_rows = "average", clustering_distance_rows = "euclidean")
+p
+```
+
+```{r}
+saveRDS(object = as.grob(as.ggplot(p)),file = "./Figures/lung_sipsic_heatmap.rds")
+```
+
+# Heatmap with asterisks
+
+
+
+```{r}
+# Description
+fdr_df_sig = fdr_df_raw
+fdr_df_sig[] <- lapply(fdr_df_sig, as.numeric)
+
+convert <- function(vec) {
+  symnum(vec, corr = FALSE, na = FALSE, cutpoints = c(0, 
+    0.001, 0.01, 0.05, 0.1, 1), symbols = c("***", "**", "*", ".", " ")) %>% as.character()
+} 
+
+fdr_df_sig[] = apply(fdr_df_sig, MARGIN = 1, FUN = convert)
+```
+
+
+```{r fig.height=7, fig.width=8}
+col_fun = circlize::colorRamp2(c(-1, 0, 1), c("blue", "white", "red"))
+p = ComplexHeatmap::Heatmap(logFC_df, name = "log2FC on/pre", col = col_fun,
+    cell_fun = function(j, i, x, y, width, height, fill) {
+        grid.text(fdr_df_sig[i, j], x, y, gp = gpar(fontsize = 8))
+}, row_names_gp = gpar(fontsize = 8,col =colors), clustering_method_rows = "average", clustering_distance_rows = "euclidean")
+p
+```
+
+# Heatmap
+```{r fig.height=15}
+DefaultAssay(lung) = "sipsic"
+data = FetchData(object = lung, vars = c(pathways_names,"patient.ident"))
+data[] <- data %>%  group_by(patient.ident) %>% mutate(across(is.numeric, ~ as.numeric(scale(.)))) %>% ungroup() 
+data = data %>% select(-patient.ident) 
+data = data %>% t() %>% as.data.frame()
+
+annotation_data = FetchData(object = lung, vars = c("patient.ident","time.point")) %>% dplyr::arrange(patient.ident,time.point)
+column_ha = HeatmapAnnotation(df = annotation_data[,2])
+data = data[,rownames(annotation_data)] #order data like annotation
+data = na.omit(data)
+p = ComplexHeatmap::Heatmap(
+  data,
+  show_column_names = F,
+  row_names_gp = grid::gpar(fontsize = 7),
+  cluster_rows = T,
+  top_annotation = column_ha,
+  name = "Z-score expression",use_raster = F,cluster_columns = F,column_split   = annotation_data$patient.ident,
+  column_gap = unit(2, "mm"), border = TRUE,show_parent_dend_line = FALSE, show_column_dend = FALSE,cluster_column_slices = F
+)
+  
+p
+```
+
+```{r fig.height=15}
+# heatmap with clutering per model and time point
+DefaultAssay(lung) = "sipsic"
+data = FetchData(object = lung, vars = c(pathways_names,"patient.ident"))
+data[] <- data %>%  group_by(patient.ident) %>%
+  mutate(across(is.numeric, ~ as.numeric(scale(.)))) %>% ungroup() # scale per model
+data = data %>% select(-patient.ident) # remove ident var
+data = data %>% t() %>% as.data.frame()
+
+annotation_data = FetchData(object = lung, vars = c("patient.ident","time.point")) %>% dplyr::arrange(patient.ident,time.point)
+column_ha = HeatmapAnnotation(time.point = annotation_data[,2], #set annotation
+                              col = list(time.point = c("pre-treatment" = "red", "on-treatment" = "green", "resistant" = "blue"))) 
+data = data[,rownames(annotation_data)] #order data like annotation
+data = na.omit(data)
+column_split = paste(annotation_data$patient.ident,annotation_data$time.point,sep = "\n") #split by ident+tp
+column_names = unique(column_split) %>% gsub(pattern = "119\nOSI",replacement = "      119\n      on-treatment") #adujst location to avoid overlap
+DefaultAssay(lung) = "RNA" #make RNA default again
+
+p = ComplexHeatmap::Heatmap(
+  data,
+  show_column_names = F,
+  row_names_gp = grid::gpar(fontsize = 10),
+  cluster_rows = T,
+  top_annotation = column_ha,
+  name = "Z-score expression",use_raster = F,cluster_columns = T,column_split = column_split,
+  column_title = column_names,
+  column_gap = unit(2, "mm"), border = TRUE,show_parent_dend_line = FALSE, show_column_dend = F,cluster_column_slices = F)
+
+  
+p
+```
+
+```{r fig.width=10}
+# only nmf programs
+for (patient_name in unique(lung$patient.ident)) {
+  
+  patient_data = subset(lung,subset = patient.ident == patient_name)
+  pathways_names = c("HALLMARK-INTERFERON-ALPHA-RESPONSE","HALLMARK-TNFA-SIGNALING-VIA-NFKB", "HALLMARK-HYPOXIA","HALLMARK-E2F-TARGETS" )
+  
+  DefaultAssay(patient_data) = "sipsic"
+  data = FetchData(object = patient_data, vars = c(pathways_names))
+  data[] <- data %>% 
+    mutate(across(everything(), ~ as.numeric(scale(.))))  # scale per pathway
+  data = data %>% t() %>% as.data.frame()
+  
+  annotation_data = FetchData(object = patient_data, vars = c("time.point")) %>% dplyr::arrange(time.point)
+  column_ha = HeatmapAnnotation(time.point = annotation_data[,1], #set annotation
+                                col = list(time.point = c("pre-treatment" = "red", "on-treatment" = "green", "resistant" = "blue"))) 
+  data = data[,rownames(annotation_data)] #order data like annotation
+  data = na.omit(data)
+  DefaultAssay(lung) = "RNA" #make RNA default again
+  
+  p = ComplexHeatmap::Heatmap(
+    data,
+    show_column_names = F,
+    row_names_gp = grid::gpar(fontsize = 10),
+    cluster_rows = T,
+    top_annotation = column_ha,
+    name = "Z-score expression",use_raster = F,cluster_columns = T,column_split = annotation_data$time.point,
+    column_gap = unit(2, "mm"), border = TRUE,show_parent_dend_line = FALSE, show_column_dend = T,cluster_column_slices = F,column_title = patient_name)
+  
+    
+  print(p)
+}
+```
+
+
+# Correlation
+
+```{r}
+# Description
+names = c("H_INFa", "H_TNFa_NFKb", "H_HYPOXIA", "H_E2F")
+combinations <- combn(names, 2, FUN = function(x) paste(x, collapse = " ~ ")) #create every combination
+all_patients_data = data.frame(pathways = combinations)
+
+for (patient_name in unique(lung$patient.ident)) {
+  
+  patient_data = subset(lung, subset = patient.ident == patient_name)
+  pathways_names = c(
+    "HALLMARK-INTERFERON-ALPHA-RESPONSE",
+    "HALLMARK-TNFA-SIGNALING-VIA-NFKB",
+    "HALLMARK-HYPOXIA",
+    "HALLMARK-E2F-TARGETS"
+  )
+  
+  DefaultAssay(patient_data) = "sipsic"
+  data = FetchData(object = patient_data, vars = c(pathways_names))
+  
+  data = na.omit(data)
+  DefaultAssay(lung) = "RNA" #make RNA default again
+  colnames(data) = c("H_INFa", "H_TNFa_NFKb", "H_HYPOXIA", "H_E2F")
+  data = cor(data)
+  library("reshape2")
+  data = melt(as.matrix(data),varnames = c("pathway_1","pathway_2"),value.name = "correlation") %>% #to long format
+    filter(!pathway_1 == pathway_2) %>%  # remove self correlation
+    mutate(pathways = paste0(pathway_1," ~ ",pathway_2)) %>%  
+    select(pathways,correlation) 
+  colnames(data)[2] = patient_name
+    
+  all_patients_data = left_join(x = all_patients_data,y = data,by = c("pathways" = "pathways")) # add patient data to all_patients_data
+  
+
+}
+
+all_patients_data = all_patients_data %>% column_to_rownames("pathways")
+
+#plot:
+col_fun = circlize::colorRamp2(c(-1, 0, 1), c("blue", "white", "red"))
+p = ComplexHeatmap::Heatmap(all_patients_data, name = "Pearson", col = col_fun,
+    cell_fun = function(j, i, x, y, width, height, fill) {
+        grid.text(round(all_patients_data[i, j],3), x, y, gp = gpar(fontsize = 8))
+}, row_names_gp = gpar(fontsize = 8), clustering_method_rows = "average", clustering_distance_rows = "euclidean")
+p
+```
+
+```{r}
+
+for (patient_name in c("1109","1071")) {
+  patient_data = subset(lung, subset = patient.ident == patient_name)
+  pathways_names = c(
+    "HALLMARK-INTERFERON-ALPHA-RESPONSE",
+    "HALLMARK-TNFA-SIGNALING-VIA-NFKB",
+    "HALLMARK-HYPOXIA",
+    "HALLMARK-E2F-TARGETS"
+  )
+  
+  DefaultAssay(patient_data) = "sipsic"
+  data = FetchData(object = patient_data, vars = c(pathways_names,"time.point"))
+
+  p = ggscatter(data, x = "HALLMARK-TNFA-SIGNALING-VIA-NFKB", y = "HALLMARK-HYPOXIA",
+                add = "reg.line", conf.int = TRUE, cor.coef = TRUE, cor.method = "pearson",
+                main = c(patient_name,"orrelation"))
+  print(p)
+
+  colnames(data)[colnames(data) == "HALLMARK-HYPOXIA"] <- "HALLMARK.HYPOXIA"
+ 
+  p1 = 
+   ggplot(data, aes(x = time.point, y = HALLMARK.HYPOXIA)) +
+    stat_summary(fun = mean)+
+    geom_jitter() +
+    geom_text(stat = "summary", aes(label = round(..y.., 2)),nudge_y = 0.2) +
+    theme_minimal() +
+    labs(title =paste(patient_name, "HALLMARK-HYPOXIA in each time.point"), x = "time.point", y = "HALLMARK-HYPOXIA")+ 
+    geom_boxplot(aes(group = time.point), fill = "white", width = 0.2, outlier.shape = NA)  
+  print(p1)
+  
+  colnames(data)[colnames(data) == "HALLMARK-TNFA-SIGNALING-VIA-NFKB"] <- "HALLMARK.TNFA.SIGNALING.VIA.NFKB"
+  
+  p2 = 
+  ggplot(data, aes(x = time.point, y = HALLMARK.TNFA.SIGNALING.VIA.NFKB)) +
+    stat_summary(fun = mean)+
+    geom_jitter() +
+    geom_text(stat = "summary", aes(label = round(..y.., 2)),nudge_y = 0.2) +
+    theme_minimal() +
+    labs(title = paste(patient_name,"HALLMARK-TNFA-SIGNALING-VIA-NFKB in each time.point"), x = "time.point", y = "HALLMARK-TNFA-SIGNALING-VIA-NFKB")+ 
+    geom_boxplot(aes(group = time.point), fill = "white", width = 0.2, outlier.shape = NA)
+  
+  print(p2)
+}
+
+```
+
+# Ternary plot
+
+## on-treatment cells
+```{r}
+# Description
+library(ggtern)
+p_list = list()
+
+for (patient_name in unique(lung$patient.ident)) {
+  patient_data = subset(lung,subset = patient.ident == patient_name)
+  pathways_names = c(
+    "HALLMARK-INTERFERON-ALPHA-RESPONSE",
+    "HALLMARK-TNFA-SIGNALING-VIA-NFKB",
+    "HALLMARK-HYPOXIA"
+  )
+  
+  DefaultAssay(patient_data) = "sipsic"
+  data = FetchData(object = patient_data, vars = c(pathways_names))
+  data[] <- data %>%
+    mutate(across(everything(), ~ as.numeric(min_max_normalize(.))))  # scale per pathway
+  data = data[colnames(patient_data)[patient_data$time.point == "on-treatment"],]
+  # data = apply(data, MARGIN = 2, min_max_normalize) %>% as.data.frame()
+  
+  colnames(data) = c("IFNa","TNFa_NFKb","HIF")
+  
+
+  p = ggtern(data,ggtern::aes(IFNa,TNFa_NFKb,HIF)) +geom_point()+
+  ggtitle(paste("Model",patient_name))+
+  theme_tropical(base_size=14)
+  
+
+  p_list[[patient_name]] = p
+
+}
+p_list
+```
+
+## pre-treatment vs on-treatment
+```{r}
+# Description
+library(ggtern)
+p_list = list()
+
+for (patient_name in unique(lung$patient.ident)) {
+  # patient_name = "119"
+  patient_data = subset(lung,subset = patient.ident == patient_name)
+  pathways_names = c(
+    "HALLMARK-INTERFERON-ALPHA-RESPONSE",
+    "HALLMARK-TNFA-SIGNALING-VIA-NFKB",
+    "HALLMARK-HYPOXIA"
+  )
+  patient_data = patient_data[,colnames(patient_data)[! patient_data$time.point == "resistant"]]
+
+  DefaultAssay(patient_data) = "sipsic"
+  data = FetchData(object = patient_data, vars = c(pathways_names))
+
+  data[] <- data %>%
+    mutate(across(everything(), ~ as.numeric(min_max_normalize(.))))  # scale per pathway
+
+# Function to normalize a row
+normalize_row <- function(row) {
+  return(row / sum(row))  # Divide each element by the sum of the row
+}
+
+# Normalize each row in the DataFrame
+normalized_df <- as.data.frame(t(apply(data, 1, normalize_row)))
+
+
+
+data$time.point = patient_data$time.point
+colnames(data) = c("IFNa","TNFa_NFKb","HIF","time.point")
+  
+# 
+  p = ggtern(data,ggtern::aes(IFNa,TNFa_NFKb,HIF)) +
+geom_point(ggtern::aes(fill=time.point,color=time.point),alpha = 0.5) +
+scale_shape_manual(values=c(21,22),breaks = c("on-treatment"))+
+    ggtitle(paste("Model",patient_name))+
+  theme_tropical(base_size=14) 
+ # stat_density_tern(geom='DensityTern',ggtern::aes(color=time.point,alpha = 0.6))
+
+#      p = ggtern(data,ggtern::aes(IFNa,TNFa_NFKb,HIF)) +
+# # geom_point(ggtern::aes(fill=time.point,color=time.point),alpha = 0.5) +
+# scale_shape_manual(values=c(21,22),breaks = c("on-treatment"))+
+#     ggtitle(paste("Model",patient_name))+
+#   theme_tropical(base_size=14) +
+#  stat_density_tern(geom='polygon',ggtern::aes(fill=time.point,alpha=..level..))
+# 
+
+#      p = ggtern(data,ggtern::aes(IFNa,TNFa_NFKb,HIF)) +
+# scale_shape_manual(values=c(21,22),breaks = c("on-treatment"))+
+#     ggtitle(paste("Model",patient_name))+
+#   theme_tropical(base_size=14) +
+#  stat_density_tern(geom='polygon',ggtern::aes(fill=time.point,alpha = 0.5))
+
+
+  p_list[[patient_name]] = p
+
+}
+p_list
+```
+
+
+
+## test
+```{r}
+
+# Description
+df = data.frame(x=c(0.8,0.06),y=c(0.2,0.87),z=c(0.1,0.03))
+labFnc <- function(x,digits=2) format(round(unique(x),digits),digits=digits)
+breaks = seq(from = 0, to = 1, by = 0.1)
+p1 = ggtern(data=df,ggtern::aes(x,y,z)) + geom_point()+
+  theme_tropical(base_size=14) +
+  scale_T_continuous(breaks=unique(df$y),labels = labFnc(df$y)) +
+  scale_L_continuous(breaks=unique(df$x),labels=labFnc(df$x)) +
+  scale_R_continuous(breaks=unique(df$z),labels=labFnc(df$y)) 
+
+crd = coord_tern()
+df
+debugonce(tlr2xy)
+tlr2xy(df,crd,scale = F)
+
+
+debugonce(coord_tern)
+
+  ggplot(data = Feldspar, mapping = ggtern::aes(Ab,An,Or)) + coord_tern(Tlim  = c(0,0.2),Llim = c(0,0.5))
+
+
+ggtern(data=Feldspar,ggtern::aes(Ab,An,Or)) + 
+  geom_point(ggtern::aes(fill=Feldspar,shape=Feldspar,size=P.Gpa),color='black') + 
+  scale_shape_manual(values=c(21,22),breaks = c("Alkalai"))
+```
+
+## plot grid
+```{r fig.height=12, fig.width=16}
+# plot
+do.call(ggtern::grid.arrange,args = c( p_list,ncol=3))
+```
+
+```{r}
+data('Feldspar')
+ggtern(data=Feldspar,ggplotzz::aes(Ab,An,Or)) + 
+    stat_density_tern(
+        geom='polygon',
+        ggtern::aes(fill=..level..),
+        bins=5,
+        color='grey') +
+    geom_point()
+```
+
+
+
