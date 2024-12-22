@@ -124,7 +124,7 @@ p
 ```
 
 ```{r}
-saveRDS(object = as.grob(p),file = "./Figures/xeno_sipsic_heatmap.rds")
+saveRDS(object = as.grob(as.ggplot(p)),file = "./Figures/xeno_sipsic_heatmap.rds")
 ```
 
 # Heatmap with asterisks
@@ -250,6 +250,10 @@ for (patient_name in unique(xeno$orig.ident)) {
 
 ```{r}
 # Description
+names = c("H_INFa", "H_TNFa_NFKb", "H_HYPOXIA", "H_E2F")
+combinations <- combn(names, 2, FUN = function(x) paste(x, collapse = " ~ ")) #create every combination
+all_patients_data = data.frame(pathways = combinations)
+
 for (patient_name in unique(xeno$orig.ident)) {
   
   patient_data = subset(xeno, subset = orig.ident == patient_name)
@@ -262,29 +266,84 @@ for (patient_name in unique(xeno$orig.ident)) {
   
   DefaultAssay(patient_data) = "sipsic"
   data = FetchData(object = patient_data, vars = c(pathways_names))
-  data[] <- data %>%
-    mutate(across(everything(), ~ as.numeric(scale(.))))  # scale per pathway
-  
   
   data = na.omit(data)
   DefaultAssay(xeno) = "RNA" #make RNA default again
   colnames(data) = c("H_INFa", "H_TNFa_NFKb", "H_HYPOXIA", "H_E2F")
-  library(circlize)
   data = cor(data)
-  col_fun = colorRamp2(c(-1, 0, 1), c("blue", "white", "red"))
- p =  Heatmap(
-    data, name = "pearson", col = col_fun, show_row_names = F, column_title = patient_name,
-    cell_fun = function(j, i, x, y, width, height, fill) {
-      grid.text(as.character(round(data[i, j], digits = 2)), x, y, gp = gpar(fontsize = 10))
-    }
-  )
- print(p)
+  library("reshape2")
+  data = melt(as.matrix(data),varnames = c("pathway_1","pathway_2"),value.name = "correlation") %>% #to long format
+    filter(!pathway_1 == pathway_2) %>%  # remove self correlation
+    mutate(pathways = paste0(pathway_1," ~ ",pathway_2)) %>%  
+    select(pathways,correlation) 
+  colnames(data)[2] = patient_name
+    
+  all_patients_data = left_join(x = all_patients_data,y = data,by = c("pathways" = "pathways")) # add patient data to all_patients_data
+  
+
 }
+
+all_patients_data = all_patients_data %>% column_to_rownames("pathways")
+
+#plot:
+col_fun = circlize::colorRamp2(c(-1, 0, 1), c("blue", "white", "red"))
+p = ComplexHeatmap::Heatmap(all_patients_data, name = "Pearson", col = col_fun,
+    cell_fun = function(j, i, x, y, width, height, fill) {
+        grid.text(round(all_patients_data[i, j],3), x, y, gp = gpar(fontsize = 8))
+}, row_names_gp = gpar(fontsize = 8), clustering_method_rows = "average", clustering_distance_rows = "euclidean")
+p
 ```
 
+```{r}
+
+for (patient_name in c("1109","1071")) {
+  patient_data = subset(xeno, subset = orig.ident == patient_name)
+  pathways_names = c(
+    "HALLMARK-INTERFERON-ALPHA-RESPONSE",
+    "HALLMARK-TNFA-SIGNALING-VIA-NFKB",
+    "HALLMARK-HYPOXIA",
+    "HALLMARK-E2F-TARGETS"
+  )
+  
+  DefaultAssay(patient_data) = "sipsic"
+  data = FetchData(object = patient_data, vars = c(pathways_names,"treatment"))
+
+  p = ggscatter(data, x = "HALLMARK-TNFA-SIGNALING-VIA-NFKB", y = "HALLMARK-HYPOXIA",
+                add = "reg.line", conf.int = TRUE, cor.coef = TRUE, cor.method = "pearson",
+                main = c(patient_name,"orrelation"))
+  print(p)
+
+  colnames(data)[colnames(data) == "HALLMARK-HYPOXIA"] <- "HALLMARK.HYPOXIA"
+ 
+  p1 = 
+   ggplot(data, aes(x = treatment, y = HALLMARK.HYPOXIA)) +
+    stat_summary(fun = mean)+
+    geom_jitter() +
+    geom_text(stat = "summary", aes(label = round(..y.., 2)),nudge_y = 0.2) +
+    theme_minimal() +
+    labs(title =paste(patient_name, "HALLMARK-HYPOXIA in each treatment"), x = "Treatment", y = "HALLMARK-HYPOXIA")+ 
+    geom_boxplot(aes(group = treatment), fill = "white", width = 0.2, outlier.shape = NA)  
+  print(p1)
+  
+  colnames(data)[colnames(data) == "HALLMARK-TNFA-SIGNALING-VIA-NFKB"] <- "HALLMARK.TNFA.SIGNALING.VIA.NFKB"
+  
+  p2 = 
+  ggplot(data, aes(x = treatment, y = HALLMARK.TNFA.SIGNALING.VIA.NFKB)) +
+    stat_summary(fun = mean)+
+    geom_jitter() +
+    geom_text(stat = "summary", aes(label = round(..y.., 2)),nudge_y = 0.2) +
+    theme_minimal() +
+    labs(title = paste(patient_name,"HALLMARK-TNFA-SIGNALING-VIA-NFKB in each treatment"), x = "Treatment", y = "HALLMARK-TNFA-SIGNALING-VIA-NFKB")+ 
+    geom_boxplot(aes(group = treatment), fill = "white", width = 0.2, outlier.shape = NA)
+  
+  print(p2)
+}
+
+```
 
 # Ternary plot
 
+## OSI cells
 ```{r}
 # Description
 library(ggtern)
@@ -316,10 +375,10 @@ for (patient_name in unique(xeno$orig.ident)) {
   p_list[[patient_name]] = p
 
 }
-
+p_list
 ```
 
-
+## NT vs OSI
 ```{r}
 # Description
 library(ggtern)
@@ -333,33 +392,59 @@ for (patient_name in unique(xeno$orig.ident)) {
     "HALLMARK-TNFA-SIGNALING-VIA-NFKB",
     "HALLMARK-HYPOXIA"
   )
-  
+  patient_data = patient_data[,colnames(patient_data)[! patient_data$treatment == "res"]]
+
   DefaultAssay(patient_data) = "sipsic"
   data = FetchData(object = patient_data, vars = c(pathways_names))
-  # data[] <- data %>%
-  #   mutate(across(everything(), ~ as.numeric(min_max_normalize(.))))  # scale per pathway
-  data$treatment = patient_data$treatment
-  colnames(data) = c("IFNa","TNFa_NFKb","HIF","treatment")
-  
 
+  data[] <- data %>%
+    mutate(across(everything(), ~ as.numeric(min_max_normalize(.))))  # scale per pathway
+
+# Function to normalize a row
+normalize_row <- function(row) {
+  return(row / sum(row))  # Divide each element by the sum of the row
+}
+
+# Normalize each row in the DataFrame
+normalized_df <- as.data.frame(t(apply(data, 1, normalize_row)))
+
+
+
+data$treatment = patient_data$treatment
+colnames(data) = c("IFNa","TNFa_NFKb","HIF","treatment")
+  
+# 
   p = ggtern(data,ggtern::aes(IFNa,TNFa_NFKb,HIF)) +
-geom_point(ggtern::aes(fill=treatment,shape=treatment),color='black') +
+# geom_point(ggtern::aes(fill=treatment,color=treatment),alpha = 0.5) +
 scale_shape_manual(values=c(21,22),breaks = c("OSI"))+
     ggtitle(paste("Model",patient_name))+
-  theme_tropical(base_size=14)
-    
+  theme_tropical(base_size=14) +
+ stat_density_tern(geom='DensityTern',ggtern::aes(color=treatment,alpha = 0.6))
+
+#      p = ggtern(data,ggtern::aes(IFNa,TNFa_NFKb,HIF)) +
+# # geom_point(ggtern::aes(fill=treatment,color=treatment),alpha = 0.5) +
+# scale_shape_manual(values=c(21,22),breaks = c("OSI"))+
+#     ggtitle(paste("Model",patient_name))+
+#   theme_tropical(base_size=14) +
+#  stat_density_tern(geom='polygon',ggtern::aes(fill=treatment,alpha=..level..))
+# 
+
+#      p = ggtern(data,ggtern::aes(IFNa,TNFa_NFKb,HIF)) +
+# scale_shape_manual(values=c(21,22),breaks = c("OSI"))+
+#     ggtitle(paste("Model",patient_name))+
+#   theme_tropical(base_size=14) +
+#  stat_density_tern(geom='polygon',ggtern::aes(fill=treatment,alpha = 0.5))
+
 
   p_list[[patient_name]] = p
 
 }
-
-```
-```{r}
-# Description
-View(p1$data)
 p_list
 ```
 
+
+
+## test
 ```{r}
 
 # Description
@@ -388,9 +473,22 @@ ggtern(data=Feldspar,ggtern::aes(Ab,An,Or)) +
   scale_shape_manual(values=c(21,22),breaks = c("Alkalai"))
 ```
 
-```{r fig.height=10, fig.width=15}
+## plot grid
+```{r fig.height=12, fig.width=16}
 # plot
-do.call(ggtern::grid.arrange,args = c(p_list,ncol=3))
+do.call(ggtern::grid.arrange,args = c( p_list,ncol=3))
 ```
+
+```{r}
+data('Feldspar')
+ggtern(data=Feldspar,ggplotzz::aes(Ab,An,Or)) + 
+    stat_density_tern(
+        geom='polygon',
+        ggtern::aes(fill=..level..),
+        bins=5,
+        color='grey') +
+    geom_point()
+```
+
 
 
