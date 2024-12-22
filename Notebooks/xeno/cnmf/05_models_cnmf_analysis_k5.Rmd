@@ -51,10 +51,24 @@ gep_scores = readRDS("./output_data/xeno/04_calculate_programs/gep_scores.RDS")
 p1  = DimPlot(xeno,group.by = "orig.ident")+ggtitle("")+ guides(color=guide_legend(title="Model",override.aes = list(size=3)))
 p2  =  DimPlot(xeno,group.by = "treatment",shuffle = T)+ggtitle("")+ guides(color=guide_legend(title="Treatment",override.aes = list(size=3)))
 p1+p2
+
+
+df = FetchData(xeno,vars = c("treatment","orig.ident"))
+
+p = ggplot(df, aes(x = orig.ident, fill = treatment)) +
+  geom_bar(position = "stack") +
+  labs(title = "Models data",
+       x = "Model ID",
+       y = "Count",
+       fill = "Treatment") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+p
 ```
 ```{r}
 saveRDS(object = as.grob(p1),file = "./Figures/xeno_patient_umap.rds")
 saveRDS(object = as.grob(p2),file = "./Figures/xeno_treatment_umap.rds")
+saveRDS(object = as.grob(p),file = "./Figures/xeno_overview.rds")
+
 ```
 
 
@@ -114,27 +128,34 @@ saveRDS(object = as.grob(p),file = "./Figures/xeno_NMF_usage_UMAP.rds")
 
 # Heatmap
 ```{r fig.height=10}
-all_programs_top_genes = c()
+all_programs_top_genes = data.frame()
 for (i in 1:(ncol(gep_scores)-1)) {
   top_genes = gep_scores  %>%  arrange(desc(gep_scores[i])) #sort by score a
   top = head(rownames(top_genes), 20) #take top top_genes_num
-  all_programs_top_genes = c(all_programs_top_genes,top)
+  all_programs_top_genes = rbind(all_programs_top_genes, data.frame(row.names = top, 
+                                                                    top = top, program = paste("program",i)))
 }
 
-data = FetchData(object = xeno, vars = all_programs_top_genes) %>% scale() %>% t()
+data = FetchData(object = xeno, vars = all_programs_top_genes$top)
+data_row_means = data %>% colMeans()
+data = data[,!data_row_means<0.05] # remove genes with expression less than 0.05
+all_programs_top_genes = all_programs_top_genes[!data_row_means<0.05,] %>% select(!top)
+data = data %>% scale() %>% t()
 
 annotation_data = FetchData(object = xeno, vars = c(names(all_metagenes)[1:4],"treatment","orig.ident"))
 # annotation_data = FetchData(object = xeno, vars =names(all_metagenes)[1:4])
 
-# data = data[,1:1000] #debug
+# data = data[,1:1000] # take small data for debug
 # annotation_data = annotation_data [1:1000,] #debug
 col_dend = as.dendrogram(hclust(dist(annotation_data[,1:4]),method = "complete")) # cluster based on 4 programs
 
 col_fun = circlize::colorRamp2(c(0, 1), c("white", "red"))
-models_colors = rainbow(6,alpha = 1) %>% set_names(unique(xeno$orig.ident))
+models_colors = rainbow(6,alpha = 1) %>% purrr::set_names(unique(xeno$orig.ident))
 column_ha = HeatmapAnnotation(df = annotation_data, col = list(Program.1 = col_fun,Program.2 = col_fun,Program.3 = col_fun,Program.4 = col_fun,unknown = col_fun, treatment  = c(NT = "red",OSI = "green",res = "blue"),orig.ident = models_colors))
-row_annotation_data = data.frame(row.names = all_programs_top_genes,top_genes = as.character(rep(paste("program",c(1,2,3,4)), each=20)))
-row_ha = rowAnnotation(df = row_annotation_data)
+colors_list = my_list <- list(program = setNames(c("blue", "green", "red","orange"), unique(all_programs_top_genes$program)))
+
+row_ha = rowAnnotation(df = all_programs_top_genes,
+                       col =  colors_list)
 
 p = ComplexHeatmap::Heatmap(
   data,
@@ -237,40 +258,6 @@ for (model in unique(xeno$orig.ident)) {
 ```
 
 
-```{r fig.height=6, fig.width=17}
-for (model in unique(xeno$orig.ident)) {
-  model_data = subset(x = xeno,subset = orig.ident == model)
-  # line plots
-  data = FetchData(object = model_data, vars = c(paste0("Program.", 1:4),"treatment"))
-  colnames(data)[1:4] = paste(c("IFNa","TNFa-NFKb","HIF","CC"),"program")
-
-  # data = data[1:100, ]
-  col_dend = hclust(dist(data[,1:4],))
-  # col_dend = hclust(as.dist(cor(t(data[,1:4]))), method = "complete")
-
-  data = data[col_dend$order, ]
-  data$cell = 1:nrow(data)
-  d <- reshape2::melt(data, id = c("cell","treatment"))
-  
-  cols <- c("NT" = "red", "OSI" = "green")
-  if ("res" %in% unique(data$treatment)) {
-    cols = c(cols,c("res" = "blue"))
-  }
-
-  p = ggplot(d, aes(x = cell, y = value, color = variable)) +
-    geom_rect(aes(xmin = cell, xmax = cell+1, fill = treatment), 
-              ymin = 0, ymax = 1, alpha = 0.2,data = data, inherit.aes = F) + scale_fill_manual(values = cols)+
-    geom_line(size = 1) +
-    theme(axis.text.x = element_blank(),
-          axis.ticks.x = element_blank())+ggtitle(model)
-  
- 
-  print(p)
-  }
-
-
-
-```
 
 ```{r warning=FALSE}
 # modify dotplot to be without exponent of the expression
@@ -292,15 +279,41 @@ for (i  in 1:ncol(all_metagenes)) {
 }
 ```
 
+```{r}
+xeno = program_assignment(dataset = xeno,program_names = names(all_metagenes),larger_by = 2)
+xeno$program.assignment %>% head()
+ 
 
-```{r fig.height=4, fig.width=11}
+data = FetchData(object = xeno,vars = c(paste0(names(all_metagenes),"_scaled"),"treatment","program.assignment"))%>%
+  group_by(treatment) %>% 
+  summarize(
+    across(c(-program.assignment), mean), # 
+    program.1  = sum(program.assignment == "Program.1"),
+    program.2  = sum(program.assignment == "Program.2"),
+    program.3  = sum(program.assignment == "Program.3"),
+    program.4  = sum(program.assignment == "Program.4"),
+    program.5  = sum(program.assignment == "Program.5")
+  ) %>% ungroup() %>% 
+  t() %>% as.data.frame() %>% janitor::row_to_names(1) %>% rownames_to_column("program") %>% 
+  pivot_longer(!program, names_to = "treatment", values_to = "value")
+data2 = cbind(data[1:15,],data[16:30,])
+data2 = data2[,-c(1,2)] %>% dplyr::rename(assigned_cells = value.1,z_score_level = value)%>%
+  mutate(
+    z_score_level = as.numeric(z_score_level),
+    assigned_cells = as.numeric(assigned_cells)
+  )
 
-p = DotPlot.2(object = xeno, features =  paste0(names(all_metagenes),"_scaled"),group.by  = 'treatment',scale = F)+
-  guides(size = guide_legend(title = "Cells above average (%)"),color = guide_colorbar(title = "Average Score"))+ scale_x_discrete(labels= paste0(names(all_metagenes),"\n(",c("IFNa","TNFa-NFKb","HIF","Cell_Cycle"),")"))+
-    scale_y_discrete(limits = c("NT","OSI"))
-
+p = ggplot(data = data2, mapping = aes_string(x = "program", 
+    y = "treatment")) + geom_point(mapping = aes_string(size = "assigned_cells", 
+    color = 'z_score_level')) + scale_size(range = c(0, 6)) + theme(axis.title.x = element_blank(), 
+    axis.title.y = element_blank()) + guides(size = guide_legend(title = "assigned_cells")) + 
+    labs(x = "Features", y = "Treatment") + cowplot::theme_cowplot()+
+  scale_color_gradient(low = "lightblue", high = "darkblue")
 p
 ```
+
+
+
 
 
 ```{r}
