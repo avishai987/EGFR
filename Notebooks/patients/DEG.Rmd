@@ -1,0 +1,93 @@
+
+---
+title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: FALSE
+    number_sections: true
+    toc_depth: 1
+---
+
+
+
+# Functions
+
+```{r warning=FALSE}
+```
+
+# Data
+
+```{r}
+lung = readRDS("./raw_data/lung_cancercells_withTP_onlyPatients.rds")
+lung_patients = lung$patient.ident %>% unique() %>% as.character()
+lung_patients_filtered = lung_patients[!(lung_patients %in% c("X1055new","X1099"))] # remove patients with less than 100 malignant cells
+lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
+lung$treatment = lung$time.point
+lung$orig.ident = lung$patient.ident
+genesets_h = getGmt("./raw_data/h.all.v2023.2.Hs.symbols.gmt") %>% geneIds()
+```
+## lung DEG regress patients
+
+```{r}
+lung = SetIdent(object = lung,value = "treatment")
+nfeatures = 5000
+lung = FindVariableFeatures(object = lung,nfeatures = nfeatures)
+deg_df = FindMarkers(
+  object = lung,
+  ident.1 = "pre-treatment",
+  ident.2 = "on-treatment",
+  densify = T,
+  mean.fxn = function(x) {
+    return(log(x = rowMeans(x = x) + 1, base = 2))
+  },
+  features = VariableFeatures(lung),
+  logfc.threshold = 0.1,
+  min.pct = 0.1,
+  test.use = "LR",
+  latent.vars = "patient.ident"
+)
+deg_df$fdr = p.adjust(deg_df$p_val,method = "fdr",n = nfeatures)
+p = volcano_plot(deg_df,top_genes_text = 5,ident1 = "pre-treatment",ident2 = "on-treatment",fc_cutoff = 1.5)+coord_cartesian(clip = "off")
+p
+```
+
+
+```{r}
+# GSEA
+ranked_vec = deg_df %>% pull(avg_log2FC) %>%  setNames(rownames(deg_df))
+hyp_obj <-hypeR_fgsea(signature = ranked_vec,genesets = (genesets),up_only = F)
+plt = hyp_dots(hyp_obj,merge = F,fdr = 0.3)
+  
+
+```
+
+```{r fig.height=5, fig.width=15}
+# 
+p1 = plt[[1]]+ aes(size=nes)+ 
+  guides(
+    size = guide_legend(title="NES",reverse=T))+scale_x_discrete(expand = expansion(add = c(1,2))) + ggtitle("pre-treatment")+
+  scale_y_continuous(trans = hypeR:::.reverselog_trans(10), 
+        breaks =exp(-seq(-log(min(plt[[1]]$data$fdr)), -log(max(plt[[1]]$data$fdr)), 
+            length.out = 6)) %>% signif(digits = 2))+ ggtitle("on-treatment down")
+
+# 
+p2 = plt[[2]]+ aes(size=nes)+
+scale_size(trans = 'reverse')+  
+  guides(
+    size = guide_legend(title="NES",reverse=T))+scale_x_discrete(expand = expansion(add = c(1,2)))+ ggtitle("on-treatment") +
+  scale_y_continuous(trans = hypeR:::.reverselog_trans(10), 
+        breaks =exp(-seq(-log(min(plt[[2]]$data$fdr)), -log(max(plt[[2]]$data$fdr)), 
+            length.out = 6)) %>% signif(digits = 2)) + ggtitle("on-treatment up")
+
+p1+p2
+```
+```{r}
+saveRDS(object = as.grob(p1),file = "./Figures/patients_DEG_GSEA_down.rds")
+
+```
