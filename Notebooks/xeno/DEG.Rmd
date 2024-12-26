@@ -1,14 +1,37 @@
 ---
-title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+title: 'DEG' 
 author: "Avishai Wizel"
 date: '`r Sys.Date()`'
-output: 
-  html_notebook: 
+output:
+  # html_notebook: 
+  #   code_folding: hide
+  #   toc: true
+  #   toc_collapse: true
+  #   toc_float:
+  #     collapsed: false
+  #   number_sections: true
+  #   toc_depth: 1
+  html_document: 
     code_folding: hide
     toc: yes
     toc_collapse: yes
     toc_float: 
-      collapsed: FALSE
+      collapsed: TRUE
+    number_sections: true
+    toc_depth: 2
+    df_print: paged
+params: 
+  data_out_dir: "./temp_data/" 
+  input_data: !r c(
+    hmsc_cancer_cells = "./Reports/HMSC/01_preprocess/03_HMSC_cells_preprocess/acc1_cancer_cells_2500features_integrated_V5.RDS",
+    genesets_h = "./Input_data/h.all.v7.0.symbols.pluscc.gmt",
+    opscc_deg =  "./Reports/HPV_OPSCC_Analysis_PMC10191634/02_findDEG/opscc_deg_5Kvargenes.rds",
+    myb_targets = "./Input_data/MYB_tergets_PMC4767593_sup_table_4.xlsx",
+    global_params  = "./Input_data/global_params.R")
+  output_data: !r c(hmsc_deg_no_cc = "HMSC_hpv_deg_df_noG2M_cells.csv",
+    hmsc_deg = "HMSC_hpv_deg_df.csv")
+editor_options: 
+  chunk_output_type: inline
 ---
 
 ## Parameters
@@ -22,7 +45,6 @@ data_to_read = ""
 ## functions
 
 ```{r warning=FALSE}
-library(stringi)
 library(ggplotify)
 source_from_github(repositoy = "DEG_functions",version = "0.2.54")
 ```
@@ -93,6 +115,8 @@ scale_size(trans = 'reverse')+
 
 p1+p2
 ```
+
+
 ```{r}
 saveRDS(object = as.grob(p1),file = "./Figures/xeno_DEG_GSEA_up.rds")
 saveRDS(object = as.grob(p2),file = "./Figures/xeno_DEG_GSEA_down.rds")
