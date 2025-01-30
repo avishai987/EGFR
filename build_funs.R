@@ -11,7 +11,6 @@ build_pipe <- function() {
 }
 
 plot_pipe <- function() {
-  source(".Rprofile")
   source("build_pipe.R")
   create_pipe()
   makepipe::show_pipeline(as = "visnetwork")

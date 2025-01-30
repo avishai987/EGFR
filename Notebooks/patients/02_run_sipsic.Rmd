@@ -1,0 +1,116 @@
+---
+title: 'Run SiPSiC' 
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+output: 
+  # html_notebook: 
+  #   code_folding: hide
+  #   toc: yes
+  #   toc_collapse: yes
+  #   toc_float: 
+  #     collapsed: FALSE
+  #   number_sections: true
+  #   toc_depth: 1
+    
+  html_document: 
+    
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: TRUE
+    number_sections: true
+    toc_depth: 2
+    df-print: paged
+params: 
+  data_out_dir: "./temp_data/" 
+  input_data: !r c(
+    lung = "./input_data/lung_cancercells_withTP_onlyPatients.rds",
+    genesets = "./input_data/h.all.v2023.2.Hs.symbols.gmt",
+    hif_targets = "./input_data/HIF_targets_Lombardi_PMC9869179.txt")
+  output_data: !r c(
+    pathwayScoresMatrix = "patients_pathwayScoresMatrix.RDS")
+    
+editor_options: 
+  chunk_output_type: inline
+---
+
+
+
+
+
+
+# Functions
+
+```{r}
+library(stringi)
+library(reticulate)
+library(ggplotify)
+library(GSEABase)
+library(SiPSiC)
+
+source_from_github(repositoy = "DEG_functions",version = "0.2.47")
+source_from_github(repositoy = "cNMF_functions",version = "0.4.04",script_name = "cnmf_functions_V3.R")
+source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_name = "functions.R")
+
+
+```
+
+# Data
+
+
+```{r}
+lung = readRDS(params$input_data["lung"])
+lung_patients = lung$patient.ident %>% unique() %>% as.character()
+lung_patients_filtered = lung_patients[!(lung_patients %in% c("X1055new","X1099"))] # remove patients with less than 100 malignant cells
+lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
+
+hallmark_genesets = getGmt(paste0(params$input_data["genesets"]))
+hif_targets = scan(params$input_data["hif_targets"], character(), quote = "")
+# add hif targets to genesets
+hif_targets <- list(hif_targets = GeneSet(geneIds = hif_targets, setName = "hif_targets"))
+genesets <- c(hallmark_genesets, hif_targets)
+names(genesets) = c(names(hallmark_genesets), names(hif_targets))
+
+```
+
+
+# DE pathways
+
+```{r}
+calculatePathwayScores <- function(pathwayToScore, countsMatrix) {
+  pathwayName <- pathwayToScore@setName
+  print(pathwayName)
+  pathwayGenes <- pathwayToScore@geneIds
+  pathwayScoresObject <- getPathwayScores(countsMatrix, pathwayGenes)
+  suppressWarnings(
+    if (is.null(pathwayScoresObject)) {
+      return(NA)
+    }
+  )
+  return(pathwayScoresObject$pathwayScores)
+}
+```
+
+
+
+```{r}
+pathwayScoreLists <- lapply(X = genesets@.Data, calculatePathwayScores, lung@assays$RNA@data %>% expm1())
+names(pathwayScoreLists) = names(genesets)
+pathwayScoreLists <- pathwayScoreLists[!is.na(pathwayScoreLists)] #remove NA pathways
+pathwayScoresMatrix <- as.data.frame(do.call("rbind", pathwayScoreLists))
+```
+```{r}
+# save
+saveRDS(object = pathwayScoresMatrix,file = paste0(params$data_out_dir,params$output_data["pathwayScoresMatrix"]))
+```
+
+
+# session info
+<button class="btn btn-primary" data-toggle="collapse" data-target="#BlockName"> Show/Hide </button>  
+<div id="BlockName" class="collapse">  
+```{r}
+devtools::session_info()
+```
+
+</div>

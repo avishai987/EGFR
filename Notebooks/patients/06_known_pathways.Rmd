@@ -1,0 +1,242 @@
+---
+title: "patients 06_known_pathways.Rmd"
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+output: 
+  html_notebook: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: FALSE
+    number_sections: true
+    toc_depth: 1
+params: 
+  data_out_dir: "./temp_data/" 
+  input_data: !r c(
+    lung = "./input_data/lung_cancercells_withTP_onlyPatients.rds",
+    kurppa = "./input_data/pathways_from_papers/Kurppa_PMC7146079_table_s1_YAP signature.xlsx",
+    hadrek = "./input_data/pathways_from_papers/Hadrek_PMC11068778_sup_data_3.xlsx",
+    SENESCENCE = "./input_data/pathways_from_papers/FRIDMAN_SENESCENCE_UP.v2024.1.Hs.gmt",
+    maynard = "./input_data/pathways_from_papers/Maynard_PMC7484178_Table_S2.csv",
+    hif_targets = "./input_data/HIF_targets_Lombardi_PMC9869179.txt")
+  output_data: !r c()
+    
+editor_options: 
+  chunk_output_type: inline
+---
+
+# Functions
+
+```{r}
+library(stringi)
+library(reticulate)
+library(readxl)
+library(GSEABase)
+library(SiPSiC)
+library(ggpubr)
+calculatePathwayScores <- function(pathwayToScore, countsMatrix) {
+  pathwayName <- pathwayToScore@setName
+  message(pathwayName)
+  pathwayGenes <- pathwayToScore@geneIds
+  pathwayScoresObject <- getPathwayScores(countsMatrix, pathwayGenes)
+  suppressWarnings(
+    if (is.null(pathwayScoresObject)) {
+      return(NA)
+    }
+  )
+  return(pathwayScoresObject$pathwayScores)
+}
+```
+
+# Data
+
+
+```{r}
+# Load data
+lung = readRDS(params$input_data["lung"])
+lung_patients = lung$patient.ident %>% unique() %>% as.character()
+lung_patients_filtered = lung_patients[!(lung_patients %in% c("X1055new","X1099"))] # remove patients with less than 100 malignant cells
+lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
+
+#read Kurppa_PMC7146079_table_s1_YAP signature.xlsx tab "Zhang et al. Cancer Res 2008"
+kurppa <- readxl::read_excel(params$input_data["kurppa"],sheet = "Zhang et al. Cancer Res 2008")
+kurppa_genes <- kurppa[-1,1,drop=T] # remove first row
+ 
+#read Hadrek_PMC11068778_sup_data_3.xlsx tab "Supp. Data 3" 
+hadrek <- readxl::read_excel(params$input_data["hadrek"],sheet = "Supp. Data 3",skip = 3)
+hadrek_genes <- hadrek[,1,drop = T]
+
+#read FRIDMAN_SENESCENCE_UP.v2024.1.Hs.gmt
+FRIDMAN_SENESCENCE_UP  = getGmt(params$input_data["SENESCENCE"]) %>% geneIds() %>%  unlist() %>% base::unname()
+
+# read Avelolar Signature from Maynard_PMC7484178_Table_S2.csv
+maynard <- read_csv(params$input_data["maynard"])
+maynard_genes <- maynard$`Avelolar Signature` %>% unlist() %>% base::unname()
+
+
+
+
+hif_targets = scan(params$input_data["hif_targets"], character(), quote = "")
+
+# list of all genesets
+genesets <- GeneSetCollection(
+  GeneSet(kurppa_genes, setName = "Kurppa_YAP"),
+   GeneSet(hadrek_genes, setName = "Hadrek_YAP5SA_UP"),
+  GeneSet(FRIDMAN_SENESCENCE_UP, setName = "FRIDMAN_SENESCENCE_UP"),
+  GeneSet(maynard_genes, setName = "Maynard_Avelolar_Signature")
+) 
+
+```
+
+```{r}
+pathwayScoreLists <- lapply(X = genesets@.Data, calculatePathwayScores, lung@assays$RNA@data %>% expm1())
+names(pathwayScoreLists) = names(genesets)
+pathwayScoreLists <- pathwayScoreLists[!is.na(pathwayScoreLists)] #remove NA pathways
+pathwayScoresMatrix <- as.data.frame(do.call("rbind", pathwayScoreLists))
+```
+
+
+# DE pathways
+
+
+```{r}
+pathwayScoresMatrix = pathwayScoresMatrix %>% rbind(FetchData(lung, vars = c("SUSD2","CAV1"),slot = "data") %>% t())
+lung[["known_pathways"]] = CreateAssayObject(counts = pathwayScoresMatrix)
+
+```
+
+```{r}
+trace(Seurat:::FindMarkers.default,edit = T) #replace "bonferroni" with "fdr"
+
+```
+
+```{r}
+lung = SetIdent(lung, value = "time.point")
+pathways_names = gsub(rownames(pathwayScoresMatrix), pattern = "_", replacement = "-")
+
+
+logFC_df = data.frame(row.names = pathways_names)
+fdr_df = data.frame(row.names = pathways_names)
+
+for (patient in unique(lung$patient.ident)) {
+  patient_data = subset(lung, subset = patient.ident == patient)
+  pathway_markers = FindMarkers(
+    object = patient_data,
+    ident.1 = "on-treatment",
+    ident.2 = "pre-treatment",
+    assay = "known_pathways",
+    slot = "counts",
+    logfc.threshold = 0,
+    densify = T,
+    pseudocount.use = 0.001,
+    features = pathways_names
+  )
+  avg_log2FC = pathway_markers[pathways_names, "avg_log2FC", drop = F]
+  colnames(avg_log2FC) = patient
+  pathway_markers  %<>%  dplyr::rename(fdr = p_val_adj)
+  fdr = pathway_markers[pathways_names, "fdr", drop = F]
+  colnames(fdr) = patient
+  
+  logFC_df = cbind(logFC_df, avg_log2FC)
+  fdr_df = cbind(fdr_df, fdr)
+}
+fdr_df_raw = fdr_df
+fdr_df = apply(fdr_df, 1:2, \(x) format(x, digits=1)) %>% as.data.frame() #round p values 
+fdr_df[fdr_df == 0] = paste0("<",format(.Machine$double.xmin,digits = 1)) # replace p=0 with p<min float
+```
+```{r}
+untrace(Seurat:::FindMarkers.default)
+
+```
+
+
+
+```{r}
+# color row name if consistent across patients/models
+colors= c()
+for (row_num in 1:nrow(logFC_df)) {
+  row = logFC_df[row_num,]
+  if (sum(row > 0.15)  >= 4) { # if at least x values are more than 0.1 log2FC
+    colors <- c(colors, "red")
+  }
+  else if (sum(row < -0.15)  >= 4) {
+    colors <- c(colors, "blue")
+  }
+  else{colors <- c(colors, "black")}
+}
+
+```
+
+```{r fig.height=7, fig.width=10}
+library(grid)
+col_fun = circlize::colorRamp2(c(-1, 0, 1), c("blue", "white", "red"))
+p = ComplexHeatmap::Heatmap(logFC_df, name = "log2FC on/pre", col = col_fun,
+    cell_fun = function(j, i, x, y, width, height, fill) {
+        grid.text(fdr_df[i, j], x, y, gp = gpar(fontsize = 8))
+}, row_names_gp = gpar(fontsize = 8,col =colors), clustering_method_rows = "average", clustering_distance_rows = "euclidean")
+p
+```
+
+# hypoxia and ROS correlation
+```{r fig.height=6, fig.width=15}
+#OT cells
+# read the pathways
+hallmark_sipsic = readRDS("./Reports/patients/02_run_sipsic/patients_pathwayScoresMatrix.RDS") 
+lung[["hallmark_sipsic"]] = CreateAssayObject(counts = hallmark_sipsic)
+
+lung_osi = subset(lung, subset = time.point == "on-treatment")
+
+# get ROS and hypoxia scores
+ros_expression = FetchData(lung_osi@assays$hallmark_sipsic, vars = "HALLMARK-REACTIVE-OXYGEN-SPECIES-PATHWAY")
+HALLMARK_HYPOXIA = FetchData(lung_osi@assays$hallmark_sipsic, vars = "hif-targets")
+patient = FetchData(lung_osi, vars = "patient.ident")
+
+#combine data
+data= cbind(ros_expression,HALLMARK_HYPOXIA) %>% cbind(patient) %>% setnames(c("HALLMARK_REACTIVE_OXYGEN_SPECIES_PATHWAY","hif_targets","patient"))
+
+#ggplot correlation between ROS and hypoxia add pvalue and r^2 split by patient
+p1 = ggplot(data = data, aes(x = HALLMARK_REACTIVE_OXYGEN_SPECIES_PATHWAY, y = hif_targets)) + geom_point()+
+  geom_smooth(method = "lm") + theme_minimal()  + stat_cor(method = "pearson") +facet_wrap(~patient)+ggtitle("on treatment cells")+
+  scale_y_continuous(limits = c(0,0.7))
+
+  
+# NT cells
+# read the pathways
+
+lung_nt = subset(lung, subset = time.point == "pre-treatment")
+
+# get ROS and hypoxia scores
+ros_expression = FetchData(lung_nt@assays$hallmark_sipsic, vars = "HALLMARK-REACTIVE-OXYGEN-SPECIES-PATHWAY")
+HALLMARK_HYPOXIA = FetchData(lung_nt@assays$hallmark_sipsic, vars = "hif-targets")
+patient = FetchData(lung_nt, vars = "patient.ident")
+
+#combine data
+data= cbind(ros_expression,HALLMARK_HYPOXIA) %>% cbind(patient) %>% setnames(c("HALLMARK_REACTIVE_OXYGEN_SPECIES_PATHWAY","hif_targets","patient"))
+
+#ggplot correlation between ROS and hypoxia add pvalue and r^2 split by patient
+p2 = ggplot(data = data, aes(x = HALLMARK_REACTIVE_OXYGEN_SPECIES_PATHWAY, y = hif_targets)) + geom_point()+
+  geom_smooth(method = "lm") + theme_minimal()  + stat_cor(method = "pearson") +facet_wrap(~patient)+ggtitle("pre treatment cells")+
+  scale_y_continuous(limits = c(0,0.7))
+print(p2+p1)
+```
+
+```{r fig.height=6, fig.width=9}
+# set time.point as ident
+lung = SetIdent(lung, value = "time.point")
+# add lung@assays$known_pathways to metadata
+lung = AddMetaData(lung, metadata = as.data.frame(t(pathwayScoresMatrix)))
+
+lung = AddMetaData(lung, metadata = as.data.frame(t(hallmark_sipsic)))
+
+data = FetchData(lung, vars = c(rownames(pathwayScoresMatrix), "time.point","patient.ident","HALLMARK_TNFA_SIGNALING_VIA_NFKB","HALLMARK_WNT_BETA_CATENIN_SIGNALING", "HALLMARK_REACTIVE_OXYGEN_SPECIES_PATHWAY", "HALLMARK_FATTY_ACID_METABOLISM","HALLMARK_G2M_CHECKPOINT"))
+
+data_cor = cor(data %>% select(-time.point,-patient.ident),method = "pearson")
+library(grid)
+col_fun = circlize::colorRamp2(c(-1, 0, 1), c("blue", "white", "red"))
+p = ComplexHeatmap::Heatmap(data_cor, name = "Pearson", col = col_fun, row_names_gp = gpar(fontsize = 8), show_column_names = F, clustering_method_rows = "average", clustering_distance_rows = "euclidean",clustering_method_columns = "average", clustering_distance_columns = "euclidean")
+p
+
+
+```
+
