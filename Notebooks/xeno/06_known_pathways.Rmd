@@ -19,6 +19,8 @@ params:
     hadrek = "./input_data/pathways_from_papers/Hadrek_PMC11068778_sup_data_3.xlsx",
     SENESCENCE = "./input_data/pathways_from_papers/FRIDMAN_SENESCENCE_UP.v2024.1.Hs.gmt",
     maynard = "./input_data/pathways_from_papers/Maynard_PMC7484178_Table_S2.csv",
+    ferroptosis  = "./input_data/pathways_from_papers/GOBP_FERROPTOSIS.v2024.1.Hs.gmt",
+    esrra = "./input_data/pathways_from_papers/ESRRA _gene_signature.xlsx",
     hif_targets = "./input_data/HIF_targets_Lombardi_PMC9869179.txt")
   output_data: !r c()
     
@@ -73,6 +75,8 @@ FRIDMAN_SENESCENCE_UP  = getGmt(params$input_data["SENESCENCE"]) %>% geneIds() %
 maynard <- read_csv(params$input_data["maynard"])
 maynard_genes <- maynard$`Avelolar Signature` %>% unlist() %>% base::unname()
 
+
+FRIDMAN_SENESCENCE_UP  = getGmt(params$input_data["SENESCENCE"]) %>% geneIds() %>%  unlist() %>% base::unname()
 
 
 hif_targets = scan(params$input_data["hif_targets"], character(), quote = "")
