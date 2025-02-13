@@ -1,9 +1,9 @@
 ---
-title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+title: 'Patients sipsic analysis' 
 author: "Avishai Wizel"
 date: '`r Sys.time()`'
 output: 
-  html_notebook: 
+  html_document: 
     code_folding: hide
     toc: yes
     toc_collapse: yes
@@ -13,10 +13,6 @@ output:
     toc_depth: 1
 params: 
   data_out_dir: "./temp_data/" 
-  input_data: !r c(
-    lung = "./input_data/lung_cancercells_withTP_onlyPatients.rds",
-    pathwayScoresMatrix = "./Reports/patients/02_run_sipsic/patients_pathwayScoresMatrix.RDS")
-  output_data: !r c()
     
 editor_options: 
   chunk_output_type: inline
@@ -30,7 +26,8 @@ editor_options:
 library(stringi)
 library(reticulate)
 library(ggplotify)
-
+library(grid)
+library(ComplexHeatmap)
 source_from_github(repositoy = "DEG_functions",version = "0.2.47")
 source_from_github(repositoy = "cNMF_functions",version = "0.4.04",script_name = "cnmf_functions_V3.R")
 source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_name = "functions.R")
@@ -42,7 +39,7 @@ source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_
 
 
 ```{r}
-lung = readRDS(params$input_data["lung"])
+lung = readRDS(input[["lung"]])
 lung_patients = lung$patient.ident %>% unique() %>% as.character()
 lung_patients_filtered = lung_patients[!(lung_patients %in% c("X1055new","X1099"))] # remove patients with less than 100 malignant cells
 lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
@@ -53,15 +50,12 @@ lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
 
 
 ```{r}
-pathwayScoresMatrix = read_rds(file = params$input_data["pathwayScoresMatrix"])
+pathwayScoresMatrix = read_rds(file = input[["sipsic_matrix"]])
 lung[["sipsic"]] = CreateAssayObject(counts = pathwayScoresMatrix)
 
 ```
 
-```{r}
-trace(Seurat:::FindMarkers.default,edit = T) #replace "bonferroni" with "fdr"
 
-```
 
 ```{r}
 lung = SetIdent(lung, value = "time.point")
@@ -86,7 +80,7 @@ for (model in unique(lung$patient.ident)) {
   )
   avg_log2FC = pathway_markers[pathways_names, "avg_log2FC", drop = F]
   colnames(avg_log2FC) = model
-  pathway_markers  %<>%  dplyr::rename(fdr = p_val_adj)
+  pathway_markers$fdr = p.adjust(pathway_markers$p_val,method = "fdr",n = length(rownames(model_data@assays$sipsic)))
   fdr = pathway_markers[pathways_names, "fdr", drop = F]
   colnames(fdr) = model
   
@@ -99,10 +93,7 @@ fdr_df[fdr_df == 0] = paste0("<",format(.Machine$double.xmin,digits = 1)) # repl
 ```
 
 
-```{r}
-untrace(Seurat:::FindMarkers.default)
 
-```
 
 
 
@@ -302,201 +293,155 @@ p = ComplexHeatmap::Heatmap(all_patients_data, name = "Pearson", col = col_fun,
 p
 ```
 
-```{r}
 
-for (patient_name in c("1109","1071")) {
-  patient_data = subset(lung, subset = patient.ident == patient_name)
-  pathways_names = c(
-    "HALLMARK-INTERFERON-ALPHA-RESPONSE",
-    "HALLMARK-TNFA-SIGNALING-VIA-NFKB",
-    "HALLMARK-HYPOXIA",
-    "HALLMARK-E2F-TARGETS"
-  )
-  
-  DefaultAssay(patient_data) = "sipsic"
-  data = FetchData(object = patient_data, vars = c(pathways_names,"time.point"))
+<!-- # Ternary plot -->
 
-  p = ggscatter(data, x = "HALLMARK-TNFA-SIGNALING-VIA-NFKB", y = "HALLMARK-HYPOXIA",
-                add = "reg.line", conf.int = TRUE, cor.coef = TRUE, cor.method = "pearson",
-                main = c(patient_name,"orrelation"))
-  print(p)
+<!-- ## on-treatment cells -->
+<!-- ```{r} -->
+<!-- # Description -->
+<!-- library(ggtern) -->
+<!-- p_list = list() -->
 
-  colnames(data)[colnames(data) == "HALLMARK-HYPOXIA"] <- "HALLMARK.HYPOXIA"
- 
-  p1 = 
-   ggplot(data, aes(x = time.point, y = HALLMARK.HYPOXIA)) +
-    stat_summary(fun = mean)+
-    geom_jitter() +
-    geom_text(stat = "summary", aes(label = round(..y.., 2)),nudge_y = 0.2) +
-    theme_minimal() +
-    labs(title =paste(patient_name, "HALLMARK-HYPOXIA in each time.point"), x = "time.point", y = "HALLMARK-HYPOXIA")+ 
-    geom_boxplot(aes(group = time.point), fill = "white", width = 0.2, outlier.shape = NA)  
-  print(p1)
-  
-  colnames(data)[colnames(data) == "HALLMARK-TNFA-SIGNALING-VIA-NFKB"] <- "HALLMARK.TNFA.SIGNALING.VIA.NFKB"
-  
-  p2 = 
-  ggplot(data, aes(x = time.point, y = HALLMARK.TNFA.SIGNALING.VIA.NFKB)) +
-    stat_summary(fun = mean)+
-    geom_jitter() +
-    geom_text(stat = "summary", aes(label = round(..y.., 2)),nudge_y = 0.2) +
-    theme_minimal() +
-    labs(title = paste(patient_name,"HALLMARK-TNFA-SIGNALING-VIA-NFKB in each time.point"), x = "time.point", y = "HALLMARK-TNFA-SIGNALING-VIA-NFKB")+ 
-    geom_boxplot(aes(group = time.point), fill = "white", width = 0.2, outlier.shape = NA)
-  
-  print(p2)
-}
+<!-- for (patient_name in unique(lung$patient.ident)) { -->
+<!--   patient_data = subset(lung,subset = patient.ident == patient_name) -->
+<!--   pathways_names = c( -->
+<!--     "HALLMARK-INTERFERON-ALPHA-RESPONSE", -->
+<!--     "HALLMARK-TNFA-SIGNALING-VIA-NFKB", -->
+<!--     "HALLMARK-HYPOXIA" -->
+<!--   ) -->
 
-```
+<!--   DefaultAssay(patient_data) = "sipsic" -->
+<!--   data = FetchData(object = patient_data, vars = c(pathways_names)) -->
+<!--   data[] <- data %>% -->
+<!--     mutate(across(everything(), ~ as.numeric(min_max_normalize(.))))  # scale per pathway -->
+<!--   data = data[colnames(patient_data)[patient_data$time.point == "on-treatment"],] -->
+<!--   # data = apply(data, MARGIN = 2, min_max_normalize) %>% as.data.frame() -->
 
-# Ternary plot
+<!--   colnames(data) = c("IFNa","TNFa_NFKb","HIF") -->
 
-## on-treatment cells
-```{r}
-# Description
-library(ggtern)
-p_list = list()
 
-for (patient_name in unique(lung$patient.ident)) {
-  patient_data = subset(lung,subset = patient.ident == patient_name)
-  pathways_names = c(
-    "HALLMARK-INTERFERON-ALPHA-RESPONSE",
-    "HALLMARK-TNFA-SIGNALING-VIA-NFKB",
-    "HALLMARK-HYPOXIA"
-  )
-  
-  DefaultAssay(patient_data) = "sipsic"
-  data = FetchData(object = patient_data, vars = c(pathways_names))
-  data[] <- data %>%
-    mutate(across(everything(), ~ as.numeric(min_max_normalize(.))))  # scale per pathway
-  data = data[colnames(patient_data)[patient_data$time.point == "on-treatment"],]
-  # data = apply(data, MARGIN = 2, min_max_normalize) %>% as.data.frame()
-  
-  colnames(data) = c("IFNa","TNFa_NFKb","HIF")
-  
+<!--   p = ggtern(data,ggtern::aes(IFNa,TNFa_NFKb,HIF)) +geom_point()+ -->
+<!--   ggtitle(paste("Model",patient_name))+ -->
+<!--   theme_tropical(base_size=14) -->
 
-  p = ggtern(data,ggtern::aes(IFNa,TNFa_NFKb,HIF)) +geom_point()+
-  ggtitle(paste("Model",patient_name))+
-  theme_tropical(base_size=14)
-  
 
-  p_list[[patient_name]] = p
+<!--   p_list[[patient_name]] = p -->
 
-}
-p_list
-```
+<!-- } -->
+<!-- p_list -->
+<!-- ``` -->
 
-## pre-treatment vs on-treatment
-```{r}
-# Description
-library(ggtern)
-p_list = list()
+<!-- ## pre-treatment vs on-treatment -->
+<!-- ```{r} -->
+<!-- # Description -->
+<!-- library(ggtern) -->
+<!-- p_list = list() -->
 
-for (patient_name in unique(lung$patient.ident)) {
-  # patient_name = "119"
-  patient_data = subset(lung,subset = patient.ident == patient_name)
-  pathways_names = c(
-    "HALLMARK-INTERFERON-ALPHA-RESPONSE",
-    "HALLMARK-TNFA-SIGNALING-VIA-NFKB",
-    "HALLMARK-HYPOXIA"
-  )
-  patient_data = patient_data[,colnames(patient_data)[! patient_data$time.point == "resistant"]]
+<!-- for (patient_name in unique(lung$patient.ident)) { -->
+<!--   # patient_name = "119" -->
+<!--   patient_data = subset(lung,subset = patient.ident == patient_name) -->
+<!--   pathways_names = c( -->
+<!--     "HALLMARK-INTERFERON-ALPHA-RESPONSE", -->
+<!--     "HALLMARK-TNFA-SIGNALING-VIA-NFKB", -->
+<!--     "HALLMARK-HYPOXIA" -->
+<!--   ) -->
+<!--   patient_data = patient_data[,colnames(patient_data)[! patient_data$time.point == "resistant"]] -->
 
-  DefaultAssay(patient_data) = "sipsic"
-  data = FetchData(object = patient_data, vars = c(pathways_names))
+<!--   DefaultAssay(patient_data) = "sipsic" -->
+<!--   data = FetchData(object = patient_data, vars = c(pathways_names)) -->
 
-  data[] <- data %>%
-    mutate(across(everything(), ~ as.numeric(min_max_normalize(.))))  # scale per pathway
+<!--   data[] <- data %>% -->
+<!--     mutate(across(everything(), ~ as.numeric(min_max_normalize(.))))  # scale per pathway -->
 
-# Function to normalize a row
-normalize_row <- function(row) {
-  return(row / sum(row))  # Divide each element by the sum of the row
-}
+<!-- # Function to normalize a row -->
+<!-- normalize_row <- function(row) { -->
+<!--   return(row / sum(row))  # Divide each element by the sum of the row -->
+<!-- } -->
 
-# Normalize each row in the DataFrame
-normalized_df <- as.data.frame(t(apply(data, 1, normalize_row)))
+<!-- # Normalize each row in the DataFrame -->
+<!-- normalized_df <- as.data.frame(t(apply(data, 1, normalize_row))) -->
 
 
 
-data$time.point = patient_data$time.point
-colnames(data) = c("IFNa","TNFa_NFKb","HIF","time.point")
-  
-# 
-  p = ggtern(data,ggtern::aes(IFNa,TNFa_NFKb,HIF)) +
-geom_point(ggtern::aes(fill=time.point,color=time.point),alpha = 0.5) +
-scale_shape_manual(values=c(21,22),breaks = c("on-treatment"))+
-    ggtitle(paste("Model",patient_name))+
-  theme_tropical(base_size=14) 
- # stat_density_tern(geom='DensityTern',ggtern::aes(color=time.point,alpha = 0.6))
+<!-- data$time.point = patient_data$time.point -->
+<!-- colnames(data) = c("IFNa","TNFa_NFKb","HIF","time.point") -->
 
-#      p = ggtern(data,ggtern::aes(IFNa,TNFa_NFKb,HIF)) +
-# # geom_point(ggtern::aes(fill=time.point,color=time.point),alpha = 0.5) +
-# scale_shape_manual(values=c(21,22),breaks = c("on-treatment"))+
-#     ggtitle(paste("Model",patient_name))+
-#   theme_tropical(base_size=14) +
-#  stat_density_tern(geom='polygon',ggtern::aes(fill=time.point,alpha=..level..))
-# 
+<!-- #  -->
+<!--   p = ggtern(data,ggtern::aes(IFNa,TNFa_NFKb,HIF)) + -->
+<!-- geom_point(ggtern::aes(fill=time.point,color=time.point),alpha = 0.5) + -->
+<!-- scale_shape_manual(values=c(21,22),breaks = c("on-treatment"))+ -->
+<!--     ggtitle(paste("Model",patient_name))+ -->
+<!--   theme_tropical(base_size=14)  -->
+<!--  # stat_density_tern(geom='DensityTern',ggtern::aes(color=time.point,alpha = 0.6)) -->
 
-#      p = ggtern(data,ggtern::aes(IFNa,TNFa_NFKb,HIF)) +
-# scale_shape_manual(values=c(21,22),breaks = c("on-treatment"))+
-#     ggtitle(paste("Model",patient_name))+
-#   theme_tropical(base_size=14) +
-#  stat_density_tern(geom='polygon',ggtern::aes(fill=time.point,alpha = 0.5))
+<!-- #      p = ggtern(data,ggtern::aes(IFNa,TNFa_NFKb,HIF)) + -->
+<!-- # # geom_point(ggtern::aes(fill=time.point,color=time.point),alpha = 0.5) + -->
+<!-- # scale_shape_manual(values=c(21,22),breaks = c("on-treatment"))+ -->
+<!-- #     ggtitle(paste("Model",patient_name))+ -->
+<!-- #   theme_tropical(base_size=14) + -->
+<!-- #  stat_density_tern(geom='polygon',ggtern::aes(fill=time.point,alpha=..level..)) -->
+<!-- #  -->
 
-
-  p_list[[patient_name]] = p
-
-}
-p_list
-```
+<!-- #      p = ggtern(data,ggtern::aes(IFNa,TNFa_NFKb,HIF)) + -->
+<!-- # scale_shape_manual(values=c(21,22),breaks = c("on-treatment"))+ -->
+<!-- #     ggtitle(paste("Model",patient_name))+ -->
+<!-- #   theme_tropical(base_size=14) + -->
+<!-- #  stat_density_tern(geom='polygon',ggtern::aes(fill=time.point,alpha = 0.5)) -->
 
 
+<!--   p_list[[patient_name]] = p -->
 
-## test
-```{r}
-
-# Description
-df = data.frame(x=c(0.8,0.06),y=c(0.2,0.87),z=c(0.1,0.03))
-labFnc <- function(x,digits=2) format(round(unique(x),digits),digits=digits)
-breaks = seq(from = 0, to = 1, by = 0.1)
-p1 = ggtern(data=df,ggtern::aes(x,y,z)) + geom_point()+
-  theme_tropical(base_size=14) +
-  scale_T_continuous(breaks=unique(df$y),labels = labFnc(df$y)) +
-  scale_L_continuous(breaks=unique(df$x),labels=labFnc(df$x)) +
-  scale_R_continuous(breaks=unique(df$z),labels=labFnc(df$y)) 
-
-crd = coord_tern()
-df
-debugonce(tlr2xy)
-tlr2xy(df,crd,scale = F)
+<!-- } -->
+<!-- p_list -->
+<!-- ``` -->
 
 
-debugonce(coord_tern)
 
-  ggplot(data = Feldspar, mapping = ggtern::aes(Ab,An,Or)) + coord_tern(Tlim  = c(0,0.2),Llim = c(0,0.5))
+<!-- ## test -->
+<!-- ```{r} -->
+
+<!-- # Description -->
+<!-- df = data.frame(x=c(0.8,0.06),y=c(0.2,0.87),z=c(0.1,0.03)) -->
+<!-- labFnc <- function(x,digits=2) format(round(unique(x),digits),digits=digits) -->
+<!-- breaks = seq(from = 0, to = 1, by = 0.1) -->
+<!-- p1 = ggtern(data=df,ggtern::aes(x,y,z)) + geom_point()+ -->
+<!--   theme_tropical(base_size=14) + -->
+<!--   scale_T_continuous(breaks=unique(df$y),labels = labFnc(df$y)) + -->
+<!--   scale_L_continuous(breaks=unique(df$x),labels=labFnc(df$x)) + -->
+<!--   scale_R_continuous(breaks=unique(df$z),labels=labFnc(df$y))  -->
+
+<!-- crd = coord_tern() -->
+<!-- df -->
+<!-- debugonce(tlr2xy) -->
+<!-- tlr2xy(df,crd,scale = F) -->
 
 
-ggtern(data=Feldspar,ggtern::aes(Ab,An,Or)) + 
-  geom_point(ggtern::aes(fill=Feldspar,shape=Feldspar,size=P.Gpa),color='black') + 
-  scale_shape_manual(values=c(21,22),breaks = c("Alkalai"))
-```
+<!-- debugonce(coord_tern) -->
 
-## plot grid
-```{r fig.height=12, fig.width=16}
-# plot
-do.call(ggtern::grid.arrange,args = c( p_list,ncol=3))
-```
+<!--   ggplot(data = Feldspar, mapping = ggtern::aes(Ab,An,Or)) + coord_tern(Tlim  = c(0,0.2),Llim = c(0,0.5)) -->
 
-```{r}
-data('Feldspar')
-ggtern(data=Feldspar,ggplotzz::aes(Ab,An,Or)) + 
-    stat_density_tern(
-        geom='polygon',
-        ggtern::aes(fill=..level..),
-        bins=5,
-        color='grey') +
-    geom_point()
-```
+
+<!-- ggtern(data=Feldspar,ggtern::aes(Ab,An,Or)) +  -->
+<!--   geom_point(ggtern::aes(fill=Feldspar,shape=Feldspar,size=P.Gpa),color='black') +  -->
+<!--   scale_shape_manual(values=c(21,22),breaks = c("Alkalai")) -->
+<!-- ``` -->
+
+<!-- ## plot grid -->
+<!-- ```{r fig.height=12, fig.width=16} -->
+<!-- # plot -->
+<!-- do.call(ggtern::grid.arrange,args = c( p_list,ncol=3)) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- data('Feldspar') -->
+<!-- ggtern(data=Feldspar,ggplotzz::aes(Ab,An,Or)) +  -->
+<!--     stat_density_tern( -->
+<!--         geom='polygon', -->
+<!--         ggtern::aes(fill=..level..), -->
+<!--         bins=5, -->
+<!--         color='grey') + -->
+<!--     geom_point() -->
+<!-- ``` -->
 
 
 
