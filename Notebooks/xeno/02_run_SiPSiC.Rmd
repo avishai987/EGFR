@@ -1,5 +1,5 @@
 ---
-title: 'Run SiPSiC' 
+title: 'Xeno Run SiPSiC' 
 author: "Avishai Wizel"
 date: '`r Sys.time()`'
 output:
@@ -22,19 +22,18 @@ output:
     df_print: paged
 params: 
   data_out_dir: "./temp_data/" 
-  input_data: !r c(
-    xeno = "./input_data/xeno.qs",
-    genesets = "./input_data/h.all.v2023.2.Hs.symbols.gmt",
-    hif_targets = "./input_data/HIF_targets_Lombardi_PMC9869179.txt")
-  output_data: !r c(
-    pathwayScoresMatrix = "pathwayScoresMatrix.RDS")
-    
+
 editor_options: 
   chunk_output_type: inline
 ---
 
 
 
+```{r}
+config.yaml = read_yaml("config.yaml",eval.expr = TRUE)
+input_paths = config.yaml[["./Notebooks/xeno/02_run_SiPSiC.Rmd"]]$input %>% unlist()
+output_paths = config.yaml[["./Notebooks/xeno/01_DEG.Rmd"]]$output %>% unlist()
+```
 
 # Functions
 
@@ -55,9 +54,9 @@ source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_
 
 
 ```{r}
-xeno <- qs::qread(params$input_data["xeno"])
-hallmark_genesets = getGmt(paste0(params$input_data["genesets"]))
-hif_targets = scan(params$input_data["hif_targets"], character(), quote = "")
+xeno <- qs::qread(input_paths["xeno"])
+hallmark_genesets = getGmt(paste0(input_paths["genesets"]))
+hif_targets = scan(input_paths["hif_targets"], character(), quote = "")
 # add hif targets to genesets
 hif_targets <- list(hif_targets = GeneSet(geneIds = hif_targets, setName = "hif_targets"))
 genesets <- c(hallmark_genesets, hif_targets)
@@ -93,7 +92,7 @@ pathwayScoresMatrix <- as.data.frame(do.call("rbind", pathwayScoreLists))
 
 ```{r}
 # save
-saveRDS(object = pathwayScoresMatrix,file = paste0(params$data_out_dir,params$output_data["pathwayScoresMatrix"]))
+saveRDS(object = pathwayScoresMatrix,file = paste0(params$data_out_dir,output_paths["pathwayScoresMatrix"]))
 ```
 
 

@@ -22,19 +22,18 @@ output:
     df_print: paged
 params: 
   data_out_dir: "./temp_data/" 
-  input_data: !r c(
-    xeno = "./input_data/xeno.qs",
-    genesets = "./input_data/h.all.v2023.2.Hs.symbols.gmt")
-  output_data: !r c(
-    xeno_DEG_GSEA_up = "xeno_DEG_GSEA_up.rds",
-    xeno_DEG_GSEA_down = "xeno_DEG_GSEA_down.rds",
-    xeno_DEG_per_patient = "xeno_DEG_per_patient.rds")
-    
+
 editor_options: 
   chunk_output_type: inline
 ---
 
 
+```{r}
+#read config
+config.yaml = read_yaml("config.yaml",eval.expr = TRUE)
+input_paths = config.yaml[["./Notebooks/xeno/01_DEG.Rmd"]]$input %>% unlist()
+output_paths = config.yaml[["./Notebooks/xeno/01_DEG.Rmd"]]$output %>% unlist()
+```
 
 ## functions
 
@@ -49,8 +48,8 @@ source_from_github(repositoy = "DEG_functions",version = "0.2.54")
 ## Data
 
 ```{r}
-xeno <- qs::qread(params$input_data["xeno"])
-genesets = getGmt(params$input_data["genesets"]) %>% geneIds()
+xeno <- qs::qread(input_paths["xeno"])
+genesets = getGmt(input_paths["genesets"]) %>% geneIds()
 ```
 
 
@@ -120,8 +119,8 @@ p1
 dev.off()
 
 
-saveRDS(object = as.grob(p1),file = paste0(params$data_out_dir,params$output_data["xeno_DEG_GSEA_up"]))
-saveRDS(object = as.grob(p2),file = paste0(params$data_out_dir,params$output_data["xeno_DEG_GSEA_down"]))
+saveRDS(object = as.grob(p1),file = paste0(params$data_out_dir,output_paths["xeno_DEG_GSEA_up"]))
+saveRDS(object = as.grob(p2),file = paste0(params$data_out_dir,output_paths["xeno_DEG_GSEA_down"]))
 ```
 
 
@@ -154,7 +153,7 @@ p
 
 
 ```{r}
-saveRDS(object = as.grob(p),file = paste0(params$data_out_dir,params$output_data["xeno_DEG_per_patient"]))
+saveRDS(object = as.grob(p),file = paste0(params$data_out_dir,output_paths["xeno_DEG_per_patient"]))
 ```
 
 
