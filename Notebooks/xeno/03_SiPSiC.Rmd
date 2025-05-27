@@ -27,7 +27,13 @@ editor_options:
   chunk_output_type: inline
 ---
 
-
+```{r}
+if (interactive()) {
+  source("./pipe.R")
+  input = get_input(get_current_path())
+  output = get_output(get_current_path())
+}
+```
 
 # Functions
 
@@ -47,7 +53,7 @@ source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_
 
 
 ```{r}
-xeno <- qs::qread(params$input_data["xeno"])
+xeno <- qs::qread(input$xeno)
 ```
 
 
@@ -55,7 +61,7 @@ xeno <- qs::qread(params$input_data["xeno"])
 
 
 ```{r}
-pathwayScoresMatrix = read_rds(file = params$input_data["pathwayScoresMatrix"])
+pathwayScoresMatrix = read_rds(file = input$sipsic_matrix)
 xeno[["sipsic"]] = CreateAssayObject(counts = pathwayScoresMatrix)
 
 ```
@@ -129,8 +135,7 @@ p = ComplexHeatmap::Heatmap(logFC_df,  row_names_gp = gpar(fontsize = 8,col =col
         grid.text(fdr_df[i, j], x, y, gp = gpar(fontsize = 8))
 }
 )
-# p %v% known_p
-p
+
 lgd = Legend(title = "log2 Fold change", at = c(-1.5, 0, 1.5),
  col_fun = col_fun)
 
@@ -164,8 +169,7 @@ p
 
 ```{r fig.height=7, fig.width=8}
 
-# saveRDS(object = as.grob(as.ggplot(p)),file = params$output_data["xeno_sipsic_heatmap_png"])
-png( paste0(params$data_out_dir,params$output_data["xeno_sipsic_heatmap_png"]), width = 8, height = 7,units = "in",res = 250)
+png( paste0(params$data_out_dir, "xeno_sipsic_heatmap_png.png"), width = 8, height = 7,units = "in",res = 250)
 p
 dev.off()
 
