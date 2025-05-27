@@ -22,30 +22,33 @@ editor_options:
 ---
 
 ```{r}
-if(interactive()) {
-  input = list(lung = './input_data/lung_cancercells_withTP_onlyPatients.rds',hif_targets =  './input_data/HIF_targets_Lombardi_PMC9869179.txt', genesets = './input_data/h.all.v2023.2.Hs.symbols.gmt')
+if (interactive()) {
+  source("./pipe.R")
+  input = get_input(get_current_path())
+  output = get_output(get_current_path())
 }
 ```
+
 
 
 
 # Functions
 
 ```{r warning=FALSE}
-library(GSEABase)
+suppressWarnings(library(GSEABase))
 source_from_github(repositoy = "DEG_functions",version = "0.2.54")
 ```
 
 # Data
 
 ```{r}
-lung = readRDS(input[["lung"]])
+lung = readRDS(input$lung)
 lung_patients = lung$patient.ident %>% unique() %>% as.character()
 lung_patients_filtered = lung_patients[!(lung_patients %in% c("X1055new","X1099"))] # remove patients with less than 100 malignant cells
 lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
 lung$treatment = lung$time.point
 lung$orig.ident = lung$patient.ident
-genesets = getGmt(input[["genesets"]]) %>% geneIds()
+genesets = getGmt(input$genesets) %>% geneIds()
 ```
 ## lung DEG regress patients
 

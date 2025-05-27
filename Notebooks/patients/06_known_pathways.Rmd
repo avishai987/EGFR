@@ -19,6 +19,8 @@ params:
     hadrek = "./input_data/pathways_from_papers/Hadrek_PMC11068778_sup_data_3.xlsx",
     SENESCENCE = "./input_data/pathways_from_papers/FRIDMAN_SENESCENCE_UP.v2024.1.Hs.gmt",
     maynard = "./input_data/pathways_from_papers/Maynard_PMC7484178_Table_S2.csv",
+    ferroptosis  = "./input_data/pathways_from_papers/GOBP_FERROPTOSIS.v2024.1.Hs.gmt",
+    esrra = "./input_data/pathways_from_papers/ESRRA _gene_signature.xlsx",
     hif_targets = "./input_data/HIF_targets_Lombardi_PMC9869179.txt")
   output_data: !r c()
     
@@ -75,8 +77,14 @@ maynard <- read_csv(params$input_data["maynard"])
 maynard_genes <- maynard$`Avelolar Signature` %>% unlist() %>% base::unname()
 
 
+#read ferroptosis
+ferroptosis = getGmt(params$input_data["ferroptosis"]) %>% geneIds() %>%  unlist() %>% base::unname()
 
+# read esrra, remove first row and NA
+esrra_up = readxl::read_excel(params$input_data["esrra"],sheet = "Sheet1")[["Up genes"]] %>% .[-1] %>% .[!is.na(.)]
+esrra_down = readxl::read_excel(params$input_data["esrra"],sheet = "Sheet1")[["Down genes"]] %>% .[-1] %>% .[!is.na(.)]
 
+# read HIF targets
 hif_targets = scan(params$input_data["hif_targets"], character(), quote = "")
 
 # list of all genesets
@@ -84,7 +92,11 @@ genesets <- GeneSetCollection(
   GeneSet(kurppa_genes, setName = "Kurppa_YAP"),
    GeneSet(hadrek_genes, setName = "Hadrek_YAP5SA_UP"),
   GeneSet(FRIDMAN_SENESCENCE_UP, setName = "FRIDMAN_SENESCENCE_UP"),
-  GeneSet(maynard_genes, setName = "Maynard_Avelolar_Signature")
+  GeneSet(maynard_genes, setName = "Maynard_Avelolar_Signature"),
+  GeneSet(ferroptosis, setName = "Ferroptosis"),
+  GeneSet(esrra_up, setName = "ESRRA_UP"),
+  GeneSet(esrra_down, setName = "ESRRA_DOWN")
+
 ) 
 
 ```
@@ -123,8 +135,8 @@ for (patient in unique(lung$patient.ident)) {
   patient_data = subset(lung, subset = patient.ident == patient)
   pathway_markers = FindMarkers(
     object = patient_data,
-    ident.1 = "on-treatment",
-    ident.2 = "pre-treatment",
+    ident.1 = "on-lung",
+    ident.2 = "pre-lung",
     assay = "known_pathways",
     slot = "counts",
     logfc.threshold = 0,
@@ -185,7 +197,7 @@ p
 hallmark_sipsic = readRDS("./Reports/patients/02_run_sipsic/patients_pathwayScoresMatrix.RDS") 
 lung[["hallmark_sipsic"]] = CreateAssayObject(counts = hallmark_sipsic)
 
-lung_osi = subset(lung, subset = time.point == "on-treatment")
+lung_osi = subset(lung, subset = time.point == "on-lung")
 
 # get ROS and hypoxia scores
 ros_expression = FetchData(lung_osi@assays$hallmark_sipsic, vars = "HALLMARK-REACTIVE-OXYGEN-SPECIES-PATHWAY")
@@ -197,14 +209,14 @@ data= cbind(ros_expression,HALLMARK_HYPOXIA) %>% cbind(patient) %>% setnames(c("
 
 #ggplot correlation between ROS and hypoxia add pvalue and r^2 split by patient
 p1 = ggplot(data = data, aes(x = HALLMARK_REACTIVE_OXYGEN_SPECIES_PATHWAY, y = hif_targets)) + geom_point()+
-  geom_smooth(method = "lm") + theme_minimal()  + stat_cor(method = "pearson") +facet_wrap(~patient)+ggtitle("on treatment cells")+
+  geom_smooth(method = "lm") + theme_minimal()  + stat_cor(method = "pearson") +facet_wrap(~patient)+ggtitle("on lung cells")+
   scale_y_continuous(limits = c(0,0.7))
 
   
 # NT cells
 # read the pathways
 
-lung_nt = subset(lung, subset = time.point == "pre-treatment")
+lung_nt = subset(lung, subset = time.point == "pre-lung")
 
 # get ROS and hypoxia scores
 ros_expression = FetchData(lung_nt@assays$hallmark_sipsic, vars = "HALLMARK-REACTIVE-OXYGEN-SPECIES-PATHWAY")
@@ -216,7 +228,7 @@ data= cbind(ros_expression,HALLMARK_HYPOXIA) %>% cbind(patient) %>% setnames(c("
 
 #ggplot correlation between ROS and hypoxia add pvalue and r^2 split by patient
 p2 = ggplot(data = data, aes(x = HALLMARK_REACTIVE_OXYGEN_SPECIES_PATHWAY, y = hif_targets)) + geom_point()+
-  geom_smooth(method = "lm") + theme_minimal()  + stat_cor(method = "pearson") +facet_wrap(~patient)+ggtitle("pre treatment cells")+
+  geom_smooth(method = "lm") + theme_minimal()  + stat_cor(method = "pearson") +facet_wrap(~patient)+ggtitle("pre lung cells")+
   scale_y_continuous(limits = c(0,0.7))
 print(p2+p1)
 ```
@@ -240,3 +252,126 @@ p
 
 ```
 
+## Genes
+```{r}
+esrra_up = genesets[["ESRRA_UP"]]@geneIds[genesets[["ESRRA_UP"]]@geneIds %in% rownames(lung@assays$RNA@data)]
+esrra_down = genesets[["ESRRA_DOWN"]]@geneIds[genesets[["ESRRA_DOWN"]]@geneIds %in% rownames(lung@assays$RNA@data)]
+
+esrra_genes = c(esrra_up,esrra_down) 
+
+lung = SetIdent(object = lung,value = "time.point")
+
+all_logFC_df = data.frame(row.names = esrra_genes)
+all_fdr_df = data.frame(row.names = esrra_genes)
+
+for (patient in unique(lung$patient.ident)) {
+  model_data = subset(lung, subset = patient.ident == patient)
+  deg_df = FindMarkers(
+    object = model_data,
+    assay = "RNA",
+    ident.1 = "pre-treatment",
+    ident.2 = "on-treatment",
+    densify = T,
+    mean.fxn = function(x) {
+      return(log(x = rowMeans(x = x) + 1, base = 2))
+    },
+    features = esrra_genes,
+    logfc.threshold = 0,
+    min.pct = 0,
+    test.use = "wilcox",
+  )
+  deg_df$fdr = p.adjust(deg_df$p_val, method = "fdr", n = length(esrra_genes))
+  avg_log2FC = deg_df[, "avg_log2FC", drop = F]
+  colnames(avg_log2FC) = patient
+  fdr = deg_df[, "fdr", drop = F]
+  colnames(fdr) = patient
+  all_logFC_df = cbind(all_logFC_df, avg_log2FC)
+  all_fdr_df = cbind(all_fdr_df, fdr)
+  
+}
+all_fdr_df[all_fdr_df > 0.05]  = 1 #remove non significant values
+
+all_fdr_df = apply(all_fdr_df, 1:2, \(x) format(x, digits=1)) %>% as.data.frame() #round p values 
+all_fdr_df[all_fdr_df == "1"] = ""
+
+all_fdr_df[all_fdr_df == "0"] = paste0("<",format(.Machine$double.xmin,digits = 1))
+# replace p=0 with p<min float
+```
+
+```{r fig.height=7, fig.width=10}
+library(grid)
+genes_origin = c(rep("ESRRA_UP", length(esrra_up)),
+                                    rep("ESRRA_DOWN",  length(esrra_down)))
+row_anon = rowAnnotation(pathway = genes_origin,
+                         col = list(pathway = c("ESRRA_UP" = "red", "ESRRA_DOWN" = "blue")))
+col_fun = circlize::colorRamp2(c(-1.5, 0, 1.5), c("blue", "white","red"))
+p = ComplexHeatmap::Heatmap(all_logFC_df,  row_names_gp = gpar(fontsize = 8), 
+                            clustering_method_rows = "average", clustering_distance_rows = "euclidean",
+                            show_heatmap_legend = T,
+                            col = col_fun,
+                            name = "log2(FC) on/pre",
+                            row_split = genes_origin,
+                            cluster_row_slices = F,
+                            row_title = "ESRRA genes",
+                            column_title = "Patients",
+                            right_annotation = row_anon,
+                            cell_fun = function(j, i, x, y, width, height, fill) {
+                              grid.text(all_fdr_df[i, j], x, y, gp = gpar(fontsize = 8))
+                              })
+p
+```
+
+
+```{r}
+pdf(paste0(params$data_out_dir,"ESRRA_heatmap_patients.pdf"))
+p
+dev.off()
+```
+
+## violin plots
+```{r}
+lung = AddMetaData(object = lung, metadata = as.data.frame(t(pathwayScoresMatrix[c("ESRRA_UP","ESRRA_DOWN"),])))
+
+all_plots = list()
+#esrra up
+library(rstatix)
+for (pathway in c("ESRRA_UP","ESRRA_DOWN")) {
+  genes_by_tp = FetchData(object = lung,vars = c("time.point", pathway,"patient.ident"),slot = "data") %>% filter(time.point != "resistant")
+  
+  # all cells by patient boxplot
+  formula <- as.formula(paste0(pathway," ~ time.point"))
+  
+  #plot and split by patient:
+  stat.test <- genes_by_tp %>%
+    group_by(patient.ident) %>%
+    wilcox_test(formula) %>%
+    adjust_pvalue(method = "fdr") %>%
+    add_significance() %>%
+    add_xy_position(x = "time.point") %>%
+    mutate(p.adj = signif(p.adj, digits = 2))
+  stat.test
+  
+  
+  plt = ggplot(genes_by_tp, aes(x = time.point, y = .data[[pathway]])) +
+    geom_violin(scale = "width",aes(fill = time.point),trim = T) +
+    stat_pvalue_manual(stat.test, label = "{p.adj}")  + #add p value
+    geom_boxplot(width = 0.2, outlier.shape = NA) +
+    labs(title = paste(pathway, "per cell"), y = pathway, fill = "time.point")+
+    theme(plot.title = element_text(hjust = 0.5),axis.title.x = element_blank()) + theme_minimal()+
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.2))) + # Add 10% spaces between the p-value labels and the plot border
+    facet_wrap(~patient.ident,scales = "free")
+  print(plt)
+
+  all_plots[[pathway]] = plt
+}
+
+
+pdf(paste0(params$data_out_dir,"ESRRA_UP_violin_patients.pdf"),width = 10,height = 5)
+all_plots[["ESRRA_UP"]]
+dev.off()
+
+
+pdf(paste0(params$data_out_dir,"ESRRA_DOWN_violin_patients.pdf"),width = 10,height = 5)
+all_plots[["ESRRA_DOWN"]]
+dev.off()
+```

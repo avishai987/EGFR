@@ -30,9 +30,11 @@ editor_options:
 
 
 ```{r}
-config.yaml = read_yaml("config.yaml",eval.expr = TRUE)
-input_paths = config.yaml[["./Notebooks/xeno/02_run_SiPSiC.Rmd"]]$input %>% unlist()
-output_paths = config.yaml[["./Notebooks/xeno/01_DEG.Rmd"]]$output %>% unlist()
+if (interactive()) {
+  source("./pipe.R")
+  input = get_input(get_current_path())
+  output = get_output(get_current_path())
+}
 ```
 
 # Functions
@@ -44,7 +46,6 @@ library(ggplotify)
 library(GSEABase)
 library(SiPSiC)
 source_from_github(repositoy = "DEG_functions",version = "0.2.47")
-source_from_github(repositoy = "cNMF_functions",version = "0.4.04",script_name = "cnmf_functions_V3.R")
 source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_name = "functions.R")
 
 
@@ -54,9 +55,9 @@ source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_
 
 
 ```{r}
-xeno <- qs::qread(input_paths["xeno"])
-hallmark_genesets = getGmt(paste0(input_paths["genesets"]))
-hif_targets = scan(input_paths["hif_targets"], character(), quote = "")
+xeno <- qs::qread(input$xeno)
+hallmark_genesets = getGmt(paste0(input$genesets))
+hif_targets = scan(input$hif_targets, character(), quote = "")
 # add hif targets to genesets
 hif_targets <- list(hif_targets = GeneSet(geneIds = hif_targets, setName = "hif_targets"))
 genesets <- c(hallmark_genesets, hif_targets)
@@ -92,7 +93,7 @@ pathwayScoresMatrix <- as.data.frame(do.call("rbind", pathwayScoreLists))
 
 ```{r}
 # save
-saveRDS(object = pathwayScoresMatrix,file = paste0(params$data_out_dir,output_paths["pathwayScoresMatrix"]))
+saveRDS(object = pathwayScoresMatrix,file = paste0(params$data_out_dir,output["pathwayScoresMatrix"]))
 ```
 
 

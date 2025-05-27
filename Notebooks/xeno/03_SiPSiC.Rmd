@@ -2,23 +2,27 @@
 title: 'SiPSiC'
 author: "Avishai Wizel"
 date: '`r Sys.time()`'
-output: 
-  html_notebook: 
+output:
+  # html_notebook: 
+  #   code_folding: hide
+  #   toc: true
+  #   toc_collapse: true
+  #   toc_float:
+  #     collapsed: false
+  #   number_sections: true
+  #   toc_depth: 1
+  html_document: 
     code_folding: hide
     toc: yes
     toc_collapse: yes
     toc_float: 
-      collapsed: FALSE
+      collapsed: TRUE
     number_sections: true
-    toc_depth: 1
+    toc_depth: 2
+    df_print: paged
 params: 
   data_out_dir: "./temp_data/" 
-  input_data: !r c(
-    xeno = "./input_data/xeno.qs",
-    pathwayScoresMatrix = "./Reports/xeno/02_run_SiPSiC/pathwayScoresMatrix.RDS")
-  output_data: !r c(
-    xeno_sipsic_heatmap_png = "xeno_sipsic_heatmap.png")
-    
+
 editor_options: 
   chunk_output_type: inline
 ---
@@ -32,8 +36,8 @@ library(stringi)
 library(reticulate)
 library(ggplotify)
 library(grid)
+library(ComplexHeatmap)
 source_from_github(repositoy = "DEG_functions",version = "0.2.47")
-source_from_github(repositoy = "cNMF_functions",version = "0.4.04",script_name = "cnmf_functions_V3.R")
 source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_name = "functions.R")
 
 
@@ -56,10 +60,7 @@ xeno[["sipsic"]] = CreateAssayObject(counts = pathwayScoresMatrix)
 
 ```
 
-```{r}
-trace(Seurat:::FindMarkers.default,edit = T) #replace "bonferroni" with "fdr"
 
-```
 
 ```{r}
 xeno = SetIdent(xeno, value = "treatment")
@@ -82,9 +83,10 @@ for (model in unique(xeno$orig.ident)) {
     pseudocount.use = 0.001,
     features = pathways_names
   )
+  
   avg_log2FC = pathway_markers[pathways_names, "avg_log2FC", drop = F]
   colnames(avg_log2FC) = model
-  pathway_markers  %<>%  dplyr::rename(fdr = p_val_adj)
+  pathway_markers$fdr = p.adjust(pathway_markers$p_val,method = "fdr",n = length(rownames(model_data@assays$sipsic)))
   fdr = pathway_markers[pathways_names, "fdr", drop = F]
   colnames(fdr) = model
   
@@ -92,13 +94,16 @@ for (model in unique(xeno$orig.ident)) {
   fdr_df = cbind(fdr_df, fdr)
 }
 fdr_df_raw = fdr_df
+fdr_df[fdr_df > 0.05]  = 1 #remove non significant values
+
 fdr_df = apply(fdr_df, 1:2, \(x) format(x, digits=1)) %>% as.data.frame() #round p values 
-fdr_df[fdr_df == 0] = paste0("<",format(.Machine$double.xmin,digits = 1)) # replace p=0 with p<min float
-```
-```{r}
-untrace(Seurat:::FindMarkers.default)
+fdr_df[fdr_df == "1"] = ""
+
+fdr_df[fdr_df == "0"] = paste0("<",format(.Machine$double.xmin,digits = 1))
+# replace p=0 with p<min float
 
 ```
+
 
 
 
@@ -118,12 +123,42 @@ for (row_num in 1:nrow(logFC_df)) {
 
 ```
 
-```{r fig.height=7, fig.width=8}
-col_fun = circlize::colorRamp2(c(-1.5, 0, 1.5), c("blue", "white", "red"))
-p = ComplexHeatmap::Heatmap(logFC_df, name = "log2FC on/pre", col = col_fun,
-    cell_fun = function(j, i, x, y, width, height, fill) {
+```{r fig.height=8, fig.width=8}
+col_fun = circlize::colorRamp2(c(-1.5, 0, 1.5), c("royalblue4", "white", "red"))
+p = ComplexHeatmap::Heatmap(logFC_df,  row_names_gp = gpar(fontsize = 8,col =colors), clustering_method_rows = "average",show_heatmap_legend = F,col = col_fun, clustering_distance_rows = "euclidean", cell_fun = function(j, i, x, y, width, height, fill) {
         grid.text(fdr_df[i, j], x, y, gp = gpar(fontsize = 8))
-}, row_names_gp = gpar(fontsize = 8,col =colors), clustering_method_rows = "average", clustering_distance_rows = "euclidean")
+}
+)
+# p %v% known_p
+p
+lgd = Legend(title = "log2 Fold change", at = c(-1.5, 0, 1.5),
+ col_fun = col_fun)
+
+
+```
+
+```{r fig.height=8, fig.width=10}
+# draw(p %v% known_p, padding = unit(c(2, 2, 2, 50), "mm"))
+draw(p, padding = unit(c(2, 2, 2, 50), "mm"))
+draw(lgd,x = unit(0.85, "npc"), y = unit(0.78, "npc"))
+```
+```{r}
+#show only consistant
+logFC_df_consistant = logFC_df[colors =="blue" | colors == "red",]
+fdr_df_consistant = fdr_df[colors =="blue" | colors == "red",]
+colors_consistant = colors[colors =="blue" | colors == "red"]
+p = ComplexHeatmap::Heatmap(
+  logFC_df_consistant,
+  name = "log2FC on/pre",
+  row_names_gp = gpar(fontsize = 8, col = colors_consistant),
+  clustering_method_rows = "average",
+  show_heatmap_legend = T,
+  col = col_fun,
+  clustering_distance_rows = "euclidean",
+  cell_fun = function(j, i, x, y, width, height, fill) {
+    grid.text(fdr_df_consistant[i, j], x, y, gp = gpar(fontsize = 8))
+  })
+# p %v% known_p
 p
 ```
 

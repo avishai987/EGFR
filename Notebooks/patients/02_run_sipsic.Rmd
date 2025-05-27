@@ -21,6 +21,14 @@ editor_options:
 
 
 
+```{r}
+if (interactive()) {
+  source("./pipe.R")
+  input = get_input(get_current_path())
+  output = get_output(get_current_path())
+}
+
+```
 
 
 
@@ -44,13 +52,13 @@ source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_
 
 
 ```{r}
-lung = readRDS(input[["lung"]])
+lung = readRDS(input$lung)
 lung_patients = lung$patient.ident %>% unique() %>% as.character()
 lung_patients_filtered = lung_patients[!(lung_patients %in% c("X1055new","X1099"))] # remove patients with less than 100 malignant cells
 lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
 
-hallmark_genesets = getGmt(paste0(input[["genesets"]]))
-hif_targets = scan(input[["hif_targets"]], character(), quote = "")
+hallmark_genesets = getGmt(paste0(input$genesets))
+hif_targets = scan(input$hif_targets, character(), quote = "")
 # add hif targets to genesets
 hif_targets <- list(hif_targets = GeneSet(geneIds = hif_targets, setName = "hif_targets"))
 genesets <- c(hallmark_genesets, hif_targets)

@@ -1568,119 +1568,23 @@ border-radius: 0px;
 
 <h1 class="title toc-ignore">Run SiPSiC</h1>
 <h4 class="author">Avishai Wizel</h4>
-<h4 class="date">2025-02-12 12:03:02.221518</h4>
+<h4 class="date">2025-05-27 14:12:48.615477</h4>
 
 </div>
 
 
+<pre class="r"><code>if (interactive()) {
+  source(&quot;./pipe.R&quot;)
+  input = get_input(get_current_path())
+  output = get_output(get_current_path())
+}</code></pre>
 <div id="functions" class="section level1" number="1">
 <h1><span class="header-section-number">1</span> Functions</h1>
 <pre class="r"><code>library(stringi)
 library(reticulate)
 library(ggplotify)
-library(GSEABase)</code></pre>
-<pre><code>## Loading required package: BiocGenerics</code></pre>
-<pre><code>## 
-## Attaching package: &#39;BiocGenerics&#39;</code></pre>
-<pre><code>## The following objects are masked from &#39;package:stats&#39;:
-## 
-##     IQR, mad, sd, var, xtabs</code></pre>
-<pre><code>## The following objects are masked from &#39;package:lubridate&#39;:
-## 
-##     intersect, setdiff, union</code></pre>
-<pre><code>## The following objects are masked from &#39;package:dplyr&#39;:
-## 
-##     combine, intersect, setdiff, union</code></pre>
-<pre><code>## The following objects are masked from &#39;package:base&#39;:
-## 
-##     anyDuplicated, aperm, append, as.data.frame, basename, cbind,
-##     colnames, dirname, do.call, duplicated, eval, evalq, Filter, Find,
-##     get, grep, grepl, intersect, is.unsorted, lapply, Map, mapply,
-##     match, mget, order, paste, pmax, pmax.int, pmin, pmin.int,
-##     Position, rank, rbind, Reduce, rownames, sapply, saveRDS, setdiff,
-##     table, tapply, union, unique, unsplit, which.max, which.min</code></pre>
-<pre><code>## Loading required package: Biobase</code></pre>
-<pre><code>## Welcome to Bioconductor
-## 
-##     Vignettes contain introductory material; view with
-##     &#39;browseVignettes()&#39;. To cite Bioconductor, see
-##     &#39;citation(&quot;Biobase&quot;)&#39;, and for packages &#39;citation(&quot;pkgname&quot;)&#39;.</code></pre>
-<pre><code>## 
-## Attaching package: &#39;Biobase&#39;</code></pre>
-<pre><code>## The following object is masked from &#39;package:rlang&#39;:
-## 
-##     exprs</code></pre>
-<pre><code>## Loading required package: annotate</code></pre>
-<pre><code>## Loading required package: AnnotationDbi</code></pre>
-<pre><code>## Loading required package: stats4</code></pre>
-<pre><code>## Loading required package: IRanges</code></pre>
-<pre><code>## Warning: package &#39;IRanges&#39; was built under R version 4.4.2</code></pre>
-<pre><code>## Loading required package: S4Vectors</code></pre>
-<pre><code>## 
-## Attaching package: &#39;S4Vectors&#39;</code></pre>
-<pre><code>## The following object is masked from &#39;package:utils&#39;:
-## 
-##     findMatches</code></pre>
-<pre><code>## The following object is masked from &#39;package:plyr&#39;:
-## 
-##     rename</code></pre>
-<pre><code>## The following objects are masked from &#39;package:lubridate&#39;:
-## 
-##     second, second&lt;-</code></pre>
-<pre><code>## The following objects are masked from &#39;package:dplyr&#39;:
-## 
-##     first, rename</code></pre>
-<pre><code>## The following object is masked from &#39;package:tidyr&#39;:
-## 
-##     expand</code></pre>
-<pre><code>## The following objects are masked from &#39;package:data.table&#39;:
-## 
-##     first, second</code></pre>
-<pre><code>## The following objects are masked from &#39;package:Matrix&#39;:
-## 
-##     expand, unname</code></pre>
-<pre><code>## The following objects are masked from &#39;package:base&#39;:
-## 
-##     expand.grid, I, unname</code></pre>
-<pre><code>## 
-## Attaching package: &#39;IRanges&#39;</code></pre>
-<pre><code>## The following object is masked from &#39;package:grDevices&#39;:
-## 
-##     windows</code></pre>
-<pre><code>## The following object is masked from &#39;package:plyr&#39;:
-## 
-##     desc</code></pre>
-<pre><code>## The following object is masked from &#39;package:lubridate&#39;:
-## 
-##     %within%</code></pre>
-<pre><code>## The following objects are masked from &#39;package:dplyr&#39;:
-## 
-##     collapse, desc, slice</code></pre>
-<pre><code>## The following object is masked from &#39;package:purrr&#39;:
-## 
-##     reduce</code></pre>
-<pre><code>## The following object is masked from &#39;package:data.table&#39;:
-## 
-##     shift</code></pre>
-<pre><code>## 
-## Attaching package: &#39;AnnotationDbi&#39;</code></pre>
-<pre><code>## The following object is masked from &#39;package:dplyr&#39;:
-## 
-##     select</code></pre>
-<pre><code>## Loading required package: XML</code></pre>
-<pre><code>## Loading required package: graph</code></pre>
-<pre><code>## 
-## Attaching package: &#39;graph&#39;</code></pre>
-<pre><code>## The following object is masked from &#39;package:XML&#39;:
-## 
-##     addNode</code></pre>
-<pre><code>## The following object is masked from &#39;package:plyr&#39;:
-## 
-##     join</code></pre>
-<pre><code>## The following object is masked from &#39;package:stringr&#39;:
-## 
-##     boundary</code></pre>
-<pre class="r"><code>library(SiPSiC)</code></pre>
+library(GSEABase)
+library(SiPSiC)</code></pre>
 <pre><code>## Loading required package: SingleCellExperiment</code></pre>
 <pre><code>## Loading required package: SummarizedExperiment</code></pre>
 <pre><code>## Loading required package: MatrixGenerics</code></pre>
@@ -1700,21 +1604,13 @@ library(GSEABase)</code></pre>
 ## Attaching package: &#39;MatrixGenerics&#39;</code></pre>
 <pre><code>## The following objects are masked from &#39;package:matrixStats&#39;:
 ## 
-##     colAlls, colAnyNAs, colAnys, colAvgsPerRowSet, colCollapse,
-##     colCounts, colCummaxs, colCummins, colCumprods, colCumsums,
-##     colDiffs, colIQRDiffs, colIQRs, colLogSumExps, colMadDiffs,
-##     colMads, colMaxs, colMeans2, colMedians, colMins, colOrderStats,
-##     colProds, colQuantiles, colRanges, colRanks, colSdDiffs, colSds,
-##     colSums2, colTabulates, colVarDiffs, colVars, colWeightedMads,
-##     colWeightedMeans, colWeightedMedians, colWeightedSds,
-##     colWeightedVars, rowAlls, rowAnyNAs, rowAnys, rowAvgsPerColSet,
-##     rowCollapse, rowCounts, rowCummaxs, rowCummins, rowCumprods,
-##     rowCumsums, rowDiffs, rowIQRDiffs, rowIQRs, rowLogSumExps,
-##     rowMadDiffs, rowMads, rowMaxs, rowMeans2, rowMedians, rowMins,
-##     rowOrderStats, rowProds, rowQuantiles, rowRanges, rowRanks,
-##     rowSdDiffs, rowSds, rowSums2, rowTabulates, rowVarDiffs, rowVars,
-##     rowWeightedMads, rowWeightedMeans, rowWeightedMedians,
-##     rowWeightedSds, rowWeightedVars</code></pre>
+##     colAlls, colAnyNAs, colAnys, colAvgsPerRowSet, colCollapse, colCounts, colCummaxs, colCummins, colCumprods, colCumsums, colDiffs,
+##     colIQRDiffs, colIQRs, colLogSumExps, colMadDiffs, colMads, colMaxs, colMeans2, colMedians, colMins, colOrderStats, colProds,
+##     colQuantiles, colRanges, colRanks, colSdDiffs, colSds, colSums2, colTabulates, colVarDiffs, colVars, colWeightedMads,
+##     colWeightedMeans, colWeightedMedians, colWeightedSds, colWeightedVars, rowAlls, rowAnyNAs, rowAnys, rowAvgsPerColSet, rowCollapse,
+##     rowCounts, rowCummaxs, rowCummins, rowCumprods, rowCumsums, rowDiffs, rowIQRDiffs, rowIQRs, rowLogSumExps, rowMadDiffs, rowMads,
+##     rowMaxs, rowMeans2, rowMedians, rowMins, rowOrderStats, rowProds, rowQuantiles, rowRanges, rowRanks, rowSdDiffs, rowSds, rowSums2,
+##     rowTabulates, rowVarDiffs, rowVars, rowWeightedMads, rowWeightedMeans, rowWeightedMedians, rowWeightedSds, rowWeightedVars</code></pre>
 <pre><code>## The following object is masked from &#39;package:Biobase&#39;:
 ## 
 ##     rowMedians</code></pre>
@@ -1736,7 +1632,6 @@ library(GSEABase)</code></pre>
 ##     Assays</code></pre>
 <pre class="r"><code>source_from_github(repositoy = &quot;DEG_functions&quot;,version = &quot;0.2.47&quot;)</code></pre>
 <pre><code>## ℹ SHA-1 hash of file is &quot;f5bb1cd741d13bded83fe3b6fd43169e29731216&quot;</code></pre>
-<pre><code>## Warning: package &#39;msigdbr&#39; was built under R version 4.4.2</code></pre>
 <pre class="r"><code>source_from_github(repositoy = &quot;cNMF_functions&quot;,version = &quot;0.4.04&quot;,script_name = &quot;cnmf_functions_V3.R&quot;)</code></pre>
 <pre><code>## ℹ SHA-1 hash of file is &quot;a735d9bfb5bc55fcb203f83a7240b9713fc080d3&quot;</code></pre>
 <pre class="r"><code>source_from_github(repositoy = &quot;sc_general_functions&quot;,version = &quot;0.1.34&quot;,script_name = &quot;functions.R&quot;)</code></pre>
@@ -1744,13 +1639,13 @@ library(GSEABase)</code></pre>
 </div>
 <div id="data" class="section level1" number="2">
 <h1><span class="header-section-number">2</span> Data</h1>
-<pre class="r"><code>lung = readRDS(input[[&quot;lung&quot;]])
+<pre class="r"><code>lung = readRDS(input$lung)
 lung_patients = lung$patient.ident %&gt;% unique() %&gt;% as.character()
 lung_patients_filtered = lung_patients[!(lung_patients %in% c(&quot;X1055new&quot;,&quot;X1099&quot;))] # remove patients with less than 100 malignant cells
 lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
 
-hallmark_genesets = getGmt(paste0(input[[&quot;genesets&quot;]]))
-hif_targets = scan(input[[&quot;hif_targets&quot;]], character(), quote = &quot;&quot;)
+hallmark_genesets = getGmt(paste0(input$genesets))
+hif_targets = scan(input$hif_targets, character(), quote = &quot;&quot;)
 # add hif targets to genesets
 hif_targets &lt;- list(hif_targets = GeneSet(geneIds = hif_targets, setName = &quot;hif_targets&quot;))
 genesets &lt;- c(hallmark_genesets, hif_targets)
@@ -1835,7 +1730,7 @@ Show/Hide
 </button>
 <div id="BlockName" class="collapse">
 <pre class="r"><code>devtools::session_info()</code></pre>
-<pre><code>## ─ Session info ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+<pre><code>## ─ Session info ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 ##  setting  value
 ##  version  R version 4.4.1 (2024-06-14 ucrt)
 ##  os       Windows 10 x64 (build 19045)
@@ -1845,10 +1740,10 @@ Show/Hide
 ##  collate  Hebrew_Israel.utf8
 ##  ctype    Hebrew_Israel.utf8
 ##  tz       Asia/Jerusalem
-##  date     2025-02-12
-##  pandoc   3.2 @ C:/Program Files/RStudio/resources/app/bin/quarto/bin/tools/ (via rmarkdown)
+##  date     2025-05-27
+##  pandoc   3.4 @ C:/Program Files/RStudio/resources/app/bin/quarto/bin/tools/ (via rmarkdown)
 ## 
-## ─ Packages ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+## ─ Packages ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 ##  package              * version   date (UTC) lib source
 ##  abind                  1.4-8     2024-09-12 [1] CRAN (R 4.4.1)
 ##  annotate             * 1.84.0    2024-10-29 [1] Bioconductor 3.20 (R 4.4.1)
@@ -1856,9 +1751,11 @@ Show/Hide
 ##  babelgene              22.9      2022-09-29 [1] CRAN (R 4.4.2)
 ##  Biobase              * 2.66.0    2024-10-29 [1] Bioconductor 3.20 (R 4.4.1)
 ##  BiocGenerics         * 0.52.0    2024-10-29 [1] Bioconductor 3.20 (R 4.4.1)
+##  BiocParallel           1.40.0    2024-10-29 [1] Bioconductor 3.20 (R 4.4.1)
 ##  Biostrings             2.74.1    2024-12-16 [1] Bioconductor 3.20 (R 4.4.2)
 ##  bit                    4.5.0.1   2024-12-03 [1] CRAN (R 4.4.2)
 ##  bit64                  4.5.2     2024-09-22 [1] CRAN (R 4.4.2)
+##  bitops                 1.0-9     2024-10-03 [1] CRAN (R 4.4.1)
 ##  blob                   1.2.4     2023-03-17 [1] CRAN (R 4.4.2)
 ##  bslib                  0.8.0     2024-07-29 [1] CRAN (R 4.4.2)
 ##  cachem                 1.1.0     2024-05-16 [1] CRAN (R 4.4.2)
@@ -1882,6 +1779,8 @@ Show/Hide
 ##  evaluate               1.0.1     2024-10-10 [1] CRAN (R 4.4.2)
 ##  farver                 2.1.2     2024-05-13 [1] CRAN (R 4.4.2)
 ##  fastmap                1.2.0     2024-05-15 [1] CRAN (R 4.4.2)
+##  fastmatch              1.1-6     2024-12-23 [1] CRAN (R 4.4.2)
+##  fgsea                  1.32.2    2024-12-19 [1] Bioconductor 3.20 (R 4.4.2)
 ##  fitdistrplus           1.2-1     2024-07-12 [1] CRAN (R 4.4.1)
 ##  forcats              * 1.0.0     2023-01-29 [1] CRAN (R 4.4.2)
 ##  fs                     1.6.5     2024-10-30 [1] CRAN (R 4.4.2)
@@ -1891,9 +1790,10 @@ Show/Hide
 ##  GenomeInfoDb         * 1.42.1    2024-11-28 [1] Bioconductor 3.20 (R 4.4.2)
 ##  GenomeInfoDbData       1.2.13    2024-12-24 [1] Bioconductor
 ##  GenomicRanges        * 1.58.0    2024-10-29 [1] Bioconductor 3.20 (R 4.4.1)
+##  ggforce                0.4.2     2024-02-19 [1] CRAN (R 4.4.2)
 ##  ggplot2              * 3.5.1     2024-04-23 [1] CRAN (R 4.4.2)
 ##  ggplotify            * 0.1.2     2023-08-09 [1] CRAN (R 4.4.2)
-##  ggrepel                0.9.6     2024-09-07 [1] CRAN (R 4.4.1)
+##  ggrepel              * 0.9.6     2024-09-07 [1] CRAN (R 4.4.1)
 ##  ggridges               0.5.6     2024-01-23 [1] CRAN (R 4.4.1)
 ##  globals                0.16.3    2024-03-08 [1] CRAN (R 4.4.1)
 ##  glue                   1.8.0     2024-09-30 [1] CRAN (R 4.4.2)
@@ -1909,15 +1809,19 @@ Show/Hide
 ##  htmlwidgets            1.6.4     2023-12-06 [1] CRAN (R 4.4.2)
 ##  httpuv                 1.6.15    2024-03-26 [1] CRAN (R 4.4.2)
 ##  httr                   1.4.7     2023-08-15 [1] CRAN (R 4.4.1)
+##  hypeR                * 2.4.0     2024-10-29 [1] Bioconductor 3.20 (R 4.4.1)
 ##  ica                    1.0-3     2022-07-08 [1] CRAN (R 4.4.1)
 ##  igraph                 2.1.2     2024-12-07 [1] CRAN (R 4.4.1)
 ##  IRanges              * 2.40.1    2024-12-05 [1] Bioconductor 3.20 (R 4.4.2)
 ##  irlba                  2.3.5.1   2022-10-03 [1] CRAN (R 4.4.1)
+##  job                    0.3.1     2024-05-05 [1] CRAN (R 4.4.2)
 ##  jquerylib              0.1.4     2021-04-26 [1] CRAN (R 4.4.2)
 ##  jsonlite               1.8.9     2024-09-20 [1] CRAN (R 4.4.2)
+##  kableExtra             1.4.0     2024-01-24 [1] CRAN (R 4.4.2)
 ##  KEGGREST               1.46.0    2024-10-29 [1] Bioconductor 3.20 (R 4.4.1)
 ##  KernSmooth             2.23-24   2024-05-17 [2] CRAN (R 4.4.1)
 ##  knitr                  1.49      2024-11-08 [1] CRAN (R 4.4.2)
+##  labeling               0.4.3     2023-08-29 [1] CRAN (R 4.4.1)
 ##  later                  1.4.1     2024-11-27 [1] CRAN (R 4.4.2)
 ##  lattice                0.22-6    2024-03-20 [2] CRAN (R 4.4.1)
 ##  lazyeval               0.2.2     2019-03-15 [1] CRAN (R 4.4.1)
@@ -1927,6 +1831,7 @@ Show/Hide
 ##  lmtest                 0.9-40    2022-03-21 [1] CRAN (R 4.4.1)
 ##  lubridate            * 1.9.4     2024-12-08 [1] CRAN (R 4.4.2)
 ##  magrittr             * 2.0.3     2022-03-30 [1] CRAN (R 4.4.2)
+##  makepipe             * 0.2.2     2025-01-07 [1] CRAN (R 4.4.2)
 ##  MASS                   7.3-60.2  2024-04-26 [2] CRAN (R 4.4.1)
 ##  Matrix               * 1.7-0     2024-04-26 [2] CRAN (R 4.4.1)
 ##  MatrixGenerics       * 1.18.0    2024-10-29 [1] Bioconductor 3.20 (R 4.4.1)
@@ -1938,6 +1843,7 @@ Show/Hide
 ##  msigdbr              * 7.5.1     2022-03-30 [1] CRAN (R 4.4.2)
 ##  munsell                0.5.1     2024-04-01 [1] CRAN (R 4.4.2)
 ##  nlme                   3.1-164   2023-11-27 [2] CRAN (R 4.4.1)
+##  openxlsx               4.2.7.1   2024-09-20 [1] CRAN (R 4.4.2)
 ##  parallelly             1.41.0    2024-12-18 [1] CRAN (R 4.4.2)
 ##  patchwork              1.3.0     2024-09-16 [1] CRAN (R 4.4.1)
 ##  pbapply                1.7-2     2023-06-27 [1] CRAN (R 4.4.1)
@@ -1958,6 +1864,8 @@ Show/Hide
 ##  RColorBrewer         * 1.1-3     2022-04-03 [1] CRAN (R 4.4.1)
 ##  Rcpp                   1.0.13-1  2024-11-02 [1] CRAN (R 4.4.2)
 ##  RcppAnnoy              0.0.22    2024-01-23 [1] CRAN (R 4.4.1)
+##  RCurl                * 1.98-1.16 2024-07-11 [1] CRAN (R 4.4.2)
+##  reactable              0.4.4     2023-03-12 [1] CRAN (R 4.4.2)
 ##  readr                * 2.1.5     2024-01-10 [1] CRAN (R 4.4.2)
 ##  remotes                2.5.0     2024-03-17 [1] CRAN (R 4.4.2)
 ##  reshape2               1.4.4     2020-04-09 [1] CRAN (R 4.4.1)
@@ -1965,6 +1873,7 @@ Show/Hide
 ##  rlang                * 1.1.4     2024-06-04 [1] CRAN (R 4.4.2)
 ##  rmarkdown            * 2.29      2024-11-04 [1] CRAN (R 4.4.2)
 ##  ROCR                   1.0-11    2020-05-02 [1] CRAN (R 4.4.1)
+##  roxygen2               7.3.2     2024-06-28 [1] CRAN (R 4.4.2)
 ##  rpart                  4.1.23    2023-12-05 [2] CRAN (R 4.4.1)
 ##  rprojroot              2.0.4     2023-11-05 [1] CRAN (R 4.4.2)
 ##  RSQLite                2.3.9     2024-12-03 [1] CRAN (R 4.4.2)
@@ -1982,6 +1891,7 @@ Show/Hide
 ##  shiny                  1.10.0    2024-12-14 [1] CRAN (R 4.4.2)
 ##  SingleCellExperiment * 1.28.1    2024-11-10 [1] Bioconductor 3.20 (R 4.4.1)
 ##  SiPSiC               * 1.6.0     2024-10-29 [1] Bioconductor 3.20 (R 4.4.1)
+##  snow                   0.4-4     2021-10-27 [1] CRAN (R 4.4.0)
 ##  SourceFromGithub     * 0.1.0     2024-12-24 [1] Github (avishai987/SourceFromGithub@99e0840)
 ##  sp                     2.1-4     2024-04-30 [1] CRAN (R 4.4.1)
 ##  spam                   2.11-0    2024-10-03 [1] CRAN (R 4.4.1)
@@ -1996,12 +1906,15 @@ Show/Hide
 ##  stringr              * 1.5.1     2023-11-14 [1] CRAN (R 4.4.2)
 ##  SummarizedExperiment * 1.36.0    2024-10-29 [1] Bioconductor 3.20 (R 4.4.1)
 ##  survival               3.6-4     2024-04-24 [2] CRAN (R 4.4.1)
+##  svglite                2.1.3     2023-12-08 [1] CRAN (R 4.4.2)
+##  systemfonts            1.1.0     2024-05-15 [1] CRAN (R 4.4.2)
 ##  tensor                 1.5       2012-05-05 [1] CRAN (R 4.4.1)
 ##  tibble               * 3.2.1     2023-03-20 [1] CRAN (R 4.4.2)
 ##  tidyr                * 1.3.1     2024-01-24 [1] CRAN (R 4.4.1)
 ##  tidyselect             1.2.1     2024-03-11 [1] CRAN (R 4.4.1)
 ##  tidyverse            * 2.0.0     2023-02-22 [1] CRAN (R 4.4.2)
 ##  timechange             0.3.0     2024-01-18 [1] CRAN (R 4.4.2)
+##  tweenr                 2.0.3     2024-02-26 [1] CRAN (R 4.4.2)
 ##  tzdb                   0.4.0     2023-05-12 [1] CRAN (R 4.4.2)
 ##  UCSC.utils             1.2.0     2024-10-29 [1] Bioconductor 3.20 (R 4.4.1)
 ##  urlchecker             1.0.1     2021-11-30 [1] CRAN (R 4.4.2)
@@ -2009,20 +1922,23 @@ Show/Hide
 ##  uwot                   0.2.2     2024-04-21 [1] CRAN (R 4.4.1)
 ##  vctrs                  0.6.5     2023-12-01 [1] CRAN (R 4.4.2)
 ##  viridisLite            0.4.2     2023-05-02 [1] CRAN (R 4.4.1)
+##  visNetwork             2.1.2     2022-09-29 [1] CRAN (R 4.4.2)
 ##  withr                  3.0.2     2024-10-28 [1] CRAN (R 4.4.2)
 ##  xfun                   0.49      2024-10-31 [1] CRAN (R 4.4.2)
 ##  XML                  * 3.99-0.17 2024-06-25 [1] CRAN (R 4.4.1)
+##  xml2                   1.3.6     2023-12-04 [1] CRAN (R 4.4.2)
 ##  xtable                 1.8-4     2019-04-21 [1] CRAN (R 4.4.2)
 ##  XVector                0.46.0    2024-10-29 [1] Bioconductor 3.20 (R 4.4.1)
 ##  yaml                   2.3.10    2024-07-26 [1] CRAN (R 4.4.1)
 ##  yulab.utils            0.1.8     2024-11-07 [1] CRAN (R 4.4.2)
+##  zip                    2.3.1     2024-01-27 [1] CRAN (R 4.4.2)
 ##  zlibbioc               1.52.0    2024-10-29 [1] Bioconductor 3.20 (R 4.4.1)
 ##  zoo                    1.8-12    2023-04-13 [1] CRAN (R 4.4.1)
 ## 
 ##  [1] C:/Users/avishaiw.EKMD/AppData/Local/R/win-library/4.4
 ##  [2] C:/Program Files/R/R-4.4.1/library
 ## 
-## ─ Python configuration ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+## ─ Python configuration ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 ##  python:         C:/Users/avishaiw.EKMD/AppData/Local/r-miniconda/envs/scvi-env2/python.exe
 ##  libpython:      C:/Users/avishaiw.EKMD/AppData/Local/r-miniconda/envs/scvi-env2/python39.dll
 ##  pythonhome:     C:/Users/avishaiw.EKMD/AppData/Local/r-miniconda/envs/scvi-env2
@@ -2033,7 +1949,7 @@ Show/Hide
 ##  
 ##  NOTE: Python version was forced by RETICULATE_PYTHON_FALLBACK
 ## 
-## ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────</code></pre>
+## ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────</code></pre>
 </div>
 </div>
 

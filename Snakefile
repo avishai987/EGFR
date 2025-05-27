@@ -1,4 +1,18 @@
+rule models_deg:
+    input: 
+       script = "Notebooks/xeno/01_DEG.Rmd",
+       xeno = "input_data/xeno.qs",
+       genesets = "input_data/h.all.v2023.2.Hs.symbols.gmt",
+       hif_targets= "input_data/HIF_targets_Lombardi_PMC9869179.txt",
 
+    output:
+      report = "Reports/xeno/01_DEG/01_DEG.html"
+    shell:
+      """
+      Rscript -e \"my_render ( '{input.script}', \"
+      """
+
+################ Patients ######################################
 rule patients_deg:
     input: 
       script = "Notebooks/patients/01_DEG.Rmd",
@@ -43,6 +57,7 @@ rule patients_sipsic_analysis:
 rmarkdown::render('{input.script}',envir=env, output_dir = dirname('{output.report}'),knit_root_dir = getwd(), \
 params = list(data_out_dir =dirname('{output.report}'))) \"
       """
+
 
 rule all:
   input:

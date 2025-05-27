@@ -36,7 +36,7 @@ editor_options:
 library(stringi)
 library(reticulate)
 library(readxl)
-library(GSEABase)
+suppressPackageStartupMessages(library(GSEABase))
 library(SiPSiC)
 library(ggpubr)
 calculatePathwayScores <- function(pathwayToScore, countsMatrix) {
@@ -76,17 +76,29 @@ maynard <- read_csv(params$input_data["maynard"])
 maynard_genes <- maynard$`Avelolar Signature` %>% unlist() %>% base::unname()
 
 
-FRIDMAN_SENESCENCE_UP  = getGmt(params$input_data["SENESCENCE"]) %>% geneIds() %>%  unlist() %>% base::unname()
+#read ferroptosis
+ferroptosis = getGmt(params$input_data["ferroptosis"]) %>% geneIds() %>%  unlist() %>% base::unname()
 
+# read esrra, remove first row and NA
+esrra_up = readxl::read_excel(params$input_data["esrra"],sheet = "Sheet1")[["Up genes"]] %>% .[-1] %>% .[!is.na(.)]
+esrra_down = readxl::read_excel(params$input_data["esrra"],sheet = "Sheet1")[["Down genes"]] %>% .[-1] %>% .[!is.na(.)]
 
+# read HIF targets
 hif_targets = scan(params$input_data["hif_targets"], character(), quote = "")
 
+#SASP
+sasp = c(c("CCL2", "CCL5", "CCL7", "IL1A", "IL1B", "IL32"),c("SCG2", "INHBA", "INHA", "WNT7A", "CSF2", "TNFRSF11B", "GREM1", "CMTM3"))
 # list of all genesets
 genesets <- GeneSetCollection(
   GeneSet(kurppa_genes, setName = "Kurppa_YAP"),
    GeneSet(hadrek_genes, setName = "Hadrek_YAP5SA_UP"),
   GeneSet(FRIDMAN_SENESCENCE_UP, setName = "FRIDMAN_SENESCENCE_UP"),
-  GeneSet(maynard_genes, setName = "Maynard_Avelolar_Signature")
+  GeneSet(maynard_genes, setName = "Maynard_Avelolar_Signature"),
+  GeneSet(ferroptosis, setName = "Ferroptosis"),
+  GeneSet(esrra_up, setName = "ESRRA_UP"),
+  GeneSet(esrra_down, setName = "ESRRA_DOWN"),
+  GeneSet(sasp, setName = "SASP")
+
 
 ) 
 
@@ -109,10 +121,7 @@ xeno[["known_pathways"]] = CreateAssayObject(counts = pathwayScoresMatrix)
 
 ```
 
-```{r}
-trace(Seurat:::FindMarkers.default,edit = T) #replace "bonferroni" with "fdr"
 
-```
 
 ```{r}
 xeno = SetIdent(xeno, value = "treatment")
@@ -138,7 +147,7 @@ for (model in unique(xeno$orig.ident)) {
   )
   avg_log2FC = pathway_markers[pathways_names, "avg_log2FC", drop = F]
   colnames(avg_log2FC) = model
-  pathway_markers  %<>%  dplyr::rename(fdr = p_val_adj)
+  pathway_markers$fdr = p.adjust(pathway_markers$p_val,method = "fdr",n = length(rownames(model_data@assays$known_pathways)))
   fdr = pathway_markers[pathways_names, "fdr", drop = F]
   colnames(fdr) = model
   
@@ -146,13 +155,16 @@ for (model in unique(xeno$orig.ident)) {
   fdr_df = cbind(fdr_df, fdr)
 }
 fdr_df_raw = fdr_df
+fdr_df[fdr_df > 0.05]  = 1 #remove non significant values
+
 fdr_df = apply(fdr_df, 1:2, \(x) format(x, digits=1)) %>% as.data.frame() #round p values 
-fdr_df[fdr_df == 0] = paste0("<",format(.Machine$double.xmin,digits = 1)) # replace p=0 with p<min float
-```
-```{r}
-untrace(Seurat:::FindMarkers.default)
+fdr_df[fdr_df == "1"] = ""
+
+fdr_df[fdr_df == "0"] = paste0("<",format(.Machine$double.xmin,digits = 1))
+# replace p=0 with p<min float
 
 ```
+
 
 
 
@@ -174,17 +186,15 @@ for (row_num in 1:nrow(logFC_df)) {
 
 ```{r fig.height=7, fig.width=10}
 library(grid)
-col_fun = circlize::colorRamp2(c(-1, 0, 1), c("blue", "white", "red"))
-p = ComplexHeatmap::Heatmap(logFC_df, name = "log2FC on/pre", col = col_fun,
+col_fun = circlize::colorRamp2(c(-1.5, 0, 1.5), c("blue", "white","red"))
+p = ComplexHeatmap::Heatmap(logFC_df,  row_names_gp = gpar(fontsize = 8,col =colors), clustering_method_rows = "average", clustering_distance_rows = "euclidean",show_heatmap_legend = FALSE,
+                            col = col_fun,
     cell_fun = function(j, i, x, y, width, height, fill) {
         grid.text(fdr_df[i, j], x, y, gp = gpar(fontsize = 8))
-}, row_names_gp = gpar(fontsize = 8,col =colors), clustering_method_rows = "average", clustering_distance_rows = "euclidean")
+})
 p
 ```
-# Correlation
-```{r}
 
-```
 
 # hypoxia and ROS correlation
 ```{r fig.height=6, fig.width=15}
@@ -355,4 +365,120 @@ p2 = ggplot(data = data, aes(x = HALLMARK_FATTY_ACID_METABOLISM, y = HALLMARK_G2
   geom_smooth(method = "lm") + theme_minimal()  + stat_cor(method = "pearson") +facet_wrap(~patient)+ggtitle("NT cells")+
   scale_y_continuous(limits = c(0,0.6))
 print(p2+p1)
+```
+## Genes
+```{r}
+
+esrra_genes = c(genesets[["ESRRA_UP"]]@geneIds,genesets[["ESRRA_DOWN"]]@geneIds) 
+xeno = SetIdent(object = xeno,value = "treatment")
+
+all_logFC_df = data.frame(row.names = esrra_genes)
+all_fdr_df = data.frame(row.names = esrra_genes)
+
+for (model in unique(xeno$orig.ident)) {
+  model_data = subset(xeno, subset = orig.ident == model)
+  deg_df = FindMarkers(
+    object = model_data,
+    ident.1 = "NT",
+    ident.2 = "OSI",
+    densify = T,
+    mean.fxn = function(x) {
+      return(log(x = rowMeans(x = x) + 1, base = 2))
+    },
+    features = esrra_genes,
+    logfc.threshold = 0,
+    min.pct = 0,
+    test.use = "wilcox",
+  )
+  deg_df$fdr = p.adjust(deg_df$p_val, method = "fdr", n = length(esrra_genes))
+  avg_log2FC = deg_df[, "avg_log2FC", drop = F]
+  colnames(avg_log2FC) = model
+  fdr = deg_df[, "fdr", drop = F]
+  colnames(fdr) = model
+  all_logFC_df = cbind(all_logFC_df, avg_log2FC)
+  all_fdr_df = cbind(all_fdr_df, fdr)
+  
+}
+all_fdr_df[all_fdr_df > 0.05]  = 1 #remove non significant values
+
+all_fdr_df = apply(all_fdr_df, 1:2, \(x) format(x, digits=1)) %>% as.data.frame() #round p values 
+all_fdr_df[all_fdr_df == "1"] = ""
+
+all_fdr_df[all_fdr_df == "0"] = paste0("<",format(.Machine$double.xmin,digits = 1))
+# replace p=0 with p<min float
+```
+
+```{r fig.height=7, fig.width=10}
+library(grid)
+genes_origin = c(rep("ESRRA_UP", length(genesets[["ESRRA_UP"]]@geneIds)),
+                                    rep("ESRRA_DOWN", length(genesets[["ESRRA_DOWN"]]@geneIds)))
+row_anon = rowAnnotation(pathway = genes_origin,
+                         col = list(pathway = c("ESRRA_UP" = "red", "ESRRA_DOWN" = "blue")))
+col_fun = circlize::colorRamp2(c(-1.5, 0, 1.5), c("blue", "white","red"))
+p = ComplexHeatmap::Heatmap(all_logFC_df,  row_names_gp = gpar(fontsize = 8), 
+                            clustering_method_rows = "average", clustering_distance_rows = "euclidean",
+                            show_heatmap_legend = T,
+                            col = col_fun,
+                            name = "log2(FC) on/pre",
+                            row_split = genes_origin,
+                            cluster_row_slices = F,
+                            row_title = "ESRRA genes",
+                            column_title = "Models",
+                            right_annotation = row_anon,
+                            cell_fun = function(j, i, x, y, width, height, fill) {
+                              grid.text(all_fdr_df[i, j], x, y, gp = gpar(fontsize = 8))
+                              })
+p
+```
+```{r}
+pdf(paste0(params$data_out_dir,"ESRRA_heatmap_models.pdf"))
+p
+dev.off()
+```
+
+## violin plots
+```{r}
+xeno = AddMetaData(object = xeno, metadata = as.data.frame(t(pathwayScoresMatrix[c("ESRRA_UP","ESRRA_DOWN"),])))
+
+all_plots = list()
+#esrra up
+library(rstatix)
+for (pathway in c("ESRRA_UP","ESRRA_DOWN")) {
+  genes_by_tp = FetchData(object = xeno,vars = c("treatment", pathway,"orig.ident"),slot = "data") %>% filter(treatment != "res")
+  
+  # all cells by patient boxplot
+  formula <- as.formula(paste0(pathway," ~ treatment"))
+  
+  #plot and split by patient:
+  stat.test <- genes_by_tp %>%
+    group_by(orig.ident) %>%
+    wilcox_test(formula) %>%
+    adjust_pvalue(method = "fdr") %>%
+    add_significance() %>%
+    add_xy_position(x = "treatment") %>%
+    mutate(p.adj = signif(p.adj, digits = 2))
+  stat.test
+  
+  
+  plt = ggplot(genes_by_tp, aes(x = treatment, y = .data[[pathway]])) +
+    geom_violin(scale = "width",aes(fill = treatment),trim = T) +
+    stat_pvalue_manual(stat.test, label = "{p.adj}")  + #add p value
+    geom_boxplot(width = 0.2, outlier.shape = NA) +
+    labs(title = paste(pathway, "per cell"), y = pathway, fill = "treatment")+
+    theme(plot.title = element_text(hjust = 0.5),axis.title.x = element_blank()) + theme_minimal()+
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.2))) + # Add 10% spaces between the p-value labels and the plot border
+    facet_wrap(~orig.ident,scales = "free")
+  print(plt)
+
+  all_plots[[pathway]] = plt
+}
+
+pdf(paste0(params$data_out_dir,"ESRRA_UP_violin_models.pdf"),width = 8,height = 5)
+all_plots[["ESRRA_UP"]]
+dev.off()
+
+
+pdf(paste0(params$data_out_dir,"ESRRA_DOWN_violin_models.pdf"),width = 8,height = 5)
+all_plots[["ESRRA_DOWN"]]
+dev.off()
 ```

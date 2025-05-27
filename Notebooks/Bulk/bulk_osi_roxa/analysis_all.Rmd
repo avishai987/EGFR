@@ -11,6 +11,8 @@ output:
       collapsed: FALSE
     number_sections: true
     toc_depth: 1
+editor_options: 
+  chunk_output_type: inline
 ---
 
 

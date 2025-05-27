@@ -21,3 +21,6 @@ processed_data/
 /Notebooks/old
 /Notebooks/input_data
 /input_data
+/.snakemake
+temp_data/
+

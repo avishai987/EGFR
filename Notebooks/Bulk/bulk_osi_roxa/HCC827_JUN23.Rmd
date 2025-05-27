@@ -11,6 +11,17 @@ output:
       collapsed: FALSE
     number_sections: true
     toc_depth: 1
+editor_options: 
+  chunk_output_type: inline
+input_data: !r c(
+    xeno = "./input_data/xeno.qs",
+    kurppa = "./input_data/pathways_from_papers/Kurppa_PMC7146079_table_s1_YAP signature.xlsx",
+    hadrek = "./input_data/pathways_from_papers/Hadrek_PMC11068778_sup_data_3.xlsx",
+    SENESCENCE = "./input_data/pathways_from_papers/FRIDMAN_SENESCENCE_UP.v2024.1.Hs.gmt",
+    maynard = "./input_data/pathways_from_papers/Maynard_PMC7484178_Table_S2.csv",
+    ferroptosis  = "./input_data/pathways_from_papers/GOBP_FERROPTOSIS.v2024.1.Hs.gmt",
+    esrra = "./input_data/pathways_from_papers/ESRRA _gene_signature.xlsx",
+    hif_targets = "./input_data/HIF_targets_Lombardi_PMC9869179.txt")
 ---
 
 <style type="text/css">
@@ -29,7 +40,7 @@ output:
 
 ```{r}
 HCC827Jun23 = read.table(
-  file = "./Data/osiRoxa_bulk/Jun23/gene_fpkm.xls",
+  file = "./input_data/osiRoxa_bulk/Jun23/gene_fpkm.xls",
   sep = "\t",
   header = TRUE
 )
@@ -70,6 +81,66 @@ PCAdata <- prcomp(t(assay(vst)))
 autoplot(PCAdata, data = metadata,colour = "condition",label = FALSE, main="PCA") # Show dots
 
 ```
+# Known signatures heatmap
+```{r}
+
+#read Kurppa_PMC7146079_table_s1_YAP signature.xlsx tab "Zhang et al. Cancer Res 2008"
+kurppa <- readxl::read_excel(params$input_data["kurppa"],sheet = "Zhang et al. Cancer Res 2008")
+kurppa_genes <- kurppa[-1,1,drop=T] # remove first row
+ 
+#read Hadrek_PMC11068778_sup_data_3.xlsx tab "Supp. Data 3" 
+hadrek <- readxl::read_excel(params$input_data["hadrek"],sheet = "Supp. Data 3",skip = 3)
+hadrek_genes <- hadrek[,1,drop = T]
+
+#read FRIDMAN_SENESCENCE_UP.v2024.1.Hs.gmt
+FRIDMAN_SENESCENCE_UP  = getGmt(params$input_data["SENESCENCE"]) %>% geneIds() %>%  unlist() %>% base::unname()
+
+# read Avelolar Signature from Maynard_PMC7484178_Table_S2.csv
+maynard <- read_csv(params$input_data["maynard"])
+maynard_genes <- maynard$`Avelolar Signature` %>% unlist() %>% base::unname()
+
+
+#read ferroptosis
+ferroptosis = getGmt(params$input_data["ferroptosis"]) %>% geneIds() %>%  unlist() %>% base::unname()
+
+# read esrra, remove first row and NA
+esrra_up = readxl::read_excel(params$input_data["esrra"],sheet = "Sheet1")[["Up genes"]] %>% .[-1] %>% .[!is.na(.)]
+esrra_down = readxl::read_excel(params$input_data["esrra"],sheet = "Sheet1")[["Down genes"]] %>% .[-1] %>% .[!is.na(.)]
+
+# read HIF targets
+hif_targets = scan(params$input_data["hif_targets"], character(), quote = "")
+
+all_signatures = list(kurppa = kurppa_genes,hadrek = hadrek_genes,FRIDMAN_SENESCENCE_UP = FRIDMAN_SENESCENCE_UP,maynard = maynard_genes,ferroptosis = ferroptosis,esrra_up = esrra_up,esrra_down = esrra_down,hif_targets = hif_targets)
+all_scores = data.frame()
+for (i in 1:length(all_signatures)) {
+  genes = all_signatures[[i]]
+  mat <- HCC827Jun23[ genes, ] %>% na.omit %>% colMeans() %>% as.data.frame() %>% 
+    setnames(names(all_signatures)[[i]]) %>% t() %>% as.data.frame()
+  all_scores = rbind(all_scores,mat)
+}
+
+all_scores <- t(scale(t(all_scores)))
+anno <- as.data.frame(all_scores)
+library(ComplexHeatmap) 
+library(ggplot2) 
+Heatmap(all_scores, cluster_rows = T, cluster_columns = F, column_labels = colnames(anno), name = "fpkm Z-score",row_names_gp = gpar(fontsize = 8)) 
+```
+```{r}
+all_scores = data.frame()
+# raw expression esrra
+for (pathway in c("esrra_up","esrra_down")) {
+  genes = all_signatures[[pathway]]
+  mat <- HCC827Jun23[ genes, ] %>% na.omit %>% colMeans() %>% as.data.frame() %>% 
+    setnames(pathway) %>% t() %>% as.data.frame()
+  all_scores = rbind(all_scores,mat)
+}
+all_scores
+```
+
+```{r}
+write.csv(all_scores,"./temp_data/HCC827_JUN23_esrra.csv")
+```
+
 #DESeq
 ```{r}
 dds <- DESeq(dds)

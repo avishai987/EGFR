@@ -23,7 +23,7 @@ output:
 # Data
 
 ```{r}
-lung = readRDS("./raw_data/lung_cancercells_withTP_onlyPatients.rds")
+lung = readRDS("./Input_data/lung_cancercells_withTP_onlyPatients.rds")
 lung_patients = lung$patient.ident %>% unique() %>% as.character()
 lung_patients_filtered = lung_patients[!(lung_patients %in% c("X1055new","X1099"))] # remove patients with less than 100 malignant cells
 lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
@@ -62,7 +62,8 @@ p = ggplot(df, aes(x = patient.ident, fill = time.point)) +
        x = "Patient ID",
        y = "Count",
        fill = "Time Point") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(axis.text.x = element_text(angle = 45, hjust = 1,size = 20),axis.title = element_text(size = 20),
+        axis.text.y = element_text(size = 15),legend.text = element_text(size = 20),legend.title = element_text(size = 20),plot.title = element_text(size = 25))
 p
 ```
 ```{r}
