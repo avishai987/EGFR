@@ -4,6 +4,7 @@ author: "Avishai Wizel"
 date: '`r Sys.time()`'
 output: 
   html_document: 
+    
     code_folding: hide
     toc: yes
     toc_collapse: yes
@@ -12,15 +13,20 @@ output:
     number_sections: true
     toc_depth: 2
     df_print: paged
-    
 params: 
-  data_out_dir: "./temp_data/" 
   
+  data_out_dir: "./temp_data/" 
 editor_options: 
   chunk_output_type: inline
 ---
 
-
+```{r}
+if (interactive()) {
+  source("./pipe.R")
+  input = get_input(get_current_path())
+  output = get_output(get_current_path())
+}
+```
 
 # Functions
 
@@ -31,14 +37,14 @@ editor_options:
 
 ```{r}
 cell_lines_data = read.table(
-  file = "./Data/cell_lines/cell_lines_noMTGLKI_tpm.txt",
+  file = input$rna_counts,
   sep = "\t",
   header = TRUE
 )
 rownames(cell_lines_data) = make.unique(cell_lines_data[,"gene_name",drop=T]) #set genes names
 cell_lines_data = cell_lines_data[,8:ncol(cell_lines_data)] #remove genes info
 names(cell_lines_data) %<>% gsub(pattern = paste0("(S\\d).*$"),replacement = "\\1") # remove redundant info 
-hif_targets = scan("./Data/HIF_targets_Lombardi_PMC9869179.txt", character(), quote = "")
+hif_targets = scan(input$hif_targets, character(), quote = "")
 ```
 
 ```{r}
@@ -57,7 +63,7 @@ metadata = data.frame(condition = condition,cell_type = cell_type, row.names = c
 ```
 
 ```{r}
-library(DESeq2)
+suppressPackageStartupMessages(library(DESeq2))
 dds <- DESeqDataSetFromMatrix(countData = round(cell_lines_data),
                               colData = metadata,
                               design = ~cell_type+condition)
@@ -94,6 +100,7 @@ hif_score$condition = strsplit(x = rownames(hif_score),split = "_") %>%
 ```
 
 ```{r fig.height=6, fig.width=8}
+library(ggpubr)
 hif_score$condition <- factor(hif_score$condition, levels = c("Day1_NT", "Day1_OSI","Day14_OSI"))
 
 
@@ -104,7 +111,9 @@ p = ggbarplot(
 p
 ```
 ```{r}
-saveRDS(object = as.grob(p),file = "./Figures/cell_lines_hif_targets.rds")
+pdf(paste0(params$data_out_dir,"HIF_targets_by_time.pdf"),width = 8,height = 6)
+p
+dev.off()
 ```
 
 ```{r}

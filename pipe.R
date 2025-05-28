@@ -43,7 +43,7 @@ pipeline[["patients_sipsic_analysis"]] = list(
   )
 )
 
-####################################### Xenogratfs ####################################################
+####################################### Xenogratfs DEG & SIPSIC ####################################################
 pipeline[["xenografts_deg"]] = list(
   input = list(
     script = "./Notebooks/xeno/01_DEG.Rmd",
@@ -80,12 +80,42 @@ pipeline[["xeno_sipsic_analysis"]] = list(
     report ="./Reports/xeno/03_SiPSiC/03_SiPSiC.html"
   )
 )
-####################################### Bulk cell lines ####################################################
+
+####################################### Xenogratfs cNMF ####################################################
+
+pipeline[["xeno_cnmf_preprocess"]] = list(
+  input = list(
+    script = "./Notebooks/xeno/04_cnmf/01_create_data_for_cnmf.Rmd",
+    xeno =  "input_data/xeno.qs"
+    ),
+  output = list(
+    report ="./Reports/xeno/04_cnmf/01_create_data_for_cnmf.html",
+    xeno_counts_filtered = "xeno_counts_filtered.h5ad"
+  )
+)
+
+####################################### Bulk cell lines - OSI ####################################################
+pipeline[["bulk_cell_lines_OSI"]] = list(
+  input = list(
+    script = "./Notebooks/Bulk/01_cell_lines_OSI.Rmd",
+    rna_counts =  "./input_data/cell_lines/cell_lines_noMTGLKI_tpm.txt",
+    hif_targets= "./input_data/HIF_targets_Lombardi_PMC9869179.txt"
+    ),
+  output = list(
+    report ="./Reports/Bulk/01_cell_lines_OSI/01_cell_lines_OSI.html"
+  )
+)
+
+
+####################################### Bulk cell lines - OSI+ROXA October 25 ####################################################
+
+
+####################################### Bulk cell lines - OSI+ROXA March 25 ####################################################
 
 
 pipeline[["bulk_mar25_HCC"]] = list(
   input = list(
-    script = "./Notebooks/Bulk/bulk_cell_lines_march25/HCC_mar25_analysis.Rmd",
+    script = "./Notebooks/Bulk/03_bulk_cell_lines_march25/HCC_mar25_analysis.Rmd",
     rna_counts =  "./input_data/osiRoxa_bulk/Mar25/gene_count.xls",
     hif_targets= "./input_data/HIF_targets_Lombardi_PMC9869179.txt",
     sample_description = "./input_data/osiRoxa_bulk/Mar25/RK_BIFSAMPLE.xlsx",
@@ -99,7 +129,7 @@ pipeline[["bulk_mar25_HCC"]] = list(
 
 pipeline[["bulk_mar25_H1975"]] = list(
   input = list(
-    script = "./Notebooks/Bulk/bulk_cell_lines_march25/H1975_mar25_analysis.Rmd",
+    script = "./Notebooks/Bulk/03_bulk_cell_lines_march25/H1975_mar25_analysis.Rmd",
     rna_counts =  "./input_data/osiRoxa_bulk/Mar25/gene_count.xls",
     hif_targets= "./input_data/HIF_targets_Lombardi_PMC9869179.txt",
     sample_description = "./input_data/osiRoxa_bulk/Mar25/RK_BIFSAMPLE.xlsx",
@@ -241,6 +271,14 @@ make_with_recipe(
 script = pipeline[[6]]$input$script
 make_with_recipe(
   recipe = my_render(notebook_path =pipeline[[6]]$input$script),
+  targets = unlist(get_output(script)),
+  dependencies = unlist(get_input(script)),
+  label = get_label(script),build = F
+)
+
+script = pipeline[[8]]$input$script
+make_with_recipe(
+  recipe = my_render(notebook_path =pipeline[[8]]$input$script),
   targets = unlist(get_output(script)),
   dependencies = unlist(get_input(script)),
   label = get_label(script),build = F

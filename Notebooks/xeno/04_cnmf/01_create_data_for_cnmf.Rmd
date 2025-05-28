@@ -2,18 +2,72 @@
 title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
 author: "Avishai Wizel"
 date: '`r Sys.time()`'
-output: 
-  html_notebook: 
+output:
+  html_document: 
     code_folding: hide
     toc: yes
     toc_collapse: yes
     toc_float: 
-      collapsed: FALSE
+      collapsed: TRUE
     number_sections: true
-    toc_depth: 1
+    toc_depth: 2
+    df_print: paged
+params: 
+  data_out_dir: "./temp_data/" 
+
+editor_options: 
+  chunk_output_type: inline
 ---
 
+```{r}
+if (interactive()) {
+  source("./pipe.R")
+  input = get_input(get_current_path())
+  output = get_output(get_current_path())
+}
+```
+```{r}
+#run once to install
+reticulate::conda_create(envname = "scanpy")
 
+  job::job({
+  reticulate::use_condaenv("scanpy")
+  print(reticulate::py_config()) # if you see that r-cnmf_dev has not been loaded, restart/terminate r and try again, DO NOT load reticulate before.
+  reticulate::conda_install(envname = "scanpy",
+              packages = c("scanpy=1.9.8",
+                      # "cnmf=1.5.0"
+                       "anndata>=0.7.4",
+                       "numpy>=1.17.0",
+                       "matplotlib>=3.6",
+                       "pandas>=1.1.1,<2.1.2",
+                       "scipy>=1.4",
+                       "seaborn>=0.13.0",
+                       "h5py>=3",
+                       "tqdm",
+                       "scikit-learn>=0.24",
+                       "statsmodels>=0.10.0rc2",
+                       "patsy",
+                       "networkx>=2.3",
+                       "natsort",
+                       "joblib",
+                       "numba>=0.41.0",
+                       "umap-learn>=0.3.10",
+                       "packaging",
+                       "session-info",
+                       "get-annotations"),
+              channel = c("conda-forge",
+                          rep("defaults", 20)))
+    job::export("none")
+  }, import = NULL, packages = NULL,title = "install scanpy conda env")
+  
+  
+
+```
+
+```{r}
+reticulate::use_condaenv("C:/Users/avishaiw.EKMD/AppData/Local/r-miniconda/envs/scanpy",required = T)
+reticulate::py_config() # if you see that r-cnmf_dev has not been loaded, restart/terminate r and try again, DO NOT load reticulate before.
+```
 
 # Functions
 
@@ -23,7 +77,7 @@ output:
 # Data
 
 ```{r}
-xeno = readRDS("./Data/10x_xeno_1000.Rds")
+xeno <- qs::qread(input$xeno)
 xeno = DietSeurat(object = xeno)
 gc()
 ```
@@ -48,8 +102,19 @@ gc()
 
 ```{python}
 import scanpy as sc
+import os
 adata = r.adata
 adata.var['highly_variable'] = adata.var['vst.variable'] # rename seurat var genes to scanpy var genes
-adata.write_h5ad("./Data/cnmf_V2/xeno_counts_filtered.h5ad")
+adata.write_h5ad(r.params['data_out_dir'] + os.path.basename((r.output['xeno_counts_filtered'])))
 ```
 
+
+
+# session info
+<button class="btn btn-primary" data-toggle="collapse" data-target="#BlockName"> Show/Hide </button>  
+<div id="BlockName" class="collapse">  
+```{r}
+devtools::session_info()
+```
+
+</div>

@@ -17,7 +17,6 @@ editor_options:
 params:
   cell_line: "HCC"
   data_out_dir: "./temp_data/" 
-
 ---
 
 ```{r}
