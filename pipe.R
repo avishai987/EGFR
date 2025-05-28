@@ -46,16 +46,40 @@ pipeline[["patients_sipsic_analysis"]] = list(
 ####################################### Xenogratfs ####################################################
 pipeline[["xenografts_deg"]] = list(
   input = list(
-    script = "./Notebooks/xenografts/01_DEG.Rmd",
-    lung =  "input_data/lung_cancercells_withTP_onlyPatients.rds",
+    script = "./Notebooks/xeno/01_DEG.Rmd",
+    xeno =  "input_data/xeno.qs",
     hif_targets= "./input_data/HIF_targets_Lombardi_PMC9869179.txt",
     genesets ="./input_data/h.all.v2023.2.Hs.symbols.gmt"
   ),
   output = list(
-    report ="./Reports/xenografts/01_DEG/01_DEG.html"
+    report ="./Reports/xeno/01_DEG/01_DEG.html"
   )
 )
 
+pipeline[["xenografts_run_sipsic"]] = list(
+  input = list(
+    script = "./Notebooks/xeno/02_run_SiPSiC.Rmd",
+    xeno =  "input_data/xeno.qs",
+    hif_targets= "./input_data/HIF_targets_Lombardi_PMC9869179.txt",
+    genesets ="./input_data/h.all.v2023.2.Hs.symbols.gmt"
+  ),
+  output = list(
+    report ="./Reports/xeno/02_run_SiPSiC/02_run_SiPSiC.html",
+    sipsic_matrix ="./Reports/xeno/02_run_SiPSiC/xeno_pathwayScoresMatrix.RDS"
+  )
+)
+
+
+pipeline[["xeno_sipsic_analysis"]] = list(
+  input = list(
+    script = "./Notebooks/xeno/03_SiPSiC.Rmd",
+    xeno =  "input_data/xeno.qs",
+    sipsic_matrix = pipeline$xenografts_run_sipsic$output$sipsic_matrix
+  ),
+  output = list(
+    report ="./Reports/xeno/03_SiPSiC/03_SiPSiC.html"
+  )
+)
 ####################################### Bulk cell lines ####################################################
 
 
@@ -145,7 +169,7 @@ my_render <- function(notebook_path , set_params = list()){
     input = get_input(notebook_path)
     output = get_output(notebook_path)
     if (dir.exists(dirname(report))) {
-      unlink(dirname(report))
+      unlink(dirname(report),recursive = T)
     }
     set_params[["data_out_dir"]] = dirname(report) %s+% "/"
     message("Rendering to:")
@@ -198,26 +222,26 @@ make_with_recipe(
   label = get_label(script),build = F
 )
 
-# script = pipeline[[4]]$input$script
-# make_with_recipe(
-#   recipe = my_render(notebook_path =pipeline[[4]]$input$script),
-#   targets = unlist(get_output(script)),
-#   dependencies = unlist(get_input(script)),
-#   label = get_label(script),build = F
-# )
+script = pipeline[[4]]$input$script
+make_with_recipe(
+  recipe = my_render(notebook_path =pipeline[[4]]$input$script),
+  targets = unlist(get_output(script)),
+  dependencies = unlist(get_input(script)),
+  label = get_label(script),build = F
+)
 
-# script = pipeline[[5]]$input$script
-# make_with_recipe(
-#   recipe = my_render(notebook_path =pipeline[[5]]$input$script),
-#   targets = unlist(get_output(script)),
-#   dependencies = unlist(get_input(script)),
-#   label = get_label(script),build = F
-# )
-# 
-# script = pipeline[[6]]$input$script
-# make_with_recipe(
-#   recipe = my_render(notebook_path =pipeline[[6]]$input$script),
-#   targets = unlist(get_output(script)),
-#   dependencies = unlist(get_input(script)),
-#   label = get_label(script),build = F
-# )
+script = pipeline[[5]]$input$script
+make_with_recipe(
+  recipe = my_render(notebook_path =pipeline[[5]]$input$script),
+  targets = unlist(get_output(script)),
+  dependencies = unlist(get_input(script)),
+  label = get_label(script),build = F
+)
+
+script = pipeline[[6]]$input$script
+make_with_recipe(
+  recipe = my_render(notebook_path =pipeline[[6]]$input$script),
+  targets = unlist(get_output(script)),
+  dependencies = unlist(get_input(script)),
+  label = get_label(script),build = F
+)
