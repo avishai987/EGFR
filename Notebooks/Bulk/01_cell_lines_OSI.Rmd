@@ -89,6 +89,38 @@ ggplot(pcaData, aes(PC1, PC2, color=cell_type, shape=condition)) +
   ylab(paste0("PC2: ",percentVar[2],"% variance")) + 
   coord_fixed()+ scale_color_manual(values=as.vector(polychrome(length(unique(cell_type))))) + theme_minimal()
 ```
+# 1157
+```{r}
+# heatmap of DUSP6 in 1157
+cells_1157 = rownames(metadata)[metadata$cell_type == "X1157.1"]
+dusp6 = cell_lines_data[c("DUSP6","MAPK1"),] %>% select(all_of(cells_1157))
+
+
+#complex heatmap with rows 45 angle, order day1 NT, dat 1 OSI, day 14 OSI
+library(ComplexHeatmap)
+library(circlize)
+Heatmap(
+  as.matrix(dusp6),
+  name = "TPM",
+  column_title = "1157",
+  row_title = "Genes",
+  row_names_gp = gpar(fontsize = 10),
+  column_names_gp = gpar(fontsize = 10),
+  column_order = c("X1157.1_Day1_NT_1_S9", "X1157.1_Day1_NT_2_S3", "X1157.1_Day1_NT_3_S2","X1157.1_Day1_OSI.300nM_1_S4", "X1157.1_Day1_OSI.300nM_2_S1", "X1157.1_Day1_OSI.300nM_3_S8", "X1157.1_Day14_OSI.300nM_1_S5", "X1157.1_Day14_OSI.300nM_2_S7", 
+"X1157.1_Day14_OSI.300nM_3_S6"),
+  cluster_rows = FALSE,
+  cluster_columns = FALSE,
+  show_row_names = TRUE,
+  show_column_names = TRUE,
+  row_dend_side = "left",
+  row_dend_width = unit(2, "cm"),
+  column_dend_height = unit(2, "cm"),
+  heatmap_legend_param = list(title = "TPM", at = c(0,100,200,300), labels = c("0","100","200","300"))
+)
+
+```
+
+# HIF targets
 ```{r}
 hif_score = cell_lines_data[hif_targets,] %>% colMeans() %>% as.data.frame() %>% `colnames<-` ("HIF_TPM_mean")
 hif_score$cell_type =  strsplit(x = rownames(hif_score),split = "_") %>%
@@ -110,12 +142,14 @@ p = ggbarplot(
 
 p
 ```
+
 ```{r}
 pdf(paste0(params$data_out_dir,"HIF_targets_by_time.pdf"),width = 8,height = 6)
 p
 dev.off()
 ```
 
+# Other HIF targets
 ```{r}
 hif_targets_dana = c("CITED2","EDN1","VEGFA","BNIP3L","CD99","FN1","PLAUR","SERPINE1","ADM","EGLN3","HK2","IGFBP3","PDK1","DDIT4","SLC2A1","PFKFB3","BNIP3","PGK1","LDHA","GPI")
 ```

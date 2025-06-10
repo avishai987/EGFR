@@ -1,0 +1,4 @@
+up_genes	down_genes
+EDN2	NA
+HK2	NA
+APOL1	NA

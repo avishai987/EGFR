@@ -1,0 +1,269 @@
+---
+title: "All cell lines analysis"
+output: 
+  html_document: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: TRUE
+    number_sections: true
+    toc_depth: 2
+    df_print: paged
+editor_options: 
+  chunk_output_type: inline
+params:
+  cell_line: "HCC"
+  data_out_dir: "./temp_data/" 
+---
+
+```{r}
+if (interactive()) {
+  source("./pipe.R")
+  input = get_input(get_current_path())
+  output = get_output(get_current_path())
+}
+```
+
+
+```{r}
+suppressPackageStartupMessages(library(GSEABase))
+source_from_github(repositoy = "DEG_functions",version = "0.2.54")
+```
+
+# Create data
+```{r}
+bulk_Mar25_raw = read.table(
+  file = input$rna_counts,
+  sep = "\t",
+  header = TRUE
+) %>% as.data.frame() 
+
+bulk_Mar25_TPM = bulk_Mar25_raw %>%   dplyr::select(!c("Geneid","Chr", "Start", "End", "Strand","Length"))
+rownames(bulk_Mar25_TPM) = make.unique(bulk_Mar25_TPM[,"gene_name",drop=T])
+bulk_Mar25_TPM  = bulk_Mar25_TPM %>% dplyr::select(!c("gene_name"))
+colnames(bulk_Mar25_TPM) = gsub(pattern = ".bam",replacement = "",x = colnames(bulk_Mar25_TPM))
+
+
+```
+
+```{r}
+#adjust sample names
+#read xlsx file
+library(readxl)
+sample_description = readxl::read_xlsx(input$sample_description, sheet = 1) %>% 
+  as.data.frame() 
+
+ sample_description = sample_description %>%  mutate(new_name = paste(sample_description$`Group Name\r\n(Required)`,c(1:3),sep = "_")) 
+
+
+bulk_Mar25_TPM = bulk_Mar25_TPM[,sample_description$`Sample Name`]
+colnames(bulk_Mar25_TPM) = sample_description$new_name
+colnames(bulk_Mar25_TPM)  = colnames(bulk_Mar25_TPM) %>%  
+  gsub(pattern = "_Osi_",replacement = "_osi_short_") %>% 
+  gsub(pattern = "_OsiRox_",replacement = "_osi_short_roxa_") %>% 
+  gsub(pattern = "_Per_",replacement = "_osi_persistor_") %>% 
+  gsub(pattern = "_PerRox_",replacement = "_osi_persist_roxa_") 
+
+
+```
+
+# cell lines comparision
+```{r}
+# create metadata
+cell.labels = names(bulk_Mar25_TPM)
+condition = str_extract(cell.labels, "HCC|H1975")
+metadata = data.frame(condition = condition, row.names = colnames(bulk_Mar25_TPM))
+```
+
+```{r}
+suppressPackageStartupMessages(library(DESeq2))
+dds <- DESeqDataSetFromMatrix(countData = round(bulk_Mar25_TPM),
+                              colData = metadata,
+                              design = ~condition)
+```
+## filtering
+```{r}
+nrow(dds)
+dds1 <- dds[ rowSums(counts(dds)) >= 3, ] # filter low count genes
+nrow(dds1)
+```
+
+## PCA
+```{r}
+vst = vst(dds1, blind=FALSE)
+```
+
+```{r}
+library("ggfortify")
+PCAdata <- prcomp(t(assay(vst)))
+autoplot(PCAdata, data = metadata,colour = "condition",label = FALSE, main="PCA") # Show dots
+```
+
+## Distance plot
+```{r}
+library(pheatmap)
+vsd <- vst(dds, blind=FALSE)
+sampleDists <- dist(t(assay(vsd)), method = "euclidean")
+library("RColorBrewer")
+sampleDistMatrix <- as.matrix(sampleDists)
+colnames(sampleDistMatrix) <- NULL
+colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+p = pheatmap(sampleDistMatrix,
+         clustering_distance_rows=sampleDists,
+         clustering_distance_cols=sampleDists,
+         col=colors, main = "Sample euclidean distance Matrix")
+p
+```
+```{r}
+pdf(paste0(params$data_out_dir,"distance plot.pdf"),width = 8,height = 6)
+p
+dev.off()
+```
+
+# up in: osi persist+roxa vs osi persist, but not in: ctrl vs roxa
+
+```{r fig.width=10}
+up_in_persistors_HCC = read.table(file = input$up_in_persistors_HCC, sep = "\t", header = TRUE) %>% 
+  as.data.frame()
+up_in_persistors_H1975 = read.table(file = input$up_in_persistors_H1975, sep = "\t", header = TRUE) %>% 
+  as.data.frame()
+#find intersection
+up_in_persistors_all_cell_lines = intersect(up_in_persistors_HCC[1], up_in_persistors_H1975[1])
+down_in_persistors_all_cell_lines = intersect(up_in_persistors_HCC[2], up_in_persistors_H1975[2])
+
+
+# heatmap of HCC up genes in H1975
+
+library(ComplexHeatmap)
+gene_vec = up_in_persistors_HCC %>% as.list() %>% unlist  %>% na.omit() # make named vector
+names(gene_vec) = names(gene_vec) %>% gsub(pattern = "[0-9]",replacement = "") # remove numbers from names
+ha1 = rowAnnotation(up_or_down = names(gene_vec),
+                    col = list(cell_line = c(up_nes = "red",down_nes = "blue")))
+
+
+ha2 = columnAnnotation(cell_line = names(bulk_Mar25_TPM) %>% str_extract(pattern  = "HCC|H1975"),
+                       col = list(cell_line = c(HCC = "green",H1975 = "orange")))
+
+signautre_expression = bulk_Mar25_TPM[gene_vec,] %>% t() %>% scale() %>% t() %>% as.data.frame() 
+
+p1 = Heatmap(signautre_expression, cluster_rows = F, cluster_columns = F, name = "Z-score TPM",column_title = "up in HCC Genes",left_annotation = ha1,top_annotation = ha2,column_split = names(bulk_Mar25_TPM) %>% str_extract(pattern  = "HCC|H1975") ,column_gap = unit(4, "mm"))
+p1
+
+
+# heatmap of H1975 up genes in HCC
+gene_vec = up_in_persistors_H1975 %>% as.list() %>% unlist  %>% na.omit() # make named vector
+names(gene_vec) = names(gene_vec) %>% gsub(pattern = "[0-9]",replacement = "") # remove numbers from names
+ha1 = rowAnnotation(up_or_down = names(gene_vec),
+                    col = list(cell_line = c(up_nes = "red",down_nes = "blue")))
+
+
+ha2 = columnAnnotation(cell_line = names(bulk_Mar25_TPM) %>% str_extract(pattern  = "HCC|H1975"),
+                       col = list(cell_line = c(HCC = "green",H1975 = "orange")))
+
+signautre_expression = bulk_Mar25_TPM[gene_vec,] %>% t() %>% scale() %>% t() %>% as.data.frame() 
+
+p2 = Heatmap(signautre_expression, cluster_rows = F, cluster_columns = F, name = "Z-score TPM",column_title = "up in H1975 Genes",left_annotation = ha1,top_annotation = ha2,column_split = names(bulk_Mar25_TPM) %>% str_extract(pattern  = "HCC|H1975") ,column_gap = unit(4, "mm"))
+p2
+```
+```{r}
+pdf(paste0(params$data_out_dir,"up_in_HCC_persistors.pdf"),width = 10,height = 6)
+p1
+dev.off()
+
+pdf(paste0(params$data_out_dir,"up_in_H1975_persistors.pdf"),width = 10,height = 6)
+p2
+dev.off()
+```
+
+# signatures
+```{r fig.width=9}
+# expression heatmap of signatures
+SASP_signature = c("CCL2", "CCL5", "CCL7", "IL1A", "IL1B", "IL32","SCG2", "INHBA", "INHA", "WNT7A", "CSF2", "TNFRSF11B", "GREM1", "CMTM3")
+FRIDMAN_SENESCENCE_UP  = getGmt(input$SENESCENCE) %>% geneIds() %>%  unlist() %>% base::unname()
+
+
+SASP_signautre_expression = bulk_Mar25_TPM[SASP_signature[SASP_signature %in% rownames(bulk_Mar25_TPM)],] %>%  
+  colMeans() %>% as.data.frame() %>% setNames("SASP_signature")
+SENESCENCE_signautre_expression = bulk_Mar25_TPM[FRIDMAN_SENESCENCE_UP[FRIDMAN_SENESCENCE_UP %in% rownames(bulk_Mar25_TPM)],] %>%
+  colMeans() %>% as.data.frame() %>% setNames("FRIDMAN\nSENESCENCE_UP")
+
+
+
+all_signature_expression_zscore = t(scale(cbind(SASP_signautre_expression,SENESCENCE_signautre_expression))) %>% as.data.frame()
+
+p1 = Heatmap(all_signature_expression_zscore, cluster_rows = F, cluster_columns = F, name = "Z-score TPM",column_title = "signatures")
+p1
+
+# expression heatmap of genes
+
+signautre_expression = bulk_Mar25_TPM[SASP_signature[SASP_signature %in% rownames(bulk_Mar25_TPM)],]  %>% t() %>% scale() %>% t() %>% as.data.frame() 
+
+
+p2 = Heatmap(signautre_expression, cluster_rows = F, cluster_columns = F, name = "Z-score TPM",column_title = "SASP genes")
+p2
+
+signautre_expression = bulk_Mar25_TPM[FRIDMAN_SENESCENCE_UP[FRIDMAN_SENESCENCE_UP %in% rownames(bulk_Mar25_TPM)],]  %>% t() %>% scale() %>% t() %>% as.data.frame() 
+
+
+p3 = Heatmap(signautre_expression, cluster_rows = F, cluster_columns = F, name = "Z-score TPM",column_title = "FRIDMAN_SENESCENCE_UP genes",row_names_gp = gpar(fontsize = 8))
+
+```
+
+```{r fig.height=12, fig.width=9}
+p3
+```
+```{r}
+# calculate fold change in SASP HCC
+cp_vs_op = SASP_signautre_expression[startsWith(rownames(SASP_signautre_expression),"HCC_osi_persist_roxa"),"SASP_signature",] %>% mean()/
+  SASP_signautre_expression[startsWith(rownames(SASP_signautre_expression),"HCC_osi_persistor"),"SASP_signature",] %>% mean()
+
+rox_vs_veh = SASP_signautre_expression[startsWith(rownames(SASP_signautre_expression),"HCC_Rox"),"SASP_signature",] %>% mean()/
+  SASP_signautre_expression[startsWith(rownames(SASP_signautre_expression),"HCC_Veh"),"SASP_signature",] %>% mean()
+print(paste("HCC cp_vs_op_SASP:",cp_vs_op))
+print(paste("HCC rox_vs_veh_SASP:",rox_vs_veh))
+
+# calculate fold change in SASP H1975
+cp_vs_op_H1975 = SASP_signautre_expression[startsWith(rownames(SASP_signautre_expression),"H1975_osi_persist_roxa"),"SASP_signature",] %>% mean()/
+  
+  SASP_signautre_expression[startsWith(rownames(SASP_signautre_expression),"H1975_osi_persistor"),"SASP_signature",] %>% mean()
+
+rox_vs_veh_H1975 = SASP_signautre_expression[startsWith(rownames(SASP_signautre_expression),"H1975_Rox"),"SASP_signature",] %>% mean()/
+  SASP_signautre_expression[startsWith(rownames(SASP_signautre_expression),"H1975_Veh"),"SASP_signature",] %>% mean()
+print(paste("H1975 cp_vs_op_SASP:",cp_vs_op_H1975))
+print(paste("H1975 rox_vs_veh_SASP:",rox_vs_veh_H1975))
+
+## calculate fold change in fridman senesence HCC
+cp_vs_op_fridman = SENESCENCE_signautre_expression[startsWith(rownames(SENESCENCE_signautre_expression),"HCC_osi_persist_roxa"),"FRIDMAN\nSENESCENCE_UP",] %>% mean()/
+  SENESCENCE_signautre_expression[startsWith(rownames(SENESCENCE_signautre_expression),"HCC_osi_persistor"),"FRIDMAN\nSENESCENCE_UP",] %>% mean()
+
+rox_vs_veh_fridman = SENESCENCE_signautre_expression[startsWith(rownames(SENESCENCE_signautre_expression),"HCC_Rox"),"FRIDMAN\nSENESCENCE_UP",] %>% mean()/
+  SENESCENCE_signautre_expression[startsWith(rownames(SENESCENCE_signautre_expression),"HCC_Veh"),"FRIDMAN\nSENESCENCE_UP",] %>% mean()
+print(paste("HCC cp_vs_op_fridman:",cp_vs_op_fridman))
+print(paste("HCC rox_vs_veh_fridman:",rox_vs_veh_fridman))
+
+
+## calculate fold change in fridman senesence H1975
+cp_vs_op_fridman_H1975 = SENESCENCE_signautre_expression[startsWith(rownames(SENESCENCE_signautre_expression),"H1975_osi_persist_roxa"),"FRIDMAN\nSENESCENCE_UP",] %>% mean()/
+  SENESCENCE_signautre_expression[startsWith(rownames(SENESCENCE_signautre_expression),"H1975_osi_persistor"),"FRIDMAN\nSENESCENCE_UP",] %>% mean()
+
+rox_vs_veh_fridman_H1975 = SENESCENCE_signautre_expression[startsWith(rownames(SENESCENCE_signautre_expression),"H1975_Rox"),"FRIDMAN\nSENESCENCE_UP",] %>% mean()/
+  SENESCENCE_signautre_expression[startsWith(rownames(SENESCENCE_signautre_expression),"H1975_Veh"),"FRIDMAN\nSENESCENCE_UP",] %>% mean()
+print(paste("H1975 cp_vs_op_fridman:",cp_vs_op_fridman_H1975))
+print(paste("H1975 rox_vs_veh_fridman:",rox_vs_veh_fridman_H1975))
+
+```
+
+```{r}
+pdf(paste0(params$data_out_dir,"signatures.pdf"),width = 10,height = 6)
+p1
+dev.off()
+
+pdf(paste0(params$data_out_dir,"SASP_genes.pdf"),width = 10,height = 6)
+p2
+dev.off()
+
+pdf(paste0(params$data_out_dir,"SENESCENCE_genes.pdf"),width = 12,height = 9)
+p3
+dev.off()
+```

@@ -43,7 +43,7 @@ if (interactive()) {
 library(ggplotify)
 library(hypeR)
 library(ggpubr)
-library(GSEABase)
+suppressPackageStartupMessages(library(GSEABase))
 source_from_github(repositoy = "DEG_functions",version = "0.2.54")
 ```
 

@@ -3,8 +3,20 @@ library(magrittr)
 library(stringr)
 
 pipeline = list()
+####################################### Preprocess ####################################################
 
-####################################### Patients ####################################################
+pipeline[["xeno_preprocess"]] = list(
+  input = list(
+    script = "./Notebooks/xeno/00_preprocess.Rmd"
+  ),
+  output = list(
+    report ="./Reports/xeno/00_preprocess/01_preprocess.html",
+    xeno = "./Reports/xeno/00_preprocess/xeno.qs")
+)
+
+
+
+####################################### Patients DEG & SIPSIC####################################################
 
 
 pipeline[["patients_deg"]] = list(
@@ -47,7 +59,7 @@ pipeline[["patients_sipsic_analysis"]] = list(
 pipeline[["xenografts_deg"]] = list(
   input = list(
     script = "./Notebooks/xeno/01_DEG.Rmd",
-    xeno =  "input_data/xeno.qs",
+    xeno =  pipeline$xeno_preprocess$output$xeno,
     hif_targets= "./input_data/HIF_targets_Lombardi_PMC9869179.txt",
     genesets ="./input_data/h.all.v2023.2.Hs.symbols.gmt"
   ),
@@ -59,7 +71,7 @@ pipeline[["xenografts_deg"]] = list(
 pipeline[["xenografts_run_sipsic"]] = list(
   input = list(
     script = "./Notebooks/xeno/02_run_SiPSiC.Rmd",
-    xeno =  "input_data/xeno.qs",
+    xeno =  pipeline$xeno_preprocess$output$xeno,
     hif_targets= "./input_data/HIF_targets_Lombardi_PMC9869179.txt",
     genesets ="./input_data/h.all.v2023.2.Hs.symbols.gmt"
   ),
@@ -73,7 +85,7 @@ pipeline[["xenografts_run_sipsic"]] = list(
 pipeline[["xeno_sipsic_analysis"]] = list(
   input = list(
     script = "./Notebooks/xeno/03_SiPSiC.Rmd",
-    xeno =  "input_data/xeno.qs",
+    xeno =  pipeline$xeno_preprocess$output$xeno,
     sipsic_matrix = pipeline$xenografts_run_sipsic$output$sipsic_matrix
   ),
   output = list(
@@ -86,7 +98,7 @@ pipeline[["xeno_sipsic_analysis"]] = list(
 pipeline[["xeno_cnmf_preprocess"]] = list(
   input = list(
     script = "./Notebooks/xeno/04_cnmf/01_create_data_for_cnmf.Rmd",
-    xeno =  "input_data/xeno.qs"
+    xeno =  pipeline$xeno_preprocess$output$xeno
     ),
   output = list(
     report ="./Reports/xeno/04_cnmf/01_create_data_for_cnmf.html",
@@ -98,7 +110,7 @@ pipeline[["xeno_cnmf_preprocess"]] = list(
 pipeline[["bulk_cell_lines_OSI"]] = list(
   input = list(
     script = "./Notebooks/Bulk/01_cell_lines_OSI.Rmd",
-    rna_counts =  "./input_data/cell_lines/cell_lines_noMTGLKI_tpm.txt",
+    rna_counts =  "./input_data/cell_lines/OSI_bulk_cell_lines_noMTGLKI_tpm.txt",
     hif_targets= "./input_data/HIF_targets_Lombardi_PMC9869179.txt"
     ),
   output = list(
@@ -107,7 +119,17 @@ pipeline[["bulk_cell_lines_OSI"]] = list(
 )
 
 
-####################################### Bulk cell lines - OSI+ROXA October 25 ####################################################
+####################################### Bulk cell lines - OSI+ROXA June/October 23 ####################################################
+pipeline[["bulk_june23_samples_distances"]] = list(
+  input = list(
+    script = "./Notebooks/Bulk/02_bulk_osi_roxa_OCT23/01_samples_distances.Rmd",
+    rna_counts =  "./input_data/cell_lines/cell_lines_noMTGLKI_tpm.txt",
+    hif_targets= "./input_data/HIF_targets_Lombardi_PMC9869179.txt"
+  ),
+  output = list(
+    report ="./Reports/Bulk/01_cell_lines_OSI/01_cell_lines_OSI.html"
+  )
+)
 
 
 ####################################### Bulk cell lines - OSI+ROXA March 25 ####################################################
@@ -116,13 +138,15 @@ pipeline[["bulk_cell_lines_OSI"]] = list(
 pipeline[["bulk_mar25_HCC"]] = list(
   input = list(
     script = "./Notebooks/Bulk/03_bulk_cell_lines_march25/HCC_mar25_analysis.Rmd",
-    rna_counts =  "./input_data/osiRoxa_bulk/Mar25/gene_count.xls",
+    rna_counts =  "./input_data/cell_lines/osiRoxa_bulk/Mar25/Mar25_noMTGLKI_tpm.txt",
     hif_targets= "./input_data/HIF_targets_Lombardi_PMC9869179.txt",
-    sample_description = "./input_data/osiRoxa_bulk/Mar25/RK_BIFSAMPLE.xlsx",
-    genesets ="./input_data/h.all.v2023.2.Hs.symbols.gmt"
+    sample_description = "./input_data/cell_lines/osiRoxa_bulk/Mar25/RK_BIFSAMPLE.xlsx",
+    genesets ="./input_data/h.all.v2023.2.Hs.symbols.gmt",
+    SENESCENCE = "./input_data/pathways_from_papers/FRIDMAN_SENESCENCE_UP.v2024.1.Hs.gmt"
   ),
   output = list(
-    report ="./Reports/Bulk/bulk_cell_lines_march25/mar25_analysis_HCC.html"
+    report ="./Reports/Bulk/03_bulk_cell_lines_march25/mar25_analysis_HCC/mar25_analysis_HCC.html",
+    up_in_persistors= "./Reports/Bulk/03_bulk_cell_lines_march25/mar25_analysis_HCC/HCC_comboVSosi_not_roxaVSctrl.txt"
   )
 )
 
@@ -130,13 +154,33 @@ pipeline[["bulk_mar25_HCC"]] = list(
 pipeline[["bulk_mar25_H1975"]] = list(
   input = list(
     script = "./Notebooks/Bulk/03_bulk_cell_lines_march25/H1975_mar25_analysis.Rmd",
-    rna_counts =  "./input_data/osiRoxa_bulk/Mar25/gene_count.xls",
+    rna_counts =  "./input_data/cell_lines/osiRoxa_bulk/Mar25/Mar25_noMTGLKI_tpm.txt",
     hif_targets= "./input_data/HIF_targets_Lombardi_PMC9869179.txt",
-    sample_description = "./input_data/osiRoxa_bulk/Mar25/RK_BIFSAMPLE.xlsx",
-    genesets ="./input_data/h.all.v2023.2.Hs.symbols.gmt"
+    sample_description = "./input_data/cell_lines/osiRoxa_bulk/Mar25/RK_BIFSAMPLE.xlsx",
+    genesets ="./input_data/h.all.v2023.2.Hs.symbols.gmt",
+    SENESCENCE = "./input_data/pathways_from_papers/FRIDMAN_SENESCENCE_UP.v2024.1.Hs.gmt"
   ),
   output = list(
-    report ="./Reports/Bulk/bulk_cell_lines_march25/mar25_analysis_H1975.html"
+    report ="./Reports/Bulk/03_bulk_cell_lines_march25/mar25_analysis_H1975/mar25_analysis_H1975.html",
+    up_in_persistors= "./Reports/Bulk/03_bulk_cell_lines_march25/mar25_analysis_H1975/H1975_comboVSosi_not_roxaVSctrl.txt"
+    
+  )
+)
+
+pipeline[["march25_all_analysis"]] = list(
+  input = list(
+    script = "./Notebooks/Bulk/03_bulk_cell_lines_march25/all_cell_lines_analysis.Rmd",
+    rna_counts =  "./input_data/cell_lines/osiRoxa_bulk/Mar25/Mar25_noMTGLKI_tpm.txt",
+    hif_targets= "./input_data/HIF_targets_Lombardi_PMC9869179.txt",
+    sample_description = "./input_data/cell_lines/osiRoxa_bulk/Mar25/RK_BIFSAMPLE.xlsx",
+    genesets ="./input_data/h.all.v2023.2.Hs.symbols.gmt",
+    up_in_persistors_HCC = pipeline$bulk_mar25_HCC$output$up_in_persistors,
+    up_in_persistors_H1975 = pipeline$bulk_mar25_H1975$output$up_in_persistors,
+    SENESCENCE = "./input_data/pathways_from_papers/FRIDMAN_SENESCENCE_UP.v2024.1.Hs.gmt"
+    
+  ),
+  output = list(
+    report ="./Reports/Bulk/03_bulk_cell_lines_march25/all_cell_lines_analysis/all_cell_lines_analysis.html"
   )
 )
 ######################################## functions ###############################################
@@ -279,6 +323,38 @@ make_with_recipe(
 script = pipeline[[8]]$input$script
 make_with_recipe(
   recipe = my_render(notebook_path =pipeline[[8]]$input$script),
+  targets = unlist(get_output(script)),
+  dependencies = unlist(get_input(script)),
+  label = get_label(script),build = F
+)
+
+script = pipeline[[10]]$input$script
+make_with_recipe(
+  recipe = my_render(notebook_path =pipeline[[10]]$input$script),
+  targets = unlist(get_output(script)),
+  dependencies = unlist(get_input(script)),
+  label = get_label(script),build = F
+)
+
+script = pipeline[[11]]$input$script
+make_with_recipe(
+  recipe = my_render(notebook_path =pipeline[[11]]$input$script),
+  targets = unlist(get_output(script)),
+  dependencies = unlist(get_input(script)),
+  label = get_label(script),build = F
+)
+
+script = pipeline[[12]]$input$script
+make_with_recipe(
+  recipe = my_render(notebook_path =pipeline[[12]]$input$script),
+  targets = unlist(get_output(script)),
+  dependencies = unlist(get_input(script)),
+  label = get_label(script),build = F
+)
+
+script = pipeline[[13]]$input$script
+make_with_recipe(
+  recipe = my_render(notebook_path =pipeline[[13]]$input$script),
   targets = unlist(get_output(script)),
   dependencies = unlist(get_input(script)),
   label = get_label(script),build = F

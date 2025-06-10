@@ -1,0 +1,125 @@
+---
+title: "R Notebook"
+output: html_document
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r}
+if (interactive()) {
+  source("./pipe.R")
+  input = get_input(get_current_path())
+  output = get_output(get_current_path())
+}
+```
+
+
+```{r}
+library(Seurat)
+library("dplyr")
+library("ggplot2")
+```
+
+```{r}
+xeno_119.data <- Read10X(data.dir = "./input_data/xeno_raw/119-1_filtered_feature_bc_matrix")
+xeno_119 <- CreateSeuratObject(counts = xeno_119.data, project = "119")
+percent.mt <- PercentageFeatureSet(xeno_119, pattern = "^MT-")
+xeno_119[["percent.mt"]] <- percent.mt
+
+xeno_PC9.data <- Read10X(data.dir = "./input_data/xeno_raw/PC9_filtered_feature_bc_matrix")
+xeno_PC9 <- CreateSeuratObject(counts = xeno_PC9.data, project = "PC9")
+percent.mt <- PercentageFeatureSet(xeno_PC9, pattern = "^MT-")
+xeno_PC9[["percent.mt"]] <- percent.mt
+
+xeno_1109.data <- Read10X(data.dir = "./input_data/xeno_raw/1109-1_filtered_feature_bc_matrix")
+xeno_1109 <- CreateSeuratObject(counts = xeno_1109.data, project = "1109")
+percent.mt <- PercentageFeatureSet(xeno_1109, pattern = "^MT-")
+xeno_1109[["percent.mt"]] <- percent.mt
+
+xeno_1071.data <- Read10X(data.dir = "./input_data/xeno_raw/1071-1_filtered_feature_bc_matrix")
+xeno_1071 <- CreateSeuratObject(counts = xeno_1071.data, project = "1071")
+percent.mt <- PercentageFeatureSet(xeno_1071, pattern = "^MT-")
+xeno_1071[["percent.mt"]] <- percent.mt
+
+xeno_1157.data <- Read10X(data.dir = "./input_data/xeno_raw/1157-1_filtered_feature_bc_matrix")
+xeno_1157 <- CreateSeuratObject(counts = xeno_1157.data, project = "1157")
+percent.mt <- PercentageFeatureSet(xeno_1157, pattern = "^MT-")
+xeno_1157[["percent.mt"]] <- percent.mt
+
+xeno_1068.data <- Read10X(data.dir = "./input_data/xeno_raw/1068-2_filtered_feature_bc_matrix")
+xeno_1068 <- CreateSeuratObject(counts = xeno_1068.data, project = "1068")
+percent.mt <- PercentageFeatureSet(xeno_1068, pattern = "^MT-")
+xeno_1068[["percent.mt"]] <- percent.mt
+
+xeno.big <- merge(xeno_119, y = c(xeno_PC9, xeno_1109, xeno_1071, xeno_1157, xeno_1068), add.cell.ids = c("119", "PC9", "1109", "1071", "1157", "1068"), project = "xeno_10x")
+
+```
+
+```{r}
+percent.mt <- PercentageFeatureSet(xeno.big, pattern = "^MT-")
+xeno.big[["percent.mt"]] <- percent.mt
+
+```
+# Normalization and scaling
+```{r}
+xeno.big <- subset(xeno.big, subset = nFeature_RNA > 1000 & percent.mt < 35)
+xeno.big <- FindVariableFeatures(xeno.big, selection.method = "vst", nfeatures = 1000)
+
+xeno.big <- NormalizeData(xeno.big)  
+all.genes <- rownames(xeno.big)
+xeno.big <- ScaleData(xeno.big, features = all.genes)
+```
+
+# PCA
+```{r}
+xeno.big <- RunPCA(xeno.big, features = VariableFeatures(object = xeno.big))
+pcaplot <- PCAPlot(xeno.big, label = FALSE)
+elbowplot <- ElbowPlot(xeno.big, ndims = 50) # checking the dimensionality 
+elbowplot
+```
+
+# Clustering and UMAP
+```{r}
+xeno.big <- FindNeighbors(xeno.big, dims = 1:25)
+xeno.big <- FindClusters(xeno.big, resolution = .5)
+xeno.big <- RunUMAP(xeno.big, dims = 1:25)
+lung_umap <- DimPlot(object = xeno.big, reduction = "umap", pt.size = 0.1, label = F)
+lung_umap
+```
+
+# Add metadata
+```{r}
+all_time_points <- c()
+for (cell in rownames(xeno.big@meta.data)){
+  all_time_points <- append(all_time_points, gsub("^.*-","", cell))
+}
+xeno.big <- AddMetaData(object = xeno.big, metadata = all_time_points, col.name="time_point")
+
+
+## adding the correct time point
+all_time_points <- c()
+for (cell in rownames(xeno.big@meta.data)){
+  cell_data <- xeno.big@meta.data[cell,]
+  if (cell_data$orig.ident %in% c("1068", "1157")){
+    if (cell_data$time_point == "1"){
+      all_time_points <- append(all_time_points, "res")
+    } else if (cell_data$time_point == "2"){
+      all_time_points <- append(all_time_points, "NT")
+    } else if (cell_data$time_point == "3"){
+      all_time_points <- append(all_time_points, "OSI")
+    }
+  } else {
+    if (cell_data$time_point == "1"){
+      all_time_points <- append(all_time_points, "NT")
+    } else if (cell_data$time_point == "2"){
+      all_time_points <- append(all_time_points, "OSI")
+    }
+  }}
+xeno.big <- AddMetaData(object = xeno.big, metadata = all_time_points, col.name="treatment")
+```
+
+```{r}
+library(qs)
+qsave(xeno.big, dirname(output$report))
+```
+

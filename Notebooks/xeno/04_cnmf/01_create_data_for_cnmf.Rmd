@@ -26,46 +26,11 @@ if (interactive()) {
   output = get_output(get_current_path())
 }
 ```
-```{r}
-#run once to install
-reticulate::conda_create(envname = "scanpy")
 
-  job::job({
-  reticulate::use_condaenv("scanpy")
-  print(reticulate::py_config()) # if you see that r-cnmf_dev has not been loaded, restart/terminate r and try again, DO NOT load reticulate before.
-  reticulate::conda_install(envname = "scanpy",
-              packages = c("scanpy=1.9.8",
-                      # "cnmf=1.5.0"
-                       "anndata>=0.7.4",
-                       "numpy>=1.17.0",
-                       "matplotlib>=3.6",
-                       "pandas>=1.1.1,<2.1.2",
-                       "scipy>=1.4",
-                       "seaborn>=0.13.0",
-                       "h5py>=3",
-                       "tqdm",
-                       "scikit-learn>=0.24",
-                       "statsmodels>=0.10.0rc2",
-                       "patsy",
-                       "networkx>=2.3",
-                       "natsort",
-                       "joblib",
-                       "numba>=0.41.0",
-                       "umap-learn>=0.3.10",
-                       "packaging",
-                       "session-info",
-                       "get-annotations"),
-              channel = c("conda-forge",
-                          rep("defaults", 20)))
-    job::export("none")
-  }, import = NULL, packages = NULL,title = "install scanpy conda env")
-  
-  
 
-```
 
 ```{r}
-reticulate::use_condaenv("C:/Users/avishaiw.EKMD/AppData/Local/r-miniconda/envs/scanpy",required = T)
+reticulate::use_condaenv("C:/Users/avishaiw.EKMD/AppData/Local/r-miniconda/envs/cnmf",required = T)
 reticulate::py_config() # if you see that r-cnmf_dev has not been loaded, restart/terminate r and try again, DO NOT load reticulate before.
 ```
 

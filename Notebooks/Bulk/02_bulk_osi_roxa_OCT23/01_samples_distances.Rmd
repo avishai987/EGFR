@@ -111,5 +111,4 @@ pheatmap(sampleDistMatrix,
          col=colors, main = "Sample Distance Matrix ",show_colnames = T,annotation_row  = annotation)+
     theme(axis.text.x = element_text(angle=30, hjust=1)) 
 ```
-<script src="https://hypothes.is/embed.js" async></script>
 
