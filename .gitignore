@@ -3,13 +3,11 @@
 .RData
 .Ruserdata
 Data/
-.Rprofile
 .cahce/
 .conda/
 .config/
 .local/
 .cache/
-EGFR.Rproj
 pythonProject/
 history.Rhistory
 .Rhistory
