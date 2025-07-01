@@ -1,37 +1,51 @@
 ---
-title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+title: '05_models_cnmf_analysis_k5' 
 author: "Avishai Wizel"
 date: '`r Sys.time()`'
-output: 
-  html_notebook: 
+output:
+  html_document: 
     code_folding: hide
     toc: yes
     toc_collapse: yes
     toc_float: 
-      collapsed: FALSE
+      collapsed: TRUE
     number_sections: true
-    toc_depth: 1
+    toc_depth: 2
+    df_print: paged
+params: 
+  data_out_dir: "./temp_data/" 
+
 editor_options: 
   chunk_output_type: inline
 ---
 
 
+```{r}
+#Get input and output
+source("./pipe.R")
+input = pipeline$models_programs_analysis$input
+output = pipeline$models_programs_analysis$output
+input_params = pipeline$models_programs_analysis$params
+```
+
 
 # Functions
-
 ```{r}
-reticulate::use_virtualenv("/sci/labs/yotamd/lab_share/avishai.wizel/python_envs/Virtual_env/cnmf_dev/",required = T)
-reticulate::py_config() # if you see that r-cnmf_dev has not been loaded, restart/terminate r and try again, DO NOT load reticulate before.
+name <- function(variables) {
+  
+}
 ```
+
+
 
 
 ```{r warning=FALSE}
 library(ggplotify)
 library(stringi)
 library(reticulate)
-library(GSEABase)
+suppressPackageStartupMessages(library(GSEABase))
 source_from_github(repositoy = "DEG_functions",version = "0.2.53")
-source_from_github(repositoy = "cNMF_functions",version = "0.4.23",script_name = "cnmf_functions_V3.R")
+source_from_github(repositoy = "cNMF_functions",version = "0.4.25",script_name = "cnmf_functions_V3.R")
 source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_name = "functions.R")
 
 ```
@@ -40,22 +54,17 @@ source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_
 # Data
 
 ```{r}
-xeno <- qs::qread("./input_data/xeno.qs")
-hif_targets = scan("./input_data/HIF_targets_Lombardi_PMC9869179.txt", character(), quote = "")
-genesets = getGmt("./input_data/h.all.v2023.2.Hs.symbols.gmt") %>% geneIds()
+xeno <- qs::qread(input$xeno)
+genesets = getGmt(input$genesets)  %>% geneIds()
+hif_targets =  scan(input$hif_targets, character(), quote = "")
 genesets[["HIF_targets"]] = hif_targets
-all_metagenes = readRDS("./input_data/cell_usage_by_TPM.RDS")
-gep_scores = readRDS("./input_data/gep_scores.RDS")
+xeno_cell_usage = readRDS(input$xeno_cell_usage)
+gep_scores = readRDS(input$gep_scores)
 ```
 
 
 
 ```{r fig.height=6, fig.width=14}
-xeno$orig.ident = paste0("MGH",xeno$orig.ident)
-p1  = DimPlot(xeno,group.by = "orig.ident")+ggtitle("")+ guides(color=guide_legend(title="Model",override.aes = list(size=3)))
-p2  =  DimPlot(xeno,group.by = "treatment",shuffle = T)+ggtitle("")+ guides(color=guide_legend(title="Treatment",override.aes = list(size=3)))
-p1+p2
-
 
 df = FetchData(xeno,vars = c("treatment","orig.ident"))
 
@@ -69,62 +78,6 @@ p = ggplot(df, aes(x = orig.ident, fill = treatment)) +
         axis.text.y = element_text(size = 15),legend.text = element_text(size = 20),legend.title = element_text(size = 20),plot.title = element_text(size = 25))
 p
 ```
-```{r}
-saveRDS(object = as.grob(p1),file = "./Figures/xeno_patient_umap.rds")
-saveRDS(object = as.grob(p2),file = "./Figures/xeno_treatment_umap.rds")
-saveRDS(object = as.grob(p),file = "./Figures/xeno_overview.rds")
-
-```
-
-
-# Programs GSEA {.tabset}
-
-
-```{r fig.height=11, fig.width=13}
-library(hypeR)
-plotlist = list()
-for (i in 1:ncol(gep_scores)) {
-  print(paste("program",i,"out of",ncol(gep_scores)))
-  ranked_vec = gep_scores %>% pull(i) %>%  setNames(rownames(gep_scores))
-  hyp_obj <-hypeR_fgsea(signature = ranked_vec,genesets = (genesets),up_only = T)
-
-  plt = hyp_dots(hyp_obj,merge = F,fdr = 0.2)+ aes(size=nes)+ggtitle(paste("program", i))+ 
-  guides(
-    size = guide_legend(title="NES",reverse=T))+scale_x_discrete(expand = expansion(add = c(1,2)))
-  plotlist[[i]] = plt
-}
-
-
-plotlist = lapply(plotlist,FUN = function(x) { #fix cropped edges
-  x = x +
-  theme(plot.margin = margin(0.1,1,0.1,0.01, "cm")) 
-})
-
-plotlist = lapply(plotlist,FUN = function(x) { #fix cropped edges
-  x = x + scale_y_continuous(trans = hypeR:::.reverselog_trans(10), 
-        breaks =exp(-seq(-log(min(x$data$fdr)), -log(max(x$data$fdr)), 
-            length.out = 6)) %>% signif(digits = 2))
-})
-
-
-
-p = ggarrange(plotlist = plotlist,common.legend = T,nrow = 3,ncol = 2)
-p
-
-
-```
-
-```{r fig.height=8, fig.width=13}
-p = ggarrange(plotlist = plotlist[1:4],common.legend = T,nrow = 2,ncol = 2)
-p
-```
-
-```{r}
-saveRDS(object = as.grob(p),file = "./Figures/xeno_nmf_GSEA.rds")
-
-```
-
-
 
 
 
@@ -133,18 +86,20 @@ saveRDS(object = as.grob(p),file = "./Figures/xeno_nmf_GSEA.rds")
 ```{r fig.height=7, fig.width=12, results='asis'}
 
 #add each metagene to metadata
-for (i  in 1:ncol(all_metagenes)) {
-  metagene_metadata = all_metagenes[,i,drop=F]
-  xeno = AddMetaData(object = xeno,metadata = metagene_metadata,col.name = names(all_metagenes)[i])
+for (i  in 1:ncol(xeno_cell_usage)) {
+  metagene_metadata = xeno_cell_usage[,i,drop=F]
+  xeno = AddMetaData(object = xeno,metadata = metagene_metadata,col.name = names(xeno_cell_usage)[i])
 }
 
-p = FeaturePlot(object = xeno,features = colnames(all_metagenes),ncol = 3)
+p = FeaturePlot(object = xeno,features = colnames(xeno_cell_usage),ncol = 3)
 
 p
 ```
 
 ```{r}
-saveRDS(object = as.grob(p),file = "./Figures/xeno_NMF_usage_UMAP.rds")
+svg(params$data_out_dir %s+% "xeno_programs_usage_UMAP.svg",height = 7,width = 12)
+p
+dev.off()
 ```
 
 # Heatmap
@@ -163,8 +118,8 @@ data = data[,!data_row_means<0.05] # remove genes with expression less than 0.05
 all_programs_top_genes = all_programs_top_genes[!data_row_means<0.05,] %>% select(!top)
 data = data %>% scale() %>% t()
 
-annotation_data = FetchData(object = xeno, vars = c(names(all_metagenes)[1:4],"treatment","orig.ident"))
-# annotation_data = FetchData(object = xeno, vars =names(all_metagenes)[1:4])
+annotation_data = FetchData(object = xeno, vars = c(names(xeno_cell_usage)[1:4],"treatment","orig.ident"))
+# annotation_data = FetchData(object = xeno, vars =names(xeno_cell_usage)[1:4])
 
 data = data[,1:1000] # take small data for debug
 annotation_data = annotation_data [1:1000,] #debug
@@ -308,17 +263,17 @@ DotPlot.2 <- eval(parse(text=newDef))
 
 ```{r}
 # scale metagene and add to metadata
-for (i  in 1:ncol(all_metagenes)) {
-  metagene_metadata = all_metagenes[,i,drop=F] %>% scale()
-  xeno = AddMetaData(object = xeno,metadata = metagene_metadata,col.name = paste0(names(all_metagenes)[i],"_scaled"))
+for (i  in 1:ncol(xeno_cell_usage)) {
+  metagene_metadata = xeno_cell_usage[,i,drop=F] %>% scale()
+  xeno = AddMetaData(object = xeno,metadata = metagene_metadata,col.name = paste0(names(xeno_cell_usage)[i],"_scaled"))
 }
 ```
 
 ```{r}
-xeno = program_assignment(dataset = xeno,program_names = names(all_metagenes),larger_by = 2)
+xeno = program_assignment(dataset = xeno,program_names = names(xeno_cell_usage),larger_by = 2)
 
 
-data = FetchData(object = xeno,vars = c(paste0(names(all_metagenes),"_scaled"),"treatment","program.assignment"))%>%
+data = FetchData(object = xeno,vars = c(paste0(names(xeno_cell_usage),"_scaled"),"treatment","program.assignment"))%>%
   group_by(treatment) %>% 
   summarize(
     across(c(-program.assignment), mean), # 
@@ -349,7 +304,7 @@ p = ggplot(data = data2, mapping = aes_string(x = "program",
     labs(x = "Features", y = "Treatment") + cowplot::theme_cowplot()+
   scale_color_gradient(low = "lightblue", high = "darkblue")
 # change x axis names to program names
- p+scale_x_discrete(labels= paste0(names(all_metagenes),"\n(",c("IFNa","TNFa-NFKb","HIF","Cell_Cycle"),")"))
+ p+scale_x_discrete(labels= paste0(names(xeno_cell_usage),"\n(",c("IFNa","TNFa-NFKb","HIF","Cell_Cycle"),")"))
 p
 ```
 
@@ -368,7 +323,7 @@ saveRDS(object = as.grob(p),file = "./Figures/xeno_NMF_programs_dotplot.rds")
 # NMF programs regulation  {.tabset}
 
 ```{r echo=TRUE, fig.height=4, fig.width=7, results='asis'}
-p = metagenes_violin_compare(dataset = xeno,prefix = "model",pre_on = c("NT","OSI"),test = "wilcox.test",programs = colnames(all_metagenes)[3], return_list = T)
+p = metagenes_violin_compare(dataset = xeno,prefix = "model",pre_on = c("NT","OSI"),test = "wilcox.test",programs = colnames(xeno_cell_usage)[3], return_list = T)
 p = p[[1]]+xlab("Model")+ylab(paste( "Program 3 (HIF)\n Z-score"))
 
 p
@@ -384,7 +339,7 @@ program_names =  c("IFNa","TNFa", "cell cycle","EMT")
 
 ```{r fig.height=5, fig.width=11}
 # for sup:
-plt_list = metagenes_violin_compare(dataset = xeno,prefix = "model",pre_on = c("NT","OSI"),test = "wilcox.test",programs = colnames(all_metagenes)[-c(3)],return_list =  T)
+plt_list = metagenes_violin_compare(dataset = xeno,prefix = "model",pre_on = c("NT","OSI"),test = "wilcox.test",programs = colnames(xeno_cell_usage)[-c(3)],return_list =  T)
 
 for (i in 1:length(plt_list)) {
   plt_list[[i]] = plt_list[[i]]+xlab("Model")+ylab(paste0( "Program ",i," (",program_names[i],")\n Z-score"))
