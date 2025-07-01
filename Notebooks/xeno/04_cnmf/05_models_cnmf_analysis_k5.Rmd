@@ -31,9 +31,7 @@ input_params = pipeline$models_programs_analysis$params
 
 # Functions
 ```{r}
-name <- function(variables) {
-  
-}
+library(ggpubr)
 ```
 
 
@@ -45,7 +43,7 @@ library(stringi)
 library(reticulate)
 suppressPackageStartupMessages(library(GSEABase))
 source_from_github(repositoy = "DEG_functions",version = "0.2.53")
-source_from_github(repositoy = "cNMF_functions",version = "0.4.25",script_name = "cnmf_functions_V3.R")
+source_from_github(repositoy = "cNMF_functions",version = "0.4.3",script_name = "cnmf_functions_V3.R")
 source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_name = "functions.R")
 
 ```
@@ -161,15 +159,6 @@ dev.off()
 
 
 
-```{r warning=FALSE}
-# modify dotplot to be without exponent of the expression
-newDef <- deparse(DotPlot)
-newDef[57] =  "            return(mean(x =  x))"
-newDef[136] =  "            yes = \"Identity\", no = \"Split Identity\")) + cowplot::theme_cowplot()" #add package name
-newDef[95] = "                data.use <- data.use" # remove log
-newDef[146] = "        plot <- plot + scale_color_distiller(palette = cols,  direction = 1)"
-DotPlot.2 <- eval(parse(text=newDef))
-```
 
 # Programs dotplot
 
@@ -185,38 +174,8 @@ for (i  in 1:ncol(xeno_cell_usage)) {
 xeno = program_assignment(dataset = xeno,program_names = names(xeno_cell_usage),larger_by = 2)
 
 
-data = FetchData(object = xeno,vars = c(paste0(names(xeno_cell_usage),"_scaled"),"treatment","program.assignment"))%>%
-  group_by(treatment) %>% 
-  summarize(
-    across(c(-program.assignment), mean), # 
-    program.1  = sum(program.assignment == "Program.1"),
-    program.2  = sum(program.assignment == "Program.2"),
-    program.3  = sum(program.assignment == "Program.3"),
-    program.4  = sum(program.assignment == "Program.4"),
-    program.5  = sum(program.assignment == "Program.5"),
-    n = n()
-  ) %>% ungroup() %>% 
-  t() %>% as.data.frame() %>% janitor::row_to_names(1) %>% rownames_to_column("program") %>% 
-  pivot_longer(!program, names_to = "treatment", values_to = "value")
-data2 = cbind(data[1:15,],data[16:30,])
-cell_count_df = data[31:33,] %>% select(treatment,value) %>% dplyr::rename(cell_count = value) 
-data2 = data2[,-c(1,2)] %>% dplyr::rename(assigned_cells = value.1,z_score_level = value)
-data2 = left_join(data2, cell_count_df, by = "treatment")%>%
-  mutate(
-    z_score_level = as.numeric(z_score_level),
-    assigned_cells = as.numeric(assigned_cells),
-    cell_count = as.numeric(cell_count)
-  )
-data2 = data2  %>% mutate(precntg = assigned_cells/cell_count)
 
-p = ggplot(data = data2, mapping = aes_string(x = "program", 
-    y = "treatment")) + geom_point(mapping = aes_string(size = "precntg", 
-    color = 'z_score_level')) + scale_size(range = c(1, 8)) + theme(axis.title.x = element_blank(), 
-    axis.title.y = element_blank()) + guides(size = guide_legend(title = "assigned/all_cells")) + 
-    labs(x = "Features", y = "Treatment") + cowplot::theme_cowplot()+
-  scale_color_gradient(low = "lightblue", high = "darkblue")
-# change x axis names to program names
- p+scale_x_discrete(labels= paste0(names(xeno_cell_usage),"\n(",c("IFNa","TNFa-NFKb","HIF","Cell_Cycle"),")"))
+p = programs_dotplot(seurat_obj = xeno,treatment_var = "treatment")
 p
 ```
 
@@ -225,7 +184,9 @@ p
 
 
 ```{r}
-saveRDS(object = as.grob(p),file = "./Figures/xeno_NMF_programs_dotplot.rds")
+svg(params$data_out_dir %s+% "xeno_programs_dotplot.svg")
+p
+dev.off()
 ```
 
 
@@ -242,14 +203,16 @@ p
 ```
 
 ```{r}
-saveRDS(object = as.grob(p),file = "./Figures/xeno_NMF_hypoxia_split_violin.rds")
+svg(params$data_out_dir %s+% "HIF_program_violin_xeno.svg",height = 4,width = 7)
+p
+dev.off()
 ```
 
-```{r}
-program_names =  c("IFNa","TNFa", "cell cycle","EMT")
-```
+
 
 ```{r fig.height=5, fig.width=11}
+program_names =  c("IFNa","TNFa", "cell cycle","EMT")
+
 # for sup:
 plt_list = metagenes_violin_compare(dataset = xeno,prefix = "model",pre_on = c("NT","OSI"),test = "wilcox.test",programs = colnames(xeno_cell_usage)[-c(3)],return_list =  T)
 
@@ -262,14 +225,11 @@ p
 ```
 
 ```{r}
-saveRDS(object = as.grob(p),file = "./Figures/xeno_NMF_NOhypoxia_split_violin.rds")
+svg(params$data_out_dir %s+% "HIF_program_violin_xeno.svg",height = 4,width = 7)
+p
+dev.off()
 ```
 
-
-
-```{r}
-saveRDS(object = as.grob(p),file = "./Figures/xeno_patient_hifTargets_split_violin.rds")
-```
 
 
 
