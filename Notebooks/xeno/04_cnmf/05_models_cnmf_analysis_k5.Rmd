@@ -233,33 +233,33 @@ dev.off()
 
 
 
-# known genes score
+# leading edge genes score
 ```{r}
-
-ranked_vec = gep_scores[,1] %>% setNames(rownames(gep_scores)) %>% sort(decreasing = TRUE) 
-hyp_obj <- hypeR_fgsea(ranked_vec, genesets)
-le_genes_ifna =  hyp_obj$data %>% filter(label == "HALLMARK_INTERFERON_ALPHA_RESPONSE") %>% pull("le") %>% strsplit(",") %>% unlist()
-
-ranked_vec = gep_scores[,2] %>% setNames(rownames(gep_scores)) %>% sort(decreasing = TRUE) 
-hyp_obj <- hypeR_fgsea(ranked_vec, genesets)
-le_genes_tnfa =  hyp_obj$data %>% filter(label == "HALLMARK_TNFA_SIGNALING_VIA_NFKB") %>% pull("le") %>% strsplit(",") %>% unlist()
-
-ranked_vec = gep_scores[,3] %>% setNames(rownames(gep_scores)) %>% sort(decreasing = TRUE) 
-hyp_obj <- hypeR_fgsea(ranked_vec, genesets)
-le_genes_hif =  hyp_obj$data %>% filter(label == "HIF_targets") %>% pull("le") %>% strsplit(",") %>% unlist()
-
-
-gene_list = list(IFNa_genes = genesets$HALLMARK_INTERFERON_ALPHA_RESPONSE, TNFa_genes = genesets$HALLMARK_TNFA_SIGNALING_VIA_NFKB, hif_targets = hif_targets,E2F_genes = genesets$HALLMARK_E2F_TARGETS,gep2_top = gep_scores  %>%  arrange(desc(gep_scores[2])) %>% rownames() %>% head(200),TNFa_le = le_genes_tnfa,hif_le = le_genes_hif,IFNa_le  = le_genes_ifna)
-# xeno = ScaleData(object = xeno,features = unlist(gene_list))
-for (i in seq_along(gene_list)) {
-  genes = gene_list[[i]]
-  name = names(gene_list)[i]
-  scores = FetchData(object = xeno,vars = genes,slot = "data")  %>%  expm1()  %>%  rowMeans() #use  TPM
-    # scores = FetchData(object = xeno,vars = genes,slot = "data")  %>%  rowMeans() #use  TPM
-
-  xeno %<>% AddMetaData(metadata = scores,col.name = name)
-
-}
+# 
+# ranked_vec = gep_scores[,1] %>% setNames(rownames(gep_scores)) %>% sort(decreasing = TRUE) 
+# hyp_obj <- hypeR_fgsea(ranked_vec, genesets)
+# le_genes_ifna =  hyp_obj$data %>% filter(label == "HALLMARK_INTERFERON_ALPHA_RESPONSE") %>% pull("le") %>% strsplit(",") %>% unlist()
+# 
+# ranked_vec = gep_scores[,2] %>% setNames(rownames(gep_scores)) %>% sort(decreasing = TRUE) 
+# hyp_obj <- hypeR_fgsea(ranked_vec, genesets)
+# le_genes_tnfa =  hyp_obj$data %>% filter(label == "HALLMARK_TNFA_SIGNALING_VIA_NFKB") %>% pull("le") %>% strsplit(",") %>% unlist()
+# 
+# ranked_vec = gep_scores[,3] %>% setNames(rownames(gep_scores)) %>% sort(decreasing = TRUE) 
+# hyp_obj <- hypeR_fgsea(ranked_vec, genesets)
+# le_genes_hif =  hyp_obj$data %>% filter(label == "HIF_targets") %>% pull("le") %>% strsplit(",") %>% unlist()
+# 
+# 
+# gene_list = list(IFNa_genes = genesets$HALLMARK_INTERFERON_ALPHA_RESPONSE, TNFa_genes = genesets$HALLMARK_TNFA_SIGNALING_VIA_NFKB, hif_targets = hif_targets,E2F_genes = genesets$HALLMARK_E2F_TARGETS,gep2_top = gep_scores  %>%  arrange(desc(gep_scores[2])) %>% rownames() %>% head(200),TNFa_le = le_genes_tnfa,hif_le = le_genes_hif,IFNa_le  = le_genes_ifna)
+# # xeno = ScaleData(object = xeno,features = unlist(gene_list))
+# for (i in seq_along(gene_list)) {
+#   genes = gene_list[[i]]
+#   name = names(gene_list)[i]
+#   scores = FetchData(object = xeno,vars = genes,slot = "data")  %>%  expm1()  %>%  rowMeans() #use  TPM
+#     # scores = FetchData(object = xeno,vars = genes,slot = "data")  %>%  rowMeans() #use  TPM
+# 
+#   xeno %<>% AddMetaData(metadata = scores,col.name = name)
+# 
+# }
 
 
 
@@ -279,7 +279,7 @@ for (i in seq_along(gene_list)) {
   genes = genes[genes %in% rownames(xeno)]
   scores = FetchData(object = xeno,vars = c(genes,patient_var))
   scores = scores %>% mutate(r = rowMeans(dplyr::select_at(scores,vars(-contains(patient_var))))) %>% # z score every patient separately 
-    group_by_at(patient_var) %>% summarise(r = scale(r)) %>% pull(r) %>% as.data.frame() 
+    group_by_at(patient_var) %>% plyr::summarise(r = scale(r)) %>% pull(r) %>% as.data.frame() 
   print(name)
   xeno %<>% AddMetaData(metadata = scores,col.name = name)
 }
@@ -303,15 +303,6 @@ saveRDS(object = as.grob(p1),file = "./Figures/xeno_hif_targets_violin.rds")
 ```
 
 
-```{r fig.height=4, fig.width=11}
-
-p = DotPlot.2(object = xeno, features =   names(gene_list),group.by  = 'treatment',scale = F)+
-  guides(size = guide_legend(title = "Cells above average (%)"),color = guide_colorbar(title = "Average Score"))
-p
-```
-```{r}
-saveRDS(object = as.grob(p),file = "./Figures/xeno_signtures_dotplot.rds")
-```
 
 
 # new
@@ -328,7 +319,7 @@ for (i in seq_along(gene_list)) {
   genes = genes[genes %in% rownames(xeno)]
   scores = FetchData(object = xeno,vars = c(genes,patient_var))
   scores = scores %>% mutate(r = rowMeans(dplyr::select_at(scores,vars(-contains(patient_var))))) %>% # z score every patient separately 
-    group_by_at(patient_var) %>% summarise(r = scale(r)) %>% pull(r) %>% as.data.frame() 
+    group_by_at(patient_var) %>% plyr::summarise(r = scale(r)) %>% pull(r) %>% as.data.frame() 
   print(name)
   xeno %<>% AddMetaData(metadata = scores,col.name = name)
 }
@@ -347,103 +338,5 @@ p2
 saveRDS(object = as.grob(p2),file = "./Figures/xeno_hif_targets_violin.rds")
 ```
 
-## Dotplot
-
-```{r}
-# scale for all cells
-for (i in seq_along(gene_list)) {
-  genes = gene_list[[i]]
-  name = paste0(names(gene_list)[i],"_scaled")
-  genes = genes[genes %in% rownames(xeno)]
-  scores = FetchData(object = xeno,vars = c(genes)) %>% rowMeans() %>% scale()
-  xeno %<>% AddMetaData(metadata = scores,col.name = name)
-}
-```
-
-```{r warning=FALSE}
-# modify dotplot to be without exponent of the expression
-newDef <- deparse(DotPlot)
-newDef[57] =  "            return(mean(x =  x))" # remove exponent
-newDef[136] =  "            yes = \"Identity\", no = \"Split Identity\")) + cowplot::theme_cowplot()" #add package name
-newDef[95] = "                data.use <- data.use" # remove log
-newDef[146] = "        plot <- plot + scale_color_distiller(palette = cols,  direction = 1)"
-DotPlot.2 <- eval(parse(text=newDef))
-```
-
-
-```{r fig.height=4, fig.width=11}
-
-p = DotPlot.2(object = xeno, features =  paste0(names(gene_list),"_scaled"),group.by  = 'treatment',scale = F)+
-  guides(size = guide_legend(title = "Cells above average (%)"),
-         color = guide_colorbar(title = "Average Score"))+ 
-  scale_y_discrete(limits = c("NT","OSI"))+
-  scale_x_discrete(labels= names(gene_list))
-p
-```
-
-```{r}
-saveRDS(object = as.grob(p),file = "./Figures/xeno_signtures_dotplot.rds")
-```
-
-
-# known genes signatures TPM
-```{r}
-patient_var = "orig.ident"
-for (i in seq_along(gene_list)) {
-  genes = gene_list[[i]]
-  name = names(gene_list)[i]
-  genes = genes[genes %in% rownames(xeno)]
-  scores = FetchData(object = xeno,vars = c(genes,patient_var))
-  scores[,1:(ncol(scores)-1)] = (2^scores[,1:(ncol(scores)-1)])-1 # log(tpm+1)to tpm without last col (patients idents)
-  scores = scores %>% mutate(r = rowMeans(dplyr::select_at(scores,vars(-contains(patient_var))))) %>% # z score every patient separately 
-    group_by_at(patient_var) %>% summarise(r = scale(r)) %>% pull(r) %>% as.data.frame() 
-  print(name)
-  xeno %<>% AddMetaData(metadata = scores,col.name = name)
-}
-
-```
-
-
-## violin
-```{r}
-p2 = metagenes_violin_compare(dataset = xeno,prefix = "Model",pre_on = c("NT","OSI"),test = "wilcox.test",programs = "hif_targets", return_list = T)[[1]] + xlab("Model")+
-  ylab("HIF targets Z-score")
-p2
-```
-
-```{r}
-saveRDS(object = as.grob(p2),file = "./Figures/xeno_hif_targets_TPM_violin.rds")
-```
-
-## Dotplot
-
-```{r}
-# scale for all cells
-for (i in seq_along(gene_list)) {
-  genes = gene_list[[i]]
-  name = paste0(names(gene_list)[i],"_scaled")
-  genes = genes[genes %in% rownames(xeno)]
-  scores = FetchData(object = xeno,vars = c(genes))
-  scores = (2^scores)-1 
-  scores = scores %>%  rowMeans() %>% scale() #log(tpm+1)to tpm
-  xeno %<>% AddMetaData(metadata = scores,col.name = name)
-}
-```
-
-
-```{r fig.height=4, fig.width=11}
-
-p = DotPlot.2(object = xeno, features =  paste0(names(gene_list),"_scaled"),group.by  = 'treatment',scale = F)+
-  guides(size = guide_legend(title = "Cells above average (%)"),
-         color = guide_colorbar(title = "Average Score"))+ 
-  scale_y_discrete(limits = c("NT","OSI"))+
-  scale_x_discrete(labels= names(gene_list))
-p
-```
-
-
-```{r}
-saveRDS(object = as.grob(p),file = "./Figures/xeno'_signtures_TPM_dotplot.rds")
-```
 
 
