@@ -233,66 +233,6 @@ dev.off()
 
 
 
-```{r fig.height=15}
-# heatmap with clutering per model and time point
-data = FetchData(object = xeno, vars = c(hif_targets,"orig.ident"))
-data[] <- data %>%  group_by(orig.ident) %>%
-  mutate(across(is.numeric, ~ as.numeric(scale(.)))) %>% ungroup() # scale per model
-data = data %>% select(-orig.ident) # remove ident var
-data = data %>% t() %>% as.data.frame()
-
-annotation_data = FetchData(object = xeno, vars = c("orig.ident","treatment")) %>% dplyr::arrange(orig.ident,treatment)
-column_ha = HeatmapAnnotation(Treatment = annotation_data[,2], #set annotation
-                              col = list(Treatment = c("NT" = "red", "OSI" = "green", "res" = "blue"))) 
-data = data[,rownames(annotation_data)] #order data like annotation
-data = na.omit(data)
-column_split = paste(annotation_data$orig.ident,annotation_data$treatment,sep = "\n") #split by ident+tp
-column_names = unique(column_split) %>% gsub(pattern = "119\nOSI",replacement = "      119\n      OSI") #adujst location to avoid overlap
-
-p = ComplexHeatmap::Heatmap(
-  data,
-  show_column_names = F,
-  row_names_gp = grid::gpar(fontsize = 10),
-  cluster_rows = T,
-  top_annotation = column_ha,
-  name = "Z-score expression",use_raster = F,cluster_columns = T,column_split = column_split,
-  column_title = column_names,
-  column_gap = unit(2, "mm"), border = TRUE,show_parent_dend_line = FALSE, show_column_dend = F,cluster_column_slices = F)
-
-  
-p
-```
-
-
-```{r fig.height=15}
-
-data = FetchData(object = xeno, vars = c(hif_targets,"orig.ident"))
-data[] <- data %>%  group_by(orig.ident) %>% mutate(across(is.numeric, ~ as.numeric(scale(.)))) %>% ungroup() %>% select(-orig.ident) 
-data = data %>% t() %>% as.data.frame()
-
-annotation_data = FetchData(object = xeno, vars = c("orig.ident","treatment")) %>% dplyr::arrange(orig.ident,treatment)
-column_ha = HeatmapAnnotation(df = annotation_data[,2])
-data = data[,rownames(annotation_data)] #order data like annotation
-data = na.omit(data)
-p = ComplexHeatmap::Heatmap(
-  data,
-  show_column_names = F,
-  row_names_gp = grid::gpar(fontsize = 7),
-  cluster_rows = T,
-  top_annotation = column_ha,
-  name = "Z-score expression",use_raster = F,cluster_columns = F,column_split   = annotation_data$orig.ident,
-  column_gap = unit(2, "mm"), border = TRUE,show_parent_dend_line = FALSE, show_column_dend = FALSE,cluster_column_slices = F
-)
-  
-p
-```
-
-```{r fig.height=7, fig.width=10}
-p = DoHeatmap(object = xeno,features = hif_targets,group.by = "treatment")
-p
-
-```
-
 # known genes score
 ```{r}
 
