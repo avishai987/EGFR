@@ -104,147 +104,59 @@ dev.off()
 
 # Heatmap
 ```{r fig.height=10}
-all_programs_top_genes = data.frame()
-for (i in 1:(ncol(gep_scores)-1)) {
-  top_genes = gep_scores  %>%  arrange(desc(gep_scores[i])) #sort by score a
-  top = head(rownames(top_genes), 20) #take top top_genes_num
-  all_programs_top_genes = rbind(all_programs_top_genes, data.frame(row.names = top, 
-                                                                    top = top, program = paste("program",i)))
-}
-
-data = FetchData(object = xeno, vars = all_programs_top_genes$top)
-data_row_means = data %>% colMeans()
-data = data[,!data_row_means<0.05] # remove genes with expression less than 0.05
-all_programs_top_genes = all_programs_top_genes[!data_row_means<0.05,] %>% select(!top)
-data = data %>% scale() %>% t()
-
-annotation_data = FetchData(object = xeno, vars = c(names(xeno_cell_usage)[1:4],"treatment","orig.ident"))
-# annotation_data = FetchData(object = xeno, vars =names(xeno_cell_usage)[1:4])
-
-data = data[,1:1000] # take small data for debug
-annotation_data = annotation_data [1:1000,] #debug
-annotation_data = annotation_data %>% dplyr::rename( model = orig.ident)
-col_dend = as.dendrogram(hclust(dist(annotation_data[,1:4]),method = "complete")) # cluster based on 4 programs
-
-col_fun = circlize::colorRamp2(c(0, 1), c("white", "red"))
-models_colors = rainbow(6,alpha = 1) %>% purrr::set_names(unique(xeno$orig.ident))
-column_ha = HeatmapAnnotation(df = annotation_data, col = list(Program.1 = col_fun,Program.2 = col_fun,Program.3 = col_fun,Program.4 = col_fun,unknown = col_fun, treatment  = c(NT = "red",OSI = "green",res = "blue"),model = models_colors))
-colors_list = my_list <- list(program = setNames(c("blue", "green", "red","orange"), unique(all_programs_top_genes$program)))
-
-row_ha = rowAnnotation(df = all_programs_top_genes,
-                       col =  colors_list)
-
-p = ComplexHeatmap::Heatmap(
-  data,
-  show_column_names = F,
-  row_names_gp = grid::gpar(fontsize = 7),
-  cluster_rows = F,
-  top_annotation =
-    column_ha,
-  name = "Z-score expression",use_raster = F,cluster_columns = col_dend,right_annotation = row_ha
-)
-  
+# all_programs_top_genes = data.frame()
+# for (i in 1:(ncol(gep_scores)-1)) {
+#   top_genes = gep_scores  %>%  arrange(desc(gep_scores[i])) #sort by score a
+#   top = head(rownames(top_genes), 20) #take top top_genes_num
+#   all_programs_top_genes = rbind(all_programs_top_genes, data.frame(row.names = top, 
+#                                                                     top = top, program = paste("program",i)))
+# }
+# 
+# data = FetchData(object = xeno, vars = all_programs_top_genes$top)
+# data_row_means = data %>% colMeans()
+# data = data[,!data_row_means<0.05] # remove genes with expression less than 0.05
+# all_programs_top_genes = all_programs_top_genes[!data_row_means<0.05,] %>% select(!top)
+# data = data %>% scale() %>% t()
+# 
+# annotation_data = FetchData(object = xeno, vars = c(names(xeno_cell_usage)[1:4],"treatment","orig.ident"))
+# # annotation_data = FetchData(object = xeno, vars =names(xeno_cell_usage)[1:4])
+# 
+# data = data[,1:1000] # take small data for debug
+# annotation_data = annotation_data [1:1000,] #debug
+# annotation_data = annotation_data %>% dplyr::rename( model = orig.ident)
+# col_dend = as.dendrogram(hclust(dist(annotation_data[,1:4]),method = "complete")) # cluster based on 4 programs
+# 
+# col_fun = circlize::colorRamp2(c(0, 1), c("white", "red"))
+# models_colors = rainbow(6,alpha = 1) %>% purrr::set_names(unique(xeno$orig.ident))
+# column_ha = HeatmapAnnotation(df = annotation_data, col = list(Program.1 = col_fun,Program.2 = col_fun,Program.3 = col_fun,Program.4 = col_fun,unknown = col_fun, treatment  = c(NT = "red",OSI = "green",res = "blue"),model = models_colors))
+# colors_list = my_list <- list(program = setNames(c("blue", "green", "red","orange"), unique(all_programs_top_genes$program)))
+# 
+# row_ha = rowAnnotation(df = all_programs_top_genes,
+#                        col =  colors_list)
+# 
+# p = ComplexHeatmap::Heatmap(
+#   data,
+#   show_column_names = F,
+#   row_names_gp = grid::gpar(fontsize = 7),
+#   cluster_rows = F,
+#   top_annotation =
+#     column_ha,
+#   name = "Z-score expression",use_raster = F,cluster_columns = col_dend,right_annotation = row_ha
+# )
+#   
 
 ```
 
 ```{r fig.height=7, fig.width=4}
-p = ComplexHeatmap::Heatmap(
-  gep_scores,
-  cluster_columns = F,
-  show_column_names = T,
-  show_row_names = F,
-  cluster_rows = T,
-  name = "score",use_raster = F
-)
-p
-```
-
-
-```{r}
-saveRDS(object = as.grob(p),file = "./Figures/xeno_NMF_programs_heatmap.rds")
-```
- 
-```{r fig.height=12, fig.width=12} 
-# Description
-p
-```
-
-#  per patient programs heatmap
-```{r fig.height=6, fig.width=17}
-for (model in unique(xeno$orig.ident)) {
-  model_data = subset(x = xeno,subset = orig.ident == model)
-  data = FetchData(object = model_data, vars = c(paste0("Program.", 1:4),"treatment"))
-  colnames(data)[1:4] = paste(c("IFNa","TNFa-NFKb","HIF","CC"),"program")
-
-  # data = data[1:100, ]
-  col_dend = hclust(dist(data[,1:4],), method = "average") # cluster cells by program expression
-  # col_dend = hclust(as.dist(cor(t(data[,1:4]))), method = "complete")
-
-  data = data[col_dend$order, ] #reorder cells by dendogram
-
-  
-  cols <- c("NT" = "red", "OSI" = "green") #make colors
-  if ("res" %in% unique(data$treatment)) {
-    cols = c(cols,c("res" = "blue"))
-  }
-  
-  
-data_to_plot = t(data)[1:4,] %>% as.data.frame()
-data_to_plot <- mutate_all(data_to_plot, function(x) as.numeric(x))
-library(circlize)
-column_ha = HeatmapAnnotation(df = data[,5,drop=F], col = list(treatment  = c(NT = "red",OSI = "green",res = "blue")))
-
-col_fun = colorRamp2(c(0,1), c("white", "red"))
-
-p = ComplexHeatmap::Heatmap(
-  data_to_plot,
-  show_column_names = F,show_row_names = T,
-  row_names_gp = grid::gpar(fontsize = 7),
-  cluster_rows = F,
-  name = "score",use_raster = F,cluster_columns = T, col = col_fun,column_title = model,top_annotation = column_ha,clustering_method_columns = "average"
-)
-
-print(p)
-  }
-
-
-
-```
-
-#  line plots
-```{r fig.height=6, fig.width=17}
-for (model in unique(xeno$orig.ident)) {
-  model_data = subset(x = xeno,subset = orig.ident == model)
-  # line plots
-  data = FetchData(object = model_data, vars = c(paste0("Program.", 1:4),"treatment"))
-  colnames(data)[1:4] = paste(c("IFNa","TNFa-NFKb","HIF","CC"),"program")
-
-  # data = data[1:100, ]
-  col_dend = hclust(dist(data[,1:4],), method = "average") # cluster cells by program expression
-  # col_dend = hclust(as.dist(cor(t(data[,1:4]))), method = "complete")
-
-  data = data[col_dend$order, ] #reorder cells by dendogram
-  data$cell = 1:nrow(data) # cell count
-  d <- reshape2::melt(data, id = c("cell","treatment"))
-  
-  cols <- c("NT" = "red", "OSI" = "green") #make colors
-  if ("res" %in% unique(data$treatment)) {
-    cols = c(cols,c("res" = "blue"))
-  }
-
-  p = ggplot(d, aes(x = cell, y = value, color = variable)) + 
-    geom_rect(aes(xmin = cell, xmax = cell+1, fill = treatment),  # fill colors by treatment
-              ymin = 0, ymax = 1, alpha = 0.2,data = data, inherit.aes = F) + scale_fill_manual(values = cols)+
-    geom_line(size = 1) + #plot lines by program expression
-    theme(axis.text.x = element_blank(),
-          axis.ticks.x = element_blank())+ggtitle(model)
-  
- 
-  print(p)
-  }
-
-
-
+# p = ComplexHeatmap::Heatmap(
+#   gep_scores,
+#   cluster_columns = F,
+#   show_column_names = T,
+#   show_row_names = F,
+#   cluster_rows = T,
+#   name = "score",use_raster = F
+# )
+# p
 ```
 
 
