@@ -21,11 +21,9 @@ params:
 ---
 
 ```{r}
-if (interactive()) {
-  source("./pipe.R")
-  input = get_input(get_current_path())
-  output = get_output(get_current_path())
-}
+source("./pipe.R")
+input = pipeline$bulk_mar25_H1975$input
+output = pipeline$bulk_mar25_H1975$output
 ```
 
 
@@ -196,7 +194,7 @@ up_genes = up_genes_df %>% rownames()
 down_genes = down_genes_df %>% rownames()
 
 gene_descriptions <- AnnotationDbi::select(org.Hs.eg.db, keys = up_genes, columns = "GENENAME", keytype = "SYMBOL")
-
+ /
 print_tab(cbind(up_genes_df,gene_description = gene_descriptions$GENENAME),
           title = "up")
 
@@ -243,3 +241,26 @@ if(length(down_genes)>=3){
   print(plt2)
 }
 ```
+
+```{r}
+library(ggrepel)
+up_genes_df =  diff_genes %>% filter(cpVSop_FC > 1.3 & roxaVSctrl_FC<1.2 & cpVSop_padj<0.05) 
+down_genes_df = diff_genes %>% filter(cpVSop_FC < 0.5 & roxaVSctrl_FC>0.8 & cpVSop_padj<0.05)
+diff_genes_signif = rbind(up_genes_df,down_genes_df)
+diff_genes_signif = diff_genes_signif %>% mutate(signif = if_else(condition = cpVSop_padj<0.05,true = "signif",false = "ns"))
+ggplot(diff_genes_signif, aes(x=cpVSop_FC, y=roxaVSctrl_FC)) +
+  geom_point() + 
+  geom_text_repel(label=rownames(diff_genes_signif),max.overlaps = 10)
+```
+
+#TGFb in OSI vctrl
+```{r}
+tgfb_genes = c("SMAD2","SMAD3","SMAD4","TGFB1","TGFB2","TGFB3","TGFBR1","TGFBR2")
+opVSctrl <- results(dds,contrast = c("condition","osi_persistor","Veh"))  %>% as.data.frame()
+opVSosiShort <- results(dds,contrast = c("condition","osi_persistor","osi_short"))  %>% as.data.frame()
+
+tgfb_fc = data.frame(row.names =tgfb_genes, combo_Persisters_vs_op = cpVSop[tgfb_genes,"log2FoldChange"], osi_persisters_VS_ctrl = opVSctrl[tgfb_genes,"log2FoldChange"],
+                     osi_persisters_VS_osiShort =  opVSosiShort[tgfb_genes,"log2FoldChange"])
+tgfb_fc
+```
+
