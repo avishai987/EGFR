@@ -1,0 +1,54 @@
+---
+title: "R Notebook"
+output:
+  html_document: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: TRUE
+    number_sections: true
+    toc_depth: 2
+    df_print: paged
+params: 
+  data_out_dir: "./temp_data/" 
+---
+
+```{r}
+# Get input and output
+source("./pipe.R")
+input = pipeline$xeno_clustering$input
+output = pipeline$xeno_clustering$output
+```
+
+```{r}
+xeno <- qs::qread(input$xeno)
+
+```
+
+```{r}
+p <- DimPlot(object = xeno, reduction = "umap", pt.size = 0.1, label = F)
+p
+```
+```{r}
+svg(filename = params$data_out_dir %s+% "xeno_clusters.svg")
+p
+dev.off()
+
+```
+
+```{r}
+p <- DimPlot(object = xeno, reduction = "umap", pt.size = 0.1, label = F,group.by = "treatment")
+p
+```
+```{r}
+svg(filename = params$data_out_dir %s+% "xeno_treatment_UMAP.svg")
+p
+dev.off()
+
+```
+
+```{r}
+p <- DimPlot(object = xeno, reduction = "umap", pt.size = 0.1, label = F,group.by = "orig.ident")+ggtitle("")
+p
+```
