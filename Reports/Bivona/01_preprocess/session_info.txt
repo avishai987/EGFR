@@ -1,0 +1,183 @@
+─ Session info ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ setting  value
+ version  R version 4.4.1 (2024-06-14)
+ os       Ubuntu 22.04.5 LTS
+ system   x86_64, linux-gnu
+ ui       X11
+ language (EN)
+ collate  en_US.UTF-8
+ ctype    en_US.UTF-8
+ tz       Etc/UTC
+ date     2025-07-01
+ pandoc   3.4 @ /usr/bin/ (via rmarkdown)
+
+─ Packages ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ !  package          * version    date (UTC) lib source
+    abind              1.4-5      2016-07-21 [1] RSPM (R 4.1.0)
+    backports          1.5.0      2024-05-23 [1] RSPM (R 4.4.0)
+    broom              1.0.7      2024-09-26 [1] RSPM (R 4.4.0)
+    bslib              0.9.0      2025-01-30 [1] RSPM (R 4.4.0)
+    cachem             1.0.6      2021-08-19 [1] RSPM
+    cellranger         1.1.0      2016-07-27 [1] RSPM (R 4.4.0)
+    chromote           0.3.1      2024-08-30 [1] RSPM (R 4.4.0)
+    cli                3.6.3      2024-06-21 [1] RSPM (R 4.4.0)
+    cluster            2.1.6      2023-12-01 [3] CRAN (R 4.4.1)
+    codetools          0.2-20     2024-03-31 [3] CRAN (R 4.4.1)
+    colorspace         2.0-3      2022-02-21 [1] RSPM
+    conflicted       * 1.2.0      2023-02-01 [1] RSPM (R 4.4.0)
+    cowplot            1.1.1      2020-12-30 [1] RSPM (R 4.1.0)
+    crayon             1.5.1      2022-03-26 [1] RSPM
+    data.table       * 1.14.2     2021-09-27 [1] RSPM (R 4.1.0)
+    DBI                1.2.3      2024-06-02 [1] RSPM (R 4.4.0)
+    dbplyr             2.3.4      2023-09-26 [1] RSPM (R 4.4.0)
+    deldir             1.0-6      2021-10-23 [1] RSPM (R 4.1.0)
+    devtools         * 2.4.3      2021-11-30 [1] RSPM (R 4.1.0)
+    digest             0.6.29     2021-12-01 [1] RSPM
+    dplyr            * 1.1.4      2023-11-17 [1] RSPM (R 4.4.0)
+    ellipsis           0.3.2      2021-04-29 [1] RSPM
+    evaluate           0.15       2022-02-18 [1] RSPM
+    fansi              1.0.3      2022-03-24 [1] RSPM
+    farver             2.1.0      2021-02-28 [1] RSPM
+    fastmap            1.1.1      2023-02-24 [1] RSPM (R 4.4.0)
+    fitdistrplus       1.1-8      2022-03-10 [1] RSPM (R 4.1.0)
+    forcats          * 1.0.0      2023-01-29 [1] RSPM (R 4.4.0)
+    fs                 1.5.2      2021-12-08 [1] RSPM
+    future             1.24.0     2022-02-19 [1] RSPM (R 4.1.0)
+    future.apply       1.8.1      2021-08-10 [1] RSPM (R 4.1.0)
+    gargle             1.5.2      2023-07-20 [1] RSPM (R 4.4.0)
+    generics           0.1.2      2022-01-31 [1] RSPM
+    ggplot2          * 3.5.1      2024-04-23 [1] RSPM (R 4.4.0)
+    ggplotify        * 0.1.0      2021-09-02 [1] RSPM (R 4.1.0)
+    ggrepel            0.9.6      2024-09-07 [1] RSPM (R 4.4.0)
+    ggridges           0.5.3      2021-01-08 [1] RSPM (R 4.1.0)
+    globals            0.14.0     2020-11-22 [1] RSPM (R 4.1.0)
+    glue               1.8.0      2024-09-30 [1] RSPM (R 4.4.0)
+    goftest            1.2-3      2021-10-07 [1] RSPM (R 4.1.0)
+    googledrive        2.1.1      2023-06-11 [1] RSPM (R 4.4.0)
+    googlesheets4      1.1.1      2023-06-11 [1] RSPM (R 4.4.0)
+    gridExtra          2.3        2017-09-09 [1] RSPM
+    gridGraphics       0.5-1      2020-12-13 [1] RSPM (R 4.1.0)
+    gtable             0.3.0      2019-03-25 [1] RSPM
+    haven              2.5.4      2023-11-30 [1] RSPM (R 4.4.0)
+    hms                1.1.3      2023-03-21 [1] RSPM (R 4.4.0)
+    htmltools          0.5.8.1    2024-04-04 [1] RSPM (R 4.4.0)
+    htmlwidgets        1.5.4      2021-09-08 [1] RSPM (R 4.1.0)
+    httpuv             1.6.5      2022-01-05 [1] RSPM (R 4.1.0)
+    httr               1.4.7      2023-08-15 [1] RSPM (R 4.4.0)
+    ica                1.0-2      2018-05-24 [1] RSPM (R 4.1.0)
+ VP igraph           * 1.4.2      2024-10-19 [?] RSPM (R 4.4.0) (on disk 2.1.1)
+    irlba              2.3.5      2021-12-06 [1] RSPM (R 4.1.0)
+    job                0.3.1      2024-05-05 [1] RSPM (R 4.4.0)
+    jquerylib          0.1.4      2021-04-26 [1] RSPM
+    jsonlite           1.8.9      2024-09-20 [1] RSPM (R 4.4.0)
+    KernSmooth         2.23-24    2024-05-17 [3] CRAN (R 4.4.1)
+    knitr              1.49       2024-11-08 [1] RSPM (R 4.4.0)
+    later              1.3.0      2021-08-18 [1] RSPM (R 4.1.0)
+    lattice            0.22-6     2024-03-20 [3] CRAN (R 4.4.1)
+    lazyeval           0.2.2      2019-03-15 [1] RSPM (R 4.1.0)
+    leiden             0.3.9      2021-07-27 [1] RSPM (R 4.1.0)
+    lifecycle          1.0.4      2023-11-07 [1] RSPM (R 4.4.0)
+    listenv            0.8.0      2019-12-05 [1] RSPM (R 4.1.0)
+    lmtest             0.9-40     2022-03-21 [1] RSPM (R 4.1.0)
+    lubridate          1.9.3      2023-09-27 [1] RSPM (R 4.4.0)
+    magrittr         * 2.0.3      2022-03-30 [1] RSPM (R 4.4.0)
+    makepipe         * 0.2.2      2025-01-07 [1] RSPM (R 4.4.0)
+    MASS               7.3-60.2   2024-04-26 [3] CRAN (R 4.4.1)
+    Matrix           * 1.4-0      2021-12-08 [1] CRAN (R 4.2.2)
+    matrixStats        1.4.1      2024-09-08 [1] RSPM (R 4.4.0)
+    memoise            2.0.1      2021-11-26 [1] RSPM
+    mgcv               1.9-1      2023-12-21 [3] CRAN (R 4.4.1)
+    mime               0.12       2021-09-28 [1] RSPM
+    miniUI             0.1.1.1    2018-05-18 [1] RSPM (R 4.1.0)
+    modelr             0.1.11     2023-03-22 [1] RSPM (R 4.4.0)
+    munsell            0.5.0      2018-06-12 [1] RSPM
+    nlme               3.1-164    2023-11-27 [3] CRAN (R 4.4.1)
+    parallelly         1.31.0     2022-04-07 [1] RSPM (R 4.1.0)
+    patchwork          1.3.0      2024-09-16 [1] RSPM (R 4.4.0)
+    pbapply            1.5-0      2021-09-16 [1] RSPM (R 4.1.0)
+    pillar             1.9.0      2023-03-22 [1] RSPM (R 4.4.0)
+    pkgbuild           1.4.6      2025-01-16 [1] RSPM (R 4.4.0)
+    pkgconfig          2.0.3      2019-09-22 [1] RSPM
+    pkgload            1.3.4      2024-01-16 [1] RSPM (R 4.4.0)
+    plotly             4.10.0     2021-10-09 [1] RSPM (R 4.1.0)
+    plyr             * 1.8.7      2022-03-24 [1] RSPM (R 4.1.0)
+    png                0.1-7      2013-12-03 [1] RSPM
+    polyclip           1.10-0     2019-03-14 [1] RSPM
+    print.rmd.tabs   * 0.2.0      2024-06-20 [1] Github (avishai987/print.rmd.tabs@ed6b345)
+    processx           3.8.2.9000 2023-08-28 [1] Github (r-pkgs/processx@25812a1)
+    promises           1.2.0.1    2021-02-11 [1] RSPM (R 4.1.0)
+    ps                 1.9.0      2025-02-18 [1] RSPM (R 4.4.0)
+    purrr            * 1.0.2      2023-08-10 [1] RSPM (R 4.4.0)
+    qs                 0.25.3     2022-02-22 [1] RSPM (R 4.1.0)
+    R6                 2.5.1      2021-08-19 [1] RSPM
+    RANN               2.6.1      2019-01-08 [1] RSPM (R 4.1.0)
+    RApiSerialize      0.1.0      2014-04-19 [1] RSPM (R 4.1.0)
+    RColorBrewer     * 1.1-3      2022-04-03 [1] RSPM
+ VP Rcpp               1.0.14     2022-03-17 [?] RSPM (on disk 1.0.8.3)
+    RcppAnnoy          0.0.19     2021-07-30 [1] RSPM (R 4.1.0)
+    RcppParallel       5.1.9      2024-08-19 [1] RSPM (R 4.4.0)
+    readr            * 2.1.5      2024-01-10 [1] RSPM (R 4.4.0)
+    readxl             1.4.3      2023-07-06 [1] RSPM (R 4.4.0)
+    remotes            2.4.2      2021-11-30 [1] RSPM (R 4.1.0)
+    reprex             2.1.1      2024-07-06 [1] RSPM (R 4.4.0)
+    reshape2           1.4.4      2020-04-09 [1] RSPM (R 4.1.0)
+    reticulate         1.42.0     2025-03-25 [1] RSPM (R 4.4.0)
+    rlang            * 1.1.5      2025-01-17 [1] RSPM (R 4.4.0)
+    rmarkdown        * 2.29       2024-11-04 [1] RSPM (R 4.4.0)
+    ROCR               1.0-11     2020-05-02 [1] RSPM (R 4.1.0)
+    roxygen2           7.1.2      2021-09-08 [1] RSPM (R 4.1.0)
+    rpart              4.1.23     2023-12-05 [3] CRAN (R 4.4.1)
+    RSpectra           0.16-0     2019-12-01 [1] RSPM (R 4.1.0)
+    rstudioapi         0.17.1     2024-10-22 [1] RSPM (R 4.4.0)
+    Rtsne              0.16       2022-04-17 [1] RSPM (R 4.1.0)
+    rvest              1.0.4      2024-02-12 [1] RSPM (R 4.4.0)
+    sass               0.4.10     2025-04-11 [1] RSPM (R 4.4.0)
+    scales             1.3.0      2023-11-28 [1] RSPM (R 4.4.0)
+    scattermore        0.8        2022-02-14 [1] RSPM (R 4.1.0)
+    sctransform        0.3.3      2022-01-13 [1] RSPM (R 4.1.0)
+    sessioninfo        1.2.2      2021-12-06 [1] RSPM (R 4.1.0)
+ VP Seurat           * 4.0.1      2022-01-14 [?] RSPM (R 4.1.0) (on disk 4.1.0)
+    SeuratObject     * 4.0.4      2021-11-23 [1] RSPM (R 4.1.0)
+    shiny              1.9.1      2024-08-01 [1] RSPM (R 4.4.0)
+    SourceFromGithub * 0.1.0      2022-12-07 [1] Github (avishai987/SourceFromGithub@99e0840)
+    spatstat.core      2.4-2      2022-04-01 [1] RSPM (R 4.1.0)
+    spatstat.data      3.0-1      2024-10-15 [1] Github (spatstat/spatstat.data@ae01346)
+    spatstat.geom      3.2-5      2024-10-15 [1] Github (spatstat/spatstat.geom@41263ad)
+    spatstat.random    3.1-5      2024-10-15 [1] Github (spatstat/spatstat.random@9528a39)
+    spatstat.sparse    3.0-1      2024-10-15 [1] Github (spatstat/spatstat.sparse@5fa3d52)
+    spatstat.utils     3.0-3      2024-10-15 [1] Github (spatstat/spatstat.utils@4e97cc3)
+    stringfish         0.15.7     2022-04-13 [1] RSPM (R 4.1.0)
+    stringi          * 1.8.4      2024-05-06 [1] RSPM (R 4.4.0)
+    stringr          * 1.5.1      2023-11-14 [1] RSPM (R 4.4.0)
+    survival           3.6-4      2024-04-24 [3] CRAN (R 4.4.1)
+    tensor             1.5        2012-05-05 [1] RSPM (R 4.1.0)
+    tibble           * 3.2.1      2023-03-20 [1] RSPM (R 4.4.0)
+    tidyr            * 1.3.1      2024-01-24 [1] RSPM (R 4.4.0)
+    tidyselect         1.2.1      2024-03-11 [1] RSPM (R 4.4.0)
+    tidyverse        * 1.3.2      2022-07-18 [1] RSPM (R 4.4.1)
+    timechange         0.3.0      2024-01-18 [1] RSPM (R 4.4.0)
+    tzdb               0.5.0      2025-03-15 [1] RSPM (R 4.4.0)
+    ulimit             0.0-3      2022-12-11 [1] Github (krlmlr/ulimit@67199f2)
+    usethis          * 2.1.5      2021-12-09 [1] RSPM (R 4.1.0)
+    utf8               1.2.2      2021-07-24 [1] RSPM
+    uwot               0.1.11     2021-12-02 [1] RSPM (R 4.1.0)
+    vctrs              0.6.5      2023-12-01 [1] RSPM (R 4.4.0)
+    viridisLite        0.4.0      2021-04-13 [1] RSPM
+    websocket          1.4.2      2024-07-22 [1] RSPM (R 4.4.0)
+    withr              3.0.2      2024-10-28 [1] RSPM (R 4.4.0)
+    xfun               0.52       2025-04-02 [1] RSPM (R 4.4.0)
+    xml2               1.3.3      2021-11-30 [1] RSPM (R 4.1.0)
+    xtable             1.8-4      2019-04-21 [1] RSPM (R 4.1.0)
+    yaml               2.3.5      2022-02-21 [1] RSPM
+    yulab.utils        0.0.4      2021-10-09 [1] RSPM (R 4.1.0)
+    zoo                1.8-10     2022-04-15 [1] RSPM (R 4.1.0)
+
+ [1] /sci/labs/yotamd/lab_share/avishai.wizel/R_projects/libs
+ [2] /usr/local/lib/R/site-library
+ [3] /usr/local/lib/R/library
+ [4] /sci/home/avishaiw/R/x86_64-pc-linux-gnu-library/4.4
+
+ V ── Loaded and on-disk version mismatch.
+ P ── Loaded and on-disk path mismatch.
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
