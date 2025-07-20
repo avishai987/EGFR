@@ -1,0 +1,198 @@
+---
+title: 'Bivona_cnmf_analysis_k5_from_xeno' 
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+output: 
+  html_document: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: TRUE
+    number_sections: true
+    toc_depth: 2
+    df_print: paged
+params: 
+  data_out_dir: "./temp_data/" 
+
+editor_options: 
+  chunk_output_type: inline
+---
+
+
+```{r}
+#Get input and output
+source("./pipe.R")
+input = pipeline$bivona_programs_analysis$input
+output = pipeline$bivona_programs_analysis$output
+```
+
+
+# Functions
+
+```{r warning=FALSE}
+library(stringi)
+library(reticulate)
+library(ggpubr)
+library(rstatix)
+suppressPackageStartupMessages(library(GSEABase))
+source_from_github(repositoy = "DEG_functions",version = "0.2.53")
+source_from_github(repositoy = "cNMF_functions",version = "0.4.33",script_name = "cnmf_functions_V3.R")
+source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_name = "functions.R")
+
+```
+
+# Data
+
+```{r}
+bivona = qs::qread(input$bivona)
+bivonas_cell_usage = readRDS(input$bivonas_cell_usage)
+genesets = getGmt(input$genesets)  %>% geneIds()
+hif_targets =  scan(input$hif_targets, character(), quote = "")
+genesets[["HIF_targets"]] = hif_targets
+```
+
+
+
+
+
+
+# programs expression
+
+```{r echo=TRUE, fig.height=7, fig.width=12, results='asis'}
+
+#add each metagene to metadata
+for (i  in 1:ncol(bivonas_cell_usage)) {
+  metagene_metadata = bivonas_cell_usage[,i,drop=F]
+  bivona = AddMetaData(object = bivona,metadata = metagene_metadata,col.name = names(bivonas_cell_usage)[i])
+}
+
+p  = FeaturePlot(object = bivona,features = colnames(bivonas_cell_usage),ncol = 3)+DimPlot(object = bivona,group.by = "treatment",shuffle = T)
+
+p
+```
+
+
+```{r}
+svg(params$data_out_dir %s+% "bivona_programs_usage_UMAP.svg",height = 7,width = 12)
+p
+dev.off()
+```
+
+
+
+
+
+# NMF programs dotplot
+
+
+
+```{r}
+# scale metagene and add to metadata
+for (i  in 1:ncol(bivonas_cell_usage)) {
+  metagene_metadata = bivonas_cell_usage[,i,drop=F] %>% scale()
+  bivona = AddMetaData(object = bivona,metadata = metagene_metadata,col.name = paste0(names(bivonas_cell_usage)[i],"_scaled"))
+}
+```
+
+
+
+```{r fig.height=4, fig.width=8}
+bivona = program_assignment(dataset = bivona,program_names = names(bivonas_cell_usage),larger_by = 1.5)
+
+p = programs_dotplot(seurat_obj = bivona,treatment_var = "treatment",program_names = paste0(names(bivonas_cell_usage),"_scaled"))+scale_y_discrete(limits  = c("naive","RD","PD"))
+p
+```
+
+```{r}
+svg(params$data_out_dir %s+% "bivona_programs_dotplot.svg",height = 4,width = 8)
+p
+dev.off()
+```
+
+
+# NMF programs violin
+```{r}
+p = metagenes_violin_combine_patients(dataset = bivona,prefix = "patient",pre_on =c("naive","RD"),test = "wilcox.test",programs = colnames(bivonas_cell_usage), return_list = F)
+
+p
+```
+```{r}
+svg(params$data_out_dir %s+% "bivona_programs_violin.svg")
+p
+dev.off()
+```
+
+# NMF programs violin
+
+```{r}
+# plot violin
+data = FetchData(object = bivona,vars = c(colnames(bivonas_cell_usage)[3],"treatment"))
+formula = as.formula(paste0(colnames(bivonas_cell_usage)[3],"~treatment"))
+stat.test = wilcox_test(formula = formula,data = data, p.adjust.method = "fdr") %>% 
+  add_xy_position(x = "treatment", dodge = 0.8,step.increase = 0.3)
+
+
+p = ggplot(data, aes_string(x="treatment", y=colnames(bivonas_cell_usage)[3])) + 
+    geom_violin(trim=FALSE,aes(fill = treatment))+geom_boxplot(width = 0.15)+
+  theme_minimal()+
+  scale_fill_manual(values = c("#00AFBB", "#E7B800", "#FC4E07"))+
+  theme(legend.position = "none")+stat_pvalue_manual(stat.test, label = "{p.adj}")+
+  ylab("Program 3 Z-score")
+
+p
+
+```
+
+
+
+```{r}
+svg(params$data_out_dir %s+% "HIF_program_violin_bivona.svg",height = 4,width = 7)
+p
+dev.off()
+```
+
+
+
+
+
+# known genes signatures log TPM
+```{r}
+gene_list = list(IFNa_genes = genesets$HALLMARK_INTERFERON_ALPHA_RESPONSE, TNFa_genes = genesets$HALLMARK_TNFA_SIGNALING_VIA_NFKB, hif_targets = hif_targets,E2F_genes = genesets$HALLMARK_E2F_TARGETS)
+for (i in seq_along(gene_list)) {
+  genes = gene_list[[i]]
+  genes = genes[genes %in% rownames(bivona)]
+  name = names(gene_list)[i]
+  scores = FetchData(object = bivona,vars = c(genes))
+  scores = scores %>% select(where(~ sum(.) != 0))# remove cols with all o 
+  scores = scores %>% scale() %>% rowMeans() %>% as.data.frame()
+  bivona %<>% AddMetaData(metadata = scores,col.name = name)
+  
+}
+```
+
+```{r}
+# plot violin
+data = FetchData(object = bivona,vars = c("hif_targets","treatment"))
+stat.test = wilcox_test(formula = hif_targets  ~ treatment,data = data, p.adjust.method = "fdr") %>% 
+  add_xy_position(x = "treatment", dodge = 0.8,step.increase = 0.3)
+
+
+p = ggplot(data, aes(x=treatment, y=hif_targets)) + 
+    geom_violin(trim=FALSE,aes(fill = treatment))+geom_boxplot(width = 0.2)+
+  theme_minimal()+
+  scale_fill_manual(values = c("#00AFBB", "#E7B800", "#FC4E07"))+
+  theme(legend.position = "none")+stat_pvalue_manual(stat.test, label = "{p.adj}")+
+  ylab("HIF targets Z-score")
+
+p
+
+```
+
+```{r}
+svg(params$data_out_dir %s+% "HIF_genes_violin_bivona.svg",height = 4,width = 7)
+p
+dev.off()
+```
+
+

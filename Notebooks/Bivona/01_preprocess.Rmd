@@ -1,0 +1,61 @@
+---
+title: 'Bivona preprocess' 
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+output:
+  html_document: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: TRUE
+    number_sections: true
+    toc_depth: 2
+    df_print: paged
+params: 
+  data_out_dir: "./temp_data/" 
+
+editor_options: 
+  chunk_output_type: inline
+---
+
+
+```{r}
+#Get input and output
+source("./pipe.R")
+input = pipeline$bivona_preprocess$input
+output = pipeline$bivona_preprocess$output
+```
+
+# Data
+
+```{r}
+load(input$data)
+tiss_subset_tumor2 = UpdateSeuratObject(tiss_subset_tumor2)
+tiss_subset_tumor2$treatment = NULL
+tiss_subset_tumor2@meta.data[["treatment"]] = factor(tiss_subset_tumor2$analysis, levels = c("naive", "grouped_pr","grouped_pd"))
+tiss_subset_tumor2$treatment = tiss_subset_tumor2$treatment %>% gsub(pattern = "grouped_pr",replacement = "RD")%>%
+  gsub(pattern = "grouped_pd",replacement = "PD") %>% factor(levels = c("naive","RD","PD"))
+```
+
+
+
+
+```{r}
+tiss_subset_tumor2_pri = subset(tiss_subset_tumor2, subset = primary_or_metastaic %in% c("Primary"))
+tiss_subset_tumor2_pri_egfr = subset(tiss_subset_tumor2_pri, subset = driver_gene == "EGFR") %>%
+  subset(subset = histolgy == "Adenocarcinoma") 
+```
+
+```{r}
+# re run umap
+tiss_subset_tumor2_pri_egfr = FindVariableFeatures(object = tiss_subset_tumor2_pri_egfr)
+tiss_subset_tumor2_pri_egfr = ScaleData(object = tiss_subset_tumor2_pri_egfr)
+tiss_subset_tumor2_pri_egfr = RunPCA(object = tiss_subset_tumor2_pri_egfr,verbose = F)
+tiss_subset_tumor2_pri_egfr = RunUMAP(tiss_subset_tumor2_pri_egfr, dims = 1:5,verbose = F)
+```
+
+```{r}
+qs::qsave(tiss_subset_tumor2_pri_egfr,file = params$data_out_dir %s+% "bivona.qs")
+```
+

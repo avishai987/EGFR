@@ -1,5 +1,5 @@
 ---
-title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+title: 'Bivona analysis' 
 author: "Avishai Wizel"
 date: '`r Sys.time()`'
 output: 
@@ -35,33 +35,6 @@ source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_
 ```
 
 
-# Data
-
-```{r}
-load("./raw_data/Bivona_scRNAseq/NI04_tumor_seurat_object.RData")
-tiss_subset_tumor2 = UpdateSeuratObject(tiss_subset_tumor2)
-tiss_subset_tumor2$treatment = NULL
-tiss_subset_tumor2@meta.data[["treatment"]] = factor(tiss_subset_tumor2$analysis, levels = c("naive", "grouped_pr","grouped_pd"))
-tiss_subset_tumor2$treatment = tiss_subset_tumor2$treatment %>% gsub(pattern = "grouped_pr",replacement = "RD")%>%
-  gsub(pattern = "grouped_pd",replacement = "PD") %>% factor(levels = c("naive","RD","PD"))
-```
-
-
-
-
-```{r}
-tiss_subset_tumor2_pri = subset(tiss_subset_tumor2, subset = primary_or_metastaic %in% c("Primary"))
-tiss_subset_tumor2_pri_egfr = subset(tiss_subset_tumor2_pri, subset = driver_gene == "EGFR") %>%
-  subset(subset = histolgy == "Adenocarcinoma") 
-```
-
-```{r}
-# re run umap
-tiss_subset_tumor2_pri_egfr = FindVariableFeatures(object = tiss_subset_tumor2_pri_egfr)
-tiss_subset_tumor2_pri_egfr = ScaleData(object = tiss_subset_tumor2_pri_egfr)
-tiss_subset_tumor2_pri_egfr = RunPCA(object = tiss_subset_tumor2_pri_egfr,verbose = F)
-tiss_subset_tumor2_pri_egfr = RunUMAP(tiss_subset_tumor2_pri_egfr, dims = 1:5,verbose = F)
-```
 
 calculate nmf metagenes
 ```{python}
