@@ -22,11 +22,9 @@ editor_options:
 ---
 
 ```{r}
-if (interactive()) {
-  source("./pipe.R")
-  input = get_input(get_current_path())
-  output = get_output(get_current_path())
-}
+source("./pipe.R")
+input = pipeline$patients_deg$input
+output = pipeline$patients_deg$output
 ```
 
 
@@ -35,25 +33,23 @@ if (interactive()) {
 # Functions
 
 ```{r warning=FALSE}
-suppressWarnings(library(GSEABase))
+suppressPackageStartupMessages(library(GSEABase))
 source_from_github(repositoy = "DEG_functions",version = "0.2.54")
 ```
 
 # Data
 
 ```{r}
-lung = readRDS(input$lung)
-lung_patients = lung$patient.ident %>% unique() %>% as.character()
-lung_patients_filtered = lung_patients[!(lung_patients %in% c("X1055new","X1099"))] # remove patients with less than 100 malignant cells
-lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
-lung$treatment = lung$time.point
-lung$orig.ident = lung$patient.ident
+lung = qs::qread(input$lung)
 genesets = getGmt(input$genesets) %>% geneIds()
+hif_targets = scan(input$hif_targets, character(), quote = "")
+# add hif targets to genesets
+genesets[["hif_targets"]] = hif_targets
 ```
 ## lung DEG regress patients
 
 ```{r}
-lung = SetIdent(object = lung,value = "treatment")
+lung = SetIdent(object = lung,value = "time.point")
 nfeatures = 5000
 lung = FindVariableFeatures(object = lung,nfeatures = nfeatures)
 deg_df = FindMarkers(
@@ -71,18 +67,26 @@ deg_df = FindMarkers(
   latent.vars = "patient.ident"
 )
 deg_df$fdr = p.adjust(deg_df$p_val,method = "fdr",n = nfeatures)
+
+print("# up genes:")
+deg_df %>% filter(fdr<0.05) %>%  filter(avg_log2FC>log2(1.5)) %>% nrow()
+print("# down genes:")
+deg_df %>% filter(fdr<0.05) %>%  filter(avg_log2FC< -log2(1.5)) %>% nrow()
+
 p = volcano_plot(deg_df,top_genes_text = 5,ident1 = "pre-treatment",ident2 = "on-treatment",fc_cutoff = 1.5)+coord_cartesian(clip = "off")
 p
 ```
 
 
 ```{r}
+set.seed(14)
 # GSEA
 ranked_vec = deg_df %>% pull(avg_log2FC) %>%  setNames(rownames(deg_df))
 hyp_obj <-hypeR_fgsea(signature = ranked_vec,genesets = (genesets),up_only = F)
 plt = hyp_dots(hyp_obj,merge = F,fdr = 0.3)
   
-
+plt$up$data %>% dplyr::arrange(fdr)
+plt$down$data 
 ```
 
 ```{r fig.height=5, fig.width=15}
@@ -107,11 +111,7 @@ p1+p2
 ```
 
 ```{r}
-pdf(paste0(params$data_out_dir,"/patients_DEG_GSEA_down.pdf"), width = 6, height = 5)
-p1
-dev.off()
-
-png(paste0(params$data_out_dir,"/patients_DEG_GSEA_down.png"),units = "in",res=250, width = 6, height = 5)
+svg(paste0(params$data_out_dir,"/patients_DEG_GSEA_down.svg"), width = 6, height = 5)
 p1
 dev.off()
 

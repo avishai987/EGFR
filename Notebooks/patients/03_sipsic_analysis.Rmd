@@ -19,12 +19,10 @@ editor_options:
 ---
 
 ```{r}
-if (interactive()) {
-  source("./pipe.R")
-  input = get_input(get_current_path())
-  output = get_output(get_current_path())
-}
-
+# Get input and output
+source("./pipe.R")
+input = pipeline$patients_sipsic_analysis$input
+output = pipeline$patients_sipsic_analysis$output
 ```
 
 # Functions
@@ -46,10 +44,7 @@ source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_
 
 
 ```{r}
-lung = readRDS(input$lung)
-lung_patients = lung$patient.ident %>% unique() %>% as.character()
-lung_patients_filtered = lung_patients[!(lung_patients %in% c("X1055new","X1099"))] # remove patients with less than 100 malignant cells
-lung = subset(x = lung,subset = patient.ident %in% lung_patients_filtered)
+lung = qs::qread(input$lung)
 ```
 
 
@@ -130,7 +125,9 @@ p
 ```
 
 ```{r}
-# saveRDS(object = as.grob(as.ggplot(p)),file = "./Figures/lung_sipsic_heatmap.rds")
+svg(params$data_out_dir %s+% "patients_sipsic_heatmap.svg",height = 9,width = 10)
+p
+dev.off()
 ```
 
 # Heatmap with asterisks
@@ -278,7 +275,7 @@ for (patient_name in unique(lung$patient.ident)) {
   colnames(data) = c("H_INFa", "H_TNFa_NFKb", "H_HYPOXIA", "H_E2F")
   data = cor(data)
   library("reshape2")
-  data = melt(as.matrix(data),varnames = c("pathway_1","pathway_2"),value.name = "correlation") %>% #to long format
+  data = reshape2::melt(as.matrix(data),varnames = c("pathway_1","pathway_2"),value.name = "correlation") %>% #to long format
     filter(!pathway_1 == pathway_2) %>%  # remove self correlation
     mutate(pathways = paste0(pathway_1," ~ ",pathway_2)) %>%  
     select(pathways,correlation) 
