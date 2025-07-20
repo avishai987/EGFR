@@ -1,8 +1,41 @@
 set.seed(3320)
+check_for_uncommitted_changes <- function(repo_path = ".") {
+  
+  # Check if a Git repository exists at the specified path
+  if (!dir.exists(file.path(repo_path, ".git"))) {
+    message("⚠️ No Git repository found at the specified path: ", repo_path)
+    return(invisible(FALSE))
+  }
+  
+  # Run 'git status --porcelain' to check for uncommitted changes
+  # '--porcelain' provides a stable, easy-to-parse output.
+  # If there are changes, the output will have lines; otherwise, it's empty.
+  git_status_output <- system("git status --porcelain", intern = TRUE, ignore.stderr = TRUE)
+  
+  # Check if there's any output (meaning uncommitted changes exist)
+  if (length(git_status_output) > 0) {
+    message("🚨 You have uncommitted changes in '", basename(normalizePath(repo_path)), "'!")
+    message("  Please run 'git add' and 'git commit' to save your work.")
+    message("\n  Details of changes:")
+    cat(paste0("  ", git_status_output, collapse = "\n"))
+    message("\n")
+    return(TRUE)
+  } else {
+    message("✅ No uncommitted changes. Great job!")
+    return(FALSE)
+  }
+}
+
+
+check_for_uncommitted_changes()
+my_library_folder = "/sci/labs/yotamd/lab_share/avishai.wizel/R_projects/libs"
+.libPaths(c(my_library_folder, .libPaths())) # make my library folder as default folder (default folder is not writable)
+ulimit::memory_limit(30000) # Limit ram to avoid crash
+library(igraph, lib.loc = "/usr/local/spack/opt/spack/linux-debian12-x86_64/gcc-12.2.0/r-igraph-1.4.2-lxqmjthw2lo45ggzwhg3x47ehnezig22/rlib/R/library")
 library(Matrix)
 library(stringi)
 library(rlang)
-library(Seurat)
+library(Seurat,lib.loc = "../libs/seurat_4.0.1/")
 library(ggplot2)
 library(data.table)
 library(tidyverse)
@@ -23,18 +56,8 @@ conflict_prefer(name = "arrange", winner = "dplyr")
 conflicts_prefer(dplyr::summarize)
 
 conflicts_prefer(dplyr::desc)
-# conflict_prefer(name = "list", winner = "base")
 library(rmarkdown)
 library(magrittr)
-# source("./build_funs.R")
 
 
-# my_render <- function(script, report,input,output, input_names, output_names ) {
-#   input = strsplit(x = input,split = " ") %>% as.list()
-#   names(input) = input_names
-#   output = strsplit(x = output,split = " ") %>% as.list()
-#   names(output) = output_names
-#   rmarkdown::render(script , output_dir = dirname(report),knit_root_dir = getwd(), 
-#                     params = list(data_out_dir =dirname(report)))
-#   # Notebooks/xeno/01_DEG.Rmd input_data/xeno.qs input_data/h.all.v2023.2.Hs.symbols.gmt input_data/HIF_targets_Lombardi_PMC9869179.txt
-# }
+
