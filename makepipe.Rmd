@@ -22,9 +22,9 @@ editor_options:
 ```{r}
 source("./pipe.R")
 show_pipeline(pipeline = makepipe_pipe, as = "visnetwork")
-# show_pipeline(as = "text")
 
 ```
+
 ```{r}
 show_pipeline(as = "text")
 ```
