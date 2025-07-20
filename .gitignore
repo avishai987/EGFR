@@ -29,3 +29,4 @@ temp_data/
 makefile
 *.qs
 *.npz
+/temp_data
