@@ -19,10 +19,8 @@ check_for_uncommitted_changes <- function(repo_path = ".") {
     message("\n  Details of changes:")
     cat(paste0("  ", git_status_output, collapse = "\n"))
     message("\n")
-    return(TRUE)
   } else {
     message("✅ No uncommitted changes. Great job!")
-    return(FALSE)
   }
 }
 
