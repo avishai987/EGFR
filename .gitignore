@@ -22,5 +22,10 @@ processed_data/
 /.snakemake
 temp_data/
 .Renviron
-.h5ad
-/sci/labs/yotamd/lab_share/avishai.wizel/R_projects/EGFR/Reports/xeno/04_cnmf/02_run_cnmf_1.7/BatchCorrected_cnmf/cnmf_temp/
+*.h5ad
+*.rds
+*.RDS
+/Reports/xeno/04_cnmf/02_run_cnmf_1.7/BatchCorrected_cnmf/cnmf_tmp
+makefile
+*.qs
+*.npz
