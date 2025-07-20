@@ -30,11 +30,10 @@ editor_options:
 
 
 ```{r}
-if (interactive()) {
-  source("./pipe.R")
-  input = get_input(get_current_path())
-  output = get_output(get_current_path())
-}
+# Get input and output
+source("./pipe.R")
+input = pipeline$xenografts_run_sipsic$input
+output = pipeline$xenografts_run_sipsic$output
 ```
 
 # Functions

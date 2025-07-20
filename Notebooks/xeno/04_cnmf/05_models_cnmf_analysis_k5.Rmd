@@ -25,7 +25,6 @@ editor_options:
 source("./pipe.R")
 input = pipeline$models_programs_analysis$input
 output = pipeline$models_programs_analysis$output
-input_params = pipeline$models_programs_analysis$params
 ```
 
 
@@ -43,7 +42,7 @@ library(stringi)
 library(reticulate)
 suppressPackageStartupMessages(library(GSEABase))
 source_from_github(repositoy = "DEG_functions",version = "0.2.53")
-source_from_github(repositoy = "cNMF_functions",version = "0.4.3",script_name = "cnmf_functions_V3.R")
+source_from_github(repositoy = "cNMF_functions",version = "0.4.33",script_name = "cnmf_functions_V3.R")
 source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_name = "functions.R")
 
 ```
@@ -173,9 +172,7 @@ for (i  in 1:ncol(xeno_cell_usage)) {
 ```{r}
 xeno = program_assignment(dataset = xeno,program_names = names(xeno_cell_usage),larger_by = 2)
 
-
-
-p = programs_dotplot(seurat_obj = xeno,treatment_var = "treatment")
+p = programs_dotplot(seurat_obj = xeno,treatment_var = "treatment",program_names = names(xeno_cell_usage))
 p
 ```
 
@@ -184,7 +181,7 @@ p
 
 
 ```{r}
-svg(params$data_out_dir %s+% "xeno_programs_dotplot.svg")
+svg(params$data_out_dir %s+% "xeno_programs_dotplot.svg",height = 4,width = 8)
 p
 dev.off()
 ```
@@ -210,11 +207,12 @@ dev.off()
 
 
 
-```{r fig.height=5, fig.width=11}
-program_names =  c("IFNa","TNFa", "cell cycle","EMT")
+
+```{r fig.height=5, fig.width=12}
+program_names =  c("IFNa","TNFa","HIF", "cell cycle")
 
 # for sup:
-plt_list = metagenes_violin_compare(dataset = xeno,prefix = "model",pre_on = c("NT","OSI"),test = "wilcox.test",programs = colnames(xeno_cell_usage)[-c(3)],return_list =  T)
+plt_list = metagenes_violin_compare(dataset = xeno,prefix = "model",pre_on = c("NT","OSI"),test = "wilcox.test",programs = colnames(xeno_cell_usage)[-c(5)],return_list =  T)
 
 for (i in 1:length(plt_list)) {
   plt_list[[i]] = plt_list[[i]]+xlab("Model")+ylab(paste0( "Program ",i," (",program_names[i],")\n Z-score"))
@@ -225,7 +223,7 @@ p
 ```
 
 ```{r}
-svg(params$data_out_dir %s+% "HIF_program_violin_xeno.svg",height = 4,width = 7)
+svg(params$data_out_dir %s+% "all_programs_violin_xeno.svg",height = 5,width = 12)
 p
 dev.off()
 ```
@@ -267,46 +265,6 @@ dev.off()
 
 
 
-# known genes score
-```{r}
-
-gene_list = list(IFNa_genes = genesets$HALLMARK_INTERFERON_ALPHA_RESPONSE, TNFa_genes = genesets$HALLMARK_TNFA_SIGNALING_VIA_NFKB, hif_targets = hif_targets,E2F_genes = genesets$HALLMARK_E2F_TARGETS)
-patient_var = "orig.ident"
-# xeno = ScaleData(object = xeno,features = unlist(gene_list))
-for (i in seq_along(gene_list)) {
-  genes = gene_list[[i]]
-  name = names(gene_list)[i]
-  genes = genes[genes %in% rownames(xeno)]
-  scores = FetchData(object = xeno,vars = c(genes,patient_var))
-  scores = scores %>% mutate(r = rowMeans(dplyr::select_at(scores,vars(-contains(patient_var))))) %>% # z score every patient separately 
-    group_by_at(patient_var) %>% plyr::summarise(r = scale(r)) %>% pull(r) %>% as.data.frame() 
-  print(name)
-  xeno %<>% AddMetaData(metadata = scores,col.name = name)
-}
-
-
-
-
-
-```
-
-
-
-```{r}
-
-p1 = metagenes_violin_compare(dataset = xeno,prefix = "Model",pre_on = c("NT","OSI"),test = "wilcox.test",programs = "hif_targets", return_list = T)[[1]]
-p1
-```
-
-```{r}
-saveRDS(object = as.grob(p1),file = "./Figures/xeno_hif_targets_violin.rds")
-```
-
-
-
-
-# new
-
 
 # known genes signatures log TPM
 ```{r}
@@ -326,6 +284,8 @@ for (i in seq_along(gene_list)) {
 
 ```
 
+##dotplot
+
 
 ## violin
 ```{r}
@@ -335,7 +295,9 @@ p2
 ```
 
 ```{r}
-saveRDS(object = as.grob(p2),file = "./Figures/xeno_hif_targets_violin.rds")
+svg(params$data_out_dir %s+% "hif_targets_violin_plot.svg")
+p2
+dev.off()
 ```
 
 

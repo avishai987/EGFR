@@ -3,32 +3,28 @@ title: "06_known_pathways.Rmd"
 author: "Avishai Wizel"
 date: '`r Sys.time()`'
 output: 
-  html_notebook: 
+  html_document: 
     code_folding: hide
     toc: yes
     toc_collapse: yes
     toc_float: 
-      collapsed: FALSE
+      collapsed: TRUE
     number_sections: true
-    toc_depth: 1
+    toc_depth: 2
+    df_print: paged
 params: 
   data_out_dir: "./temp_data/" 
-  input_data: !r c(
-    xeno = "./input_data/xeno.qs",
-    kurppa = "./input_data/pathways_from_papers/Kurppa_PMC7146079_table_s1_YAP signature.xlsx",
-    hadrek = "./input_data/pathways_from_papers/Hadrek_PMC11068778_sup_data_3.xlsx",
-    SENESCENCE = "./input_data/pathways_from_papers/FRIDMAN_SENESCENCE_UP.v2024.1.Hs.gmt",
-    maynard = "./input_data/pathways_from_papers/Maynard_PMC7484178_Table_S2.csv",
-    ferroptosis  = "./input_data/pathways_from_papers/GOBP_FERROPTOSIS.v2024.1.Hs.gmt",
-    esrra = "./input_data/pathways_from_papers/ESRRA _gene_signature.xlsx",
-    hif_targets = "./input_data/HIF_targets_Lombardi_PMC9869179.txt")
-  output_data: !r c()
-    
+  
 editor_options: 
   chunk_output_type: inline
 ---
 
-
+```{r}
+# Get input and output
+source("./pipe.R")
+input = pipeline$xeno_sipsic_known_pathways$input
+output = pipeline$xeno_sipsic_known_pathways$output
+```
 
 # Functions
 
@@ -58,33 +54,33 @@ calculatePathwayScores <- function(pathwayToScore, countsMatrix) {
 
 ```{r}
 # Load data
-xeno <- qs::qread(params$input_data["xeno"])
+xeno <- qs::qread(input$xeno)
 
 #read Kurppa_PMC7146079_table_s1_YAP signature.xlsx tab "Zhang et al. Cancer Res 2008"
-kurppa <- readxl::read_excel(params$input_data["kurppa"],sheet = "Zhang et al. Cancer Res 2008")
+kurppa <- readxl::read_excel(input$kurppa,sheet = "Zhang et al. Cancer Res 2008")
 kurppa_genes <- kurppa[-1,1,drop=T] # remove first row
  
 #read Hadrek_PMC11068778_sup_data_3.xlsx tab "Supp. Data 3" 
-hadrek <- readxl::read_excel(params$input_data["hadrek"],sheet = "Supp. Data 3",skip = 3)
+hadrek <- readxl::read_excel(input$hadrek,sheet = "Supp. Data 3",skip = 3)
 hadrek_genes <- hadrek[,1,drop = T]
 
 #read FRIDMAN_SENESCENCE_UP.v2024.1.Hs.gmt
-FRIDMAN_SENESCENCE_UP  = getGmt(params$input_data["SENESCENCE"]) %>% geneIds() %>%  unlist() %>% base::unname()
+FRIDMAN_SENESCENCE_UP  = getGmt(input$SENESCENCE) %>% geneIds() %>%  unlist() %>% base::unname()
 
 # read Avelolar Signature from Maynard_PMC7484178_Table_S2.csv
-maynard <- read_csv(params$input_data["maynard"])
+maynard <- read_csv(input$maynard)
 maynard_genes <- maynard$`Avelolar Signature` %>% unlist() %>% base::unname()
 
 
 #read ferroptosis
-ferroptosis = getGmt(params$input_data["ferroptosis"]) %>% geneIds() %>%  unlist() %>% base::unname()
+ferroptosis = getGmt(input$ferroptosis) %>% geneIds() %>%  unlist() %>% base::unname()
 
 # read esrra, remove first row and NA
-esrra_up = readxl::read_excel(params$input_data["esrra"],sheet = "Sheet1")[["Up genes"]] %>% .[-1] %>% .[!is.na(.)]
-esrra_down = readxl::read_excel(params$input_data["esrra"],sheet = "Sheet1")[["Down genes"]] %>% .[-1] %>% .[!is.na(.)]
+esrra_up = readxl::read_excel(input$esrra,sheet = "Sheet1")[["Up genes"]] %>% .[-1] %>% .[!is.na(.)]
+esrra_down = readxl::read_excel(input$esrra,sheet = "Sheet1")[["Down genes"]] %>% .[-1] %>% .[!is.na(.)]
 
 # read HIF targets
-hif_targets = scan(params$input_data["hif_targets"], character(), quote = "")
+hif_targets = scan(input$hif_targets, character(), quote = "")
 
 #SASP
 sasp = c(c("CCL2", "CCL5", "CCL7", "IL1A", "IL1B", "IL32"),c("SCG2", "INHBA", "INHA", "WNT7A", "CSF2", "TNFRSF11B", "GREM1", "CMTM3"))
@@ -116,7 +112,6 @@ pathwayScoresMatrix <- as.data.frame(do.call("rbind", pathwayScoreLists))
 
 
 ```{r}
-pathwayScoresMatrix = pathwayScoresMatrix %>% rbind(FetchData(xeno, vars = c("SUSD2","CAV1"),slot = "data") %>% t())
 xeno[["known_pathways"]] = CreateAssayObject(counts = pathwayScoresMatrix)
 
 ```
@@ -367,6 +362,8 @@ p2 = ggplot(data = data, aes(x = HALLMARK_FATTY_ACID_METABOLISM, y = HALLMARK_G2
 print(p2+p1)
 ```
 ## Genes
+
+
 ```{r}
 
 esrra_genes = c(genesets[["ESRRA_UP"]]@geneIds,genesets[["ESRRA_DOWN"]]@geneIds) 
@@ -379,24 +376,27 @@ for (model in unique(xeno$orig.ident)) {
   model_data = subset(xeno, subset = orig.ident == model)
   deg_df = FindMarkers(
     object = model_data,
-    ident.1 = "NT",
-    ident.2 = "OSI",
+    assay = "RNA",
+    slot = "data",
+    ident.1 = "OSI",
+    ident.2 = "NT",
     densify = T,
     mean.fxn = function(x) {
-      return(log(x = rowMeans(x = x) + 1, base = 2))
+      return(log(x = rowMeans(x = x)+0.1, base = 2))
     },
     features = esrra_genes,
     logfc.threshold = 0,
     min.pct = 0,
-    test.use = "wilcox",
+    test.use = "wilcox"
   )
   deg_df$fdr = p.adjust(deg_df$p_val, method = "fdr", n = length(esrra_genes))
   avg_log2FC = deg_df[, "avg_log2FC", drop = F]
   colnames(avg_log2FC) = model
   fdr = deg_df[, "fdr", drop = F]
   colnames(fdr) = model
-  all_logFC_df = cbind(all_logFC_df, avg_log2FC)
-  all_fdr_df = cbind(all_fdr_df, fdr)
+  avg_log2FC = avg_log2FC[rownames(all_logFC_df),,drop=F] #combine with same rownames
+  all_logFC_df = cbind(all_logFC_df,avg_log2FC ) 
+  all_fdr_df = cbind(all_fdr_df, fdr[rownames(all_fdr_df),])
   
 }
 all_fdr_df[all_fdr_df > 0.05]  = 1 #remove non significant values
@@ -410,6 +410,7 @@ all_fdr_df[all_fdr_df == "0"] = paste0("<",format(.Machine$double.xmin,digits = 
 
 ```{r fig.height=7, fig.width=10}
 library(grid)
+library(ComplexHeatmap)
 genes_origin = c(rep("ESRRA_UP", length(genesets[["ESRRA_UP"]]@geneIds)),
                                     rep("ESRRA_DOWN", length(genesets[["ESRRA_DOWN"]]@geneIds)))
 row_anon = rowAnnotation(pathway = genes_origin,
@@ -438,13 +439,13 @@ dev.off()
 
 ## violin plots
 ```{r}
-xeno = AddMetaData(object = xeno, metadata = as.data.frame(t(pathwayScoresMatrix[c("ESRRA_UP","ESRRA_DOWN"),])))
 
 all_plots = list()
+DefaultAssay(object = xeno) = "known_pathways"
 #esrra up
 library(rstatix)
 for (pathway in c("ESRRA_UP","ESRRA_DOWN")) {
-  genes_by_tp = FetchData(object = xeno,vars = c("treatment", pathway,"orig.ident"),slot = "data") %>% filter(treatment != "res")
+  genes_by_tp = FetchData(object = xeno,vars = c("treatment", pathway,"orig.ident"),slot = "counts") %>% filter(treatment != "res")
   
   # all cells by patient boxplot
   formula <- as.formula(paste0(pathway," ~ treatment"))

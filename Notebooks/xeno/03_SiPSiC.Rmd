@@ -28,11 +28,10 @@ editor_options:
 ---
 
 ```{r}
-if (interactive()) {
-  source("./pipe.R")
-  input = get_input(get_current_path())
-  output = get_output(get_current_path())
-}
+# Get input and output
+source("./pipe.R")
+input = pipeline$xeno_sipsic_analysis$input
+output = pipeline$xeno_sipsic_analysis$output
 ```
 
 # Functions
@@ -111,6 +110,11 @@ fdr_df[fdr_df == "0"] = paste0("<",format(.Machine$double.xmin,digits = 1))
 ```
 
 
+```{r}
+fwrite(logFC_df,file = params$data_out_dir %s+% "xeno_sipsic_hallmarks_logFC.tsv",sep = "\t",row.names = T)
+fwrite(fdr_df,file = params$data_out_dir %s+% "xeno_sipsic_hallmarks_fdr_df.tsv",sep = "\t",row.names = T)
+```
+
 
 
 ```{r}
@@ -147,6 +151,17 @@ lgd = Legend(title = "log2 Fold change", at = c(-1.5, 0, 1.5),
 draw(p, padding = unit(c(2, 2, 2, 50), "mm"))
 draw(lgd,x = unit(0.85, "npc"), y = unit(0.78, "npc"))
 ```
+
+```{r fig.height=7, fig.width=8}
+
+svg( paste0(params$data_out_dir, "xeno_sipsic_heatmap.svg"), width = 8, height = 7)
+draw(p, padding = unit(c(2, 2, 2, 50), "mm"))
+draw(lgd,x = unit(0.85, "npc"), y = unit(0.78, "npc"))
+dev.off()
+
+
+```
+
 ```{r}
 #show only consistant
 logFC_df_consistant = logFC_df[colors =="blue" | colors == "red",]
@@ -167,14 +182,7 @@ p = ComplexHeatmap::Heatmap(
 p
 ```
 
-```{r fig.height=7, fig.width=8}
 
-png( paste0(params$data_out_dir, "xeno_sipsic_heatmap.png"), width = 8, height = 7,units = "in",res = 250)
-p
-dev.off()
-
-
-```
 
 # Heatmap with asterisks
 
@@ -321,7 +329,7 @@ for (patient_name in unique(xeno$orig.ident)) {
   colnames(data) = c("H_INFa", "H_TNFa_NFKb", "H_HYPOXIA", "H_E2F")
   data = cor(data)
   library("reshape2")
-  data = melt(as.matrix(data),varnames = c("pathway_1","pathway_2"),value.name = "correlation") %>% #to long format
+  data = reshape2::melt(as.matrix(data),varnames = c("pathway_1","pathway_2"),value.name = "correlation") %>% #to long format
     filter(!pathway_1 == pathway_2) %>%  # remove self correlation
     mutate(pathways = paste0(pathway_1," ~ ",pathway_2)) %>%  
     select(pathways,correlation) 

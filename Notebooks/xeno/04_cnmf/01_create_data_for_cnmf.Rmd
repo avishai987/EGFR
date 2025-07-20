@@ -20,17 +20,15 @@ editor_options:
 ---
 
 ```{r}
-if (interactive()) {
-  source("./pipe.R")
-  input = get_input(get_current_path())
-  output = get_output(get_current_path())
-}
+source("./pipe.R")
+input = pipeline$xeno_cnmf_preprocess$input
+output = pipeline$xeno_cnmf_preprocess$output
 ```
 
 
 
 ```{r}
-reticulate::use_condaenv("C:/Users/avishaiw.EKMD/AppData/Local/r-miniconda/envs/cnmf",required = T)
+reticulate::use_condaenv(pipeline$xeno_cnmf_preprocess$params$cnmf_env,required = T)
 reticulate::py_config() # if you see that r-cnmf_dev has not been loaded, restart/terminate r and try again, DO NOT load reticulate before.
 ```
 
@@ -40,12 +38,11 @@ reticulate::py_config() # if you see that r-cnmf_dev has not been loaded, restar
 ```
 
 # Data
-
 ```{r}
 xeno <- qs::qread(input$xeno)
-xeno = DietSeurat(object = xeno)
-gc()
+xeno = DietSeurat(xeno)
 ```
+
 
 
 ## Convert seurat to scanpy
@@ -55,19 +52,25 @@ sc <- import('scanpy', convert = FALSE)
 gene_expression = t(as.matrix(GetAssayData(xeno,slot='counts'))) 
 gene_expression = gene_expression[,colSums(gene_expression) != 0] #remove genes with 0 expression in all cells
 
+
 xeno_filtered  = xeno[colnames(gene_expression),]
 adata <- sc$AnnData(
   X   = gene_expression,
-  obs = xeno_filtered[[]],
-  var = GetAssay(xeno_filtered)[[]]
+  obs = xeno_filtered@meta.data,
+  var = GetAssay(xeno_filtered)@meta.features
 )
 rm(gene_expression)
+rm(gene_expression)
+
 gc()
 ```
 
+
+
+
 ```{python}
-import scanpy as sc
 import os
+import scanpy as sc
 adata = r.adata
 adata.var['highly_variable'] = adata.var['vst.variable'] # rename seurat var genes to scanpy var genes
 adata.write_h5ad(r.params['data_out_dir'] + os.path.basename((r.output['xeno_counts_filtered'])))
