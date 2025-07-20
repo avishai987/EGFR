@@ -1,5 +1,5 @@
 ---
-title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+title: '01_cell_lines_OSI`' 
 author: "Avishai Wizel"
 date: '`r Sys.time()`'
 output: 
@@ -21,11 +21,9 @@ editor_options:
 ---
 
 ```{r}
-if (interactive()) {
-  source("./pipe.R")
-  input = get_input(get_current_path())
-  output = get_output(get_current_path())
-}
+source("./pipe.R")
+input = pipeline$bulk_cell_lines_OSI$input
+output = pipeline$bulk_cell_lines_OSI$output
 ```
 
 # Functions
@@ -92,22 +90,22 @@ ggplot(pcaData, aes(PC1, PC2, color=cell_type, shape=condition)) +
 # 1157
 ```{r}
 # heatmap of DUSP6 in 1157
-cells_1157 = rownames(metadata)[metadata$cell_type == "X1157.1"]
-dusp6 = cell_lines_data[c("DUSP6","MAPK1"),] %>% select(all_of(cells_1157))
+metadata$condition = metadata$condition %>%   factor(levels = c("Day1_NT","Day1_OSI","Day14_OSI"),ordered = T)
+metadata <- metadata[order(metadata$condition), ]
 
-
+for (cell_line in unique(metadata$cell_type )) {
+  cells = rownames(metadata)[metadata$cell_type == cell_line]
+dusp6 = cell_lines_data[c("DUSP6","MAPK1"),] %>% select(all_of(cells))
 #complex heatmap with rows 45 angle, order day1 NT, dat 1 OSI, day 14 OSI
 library(ComplexHeatmap)
 library(circlize)
-Heatmap(
+p = Heatmap(
   as.matrix(dusp6),
   name = "TPM",
-  column_title = "1157",
+  column_title = cell_line,
   row_title = "Genes",
   row_names_gp = gpar(fontsize = 10),
   column_names_gp = gpar(fontsize = 10),
-  column_order = c("X1157.1_Day1_NT_1_S9", "X1157.1_Day1_NT_2_S3", "X1157.1_Day1_NT_3_S2","X1157.1_Day1_OSI.300nM_1_S4", "X1157.1_Day1_OSI.300nM_2_S1", "X1157.1_Day1_OSI.300nM_3_S8", "X1157.1_Day14_OSI.300nM_1_S5", "X1157.1_Day14_OSI.300nM_2_S7", 
-"X1157.1_Day14_OSI.300nM_3_S6"),
   cluster_rows = FALSE,
   cluster_columns = FALSE,
   show_row_names = TRUE,
@@ -116,7 +114,13 @@ Heatmap(
   row_dend_width = unit(2, "cm"),
   column_dend_height = unit(2, "cm"),
   heatmap_legend_param = list(title = "TPM", at = c(0,100,200,300), labels = c("0","100","200","300"))
-)
+) 
+print(p)
+}
+
+
+
+
 
 ```
 
