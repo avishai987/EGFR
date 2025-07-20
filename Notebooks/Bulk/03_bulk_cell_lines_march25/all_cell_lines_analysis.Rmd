@@ -18,11 +18,9 @@ params:
 ---
 
 ```{r}
-if (interactive()) {
-  source("./pipe.R")
-  input = get_input(get_current_path())
-  output = get_output(get_current_path())
-}
+source("./pipe.R")
+input = pipeline$march25_all_analysis$input
+output = pipeline$march25_all_analysis$output
 ```
 
 
@@ -188,25 +186,42 @@ SASP_signautre_expression = bulk_Mar25_TPM[SASP_signature[SASP_signature %in% ro
 SENESCENCE_signautre_expression = bulk_Mar25_TPM[FRIDMAN_SENESCENCE_UP[FRIDMAN_SENESCENCE_UP %in% rownames(bulk_Mar25_TPM)],] %>%
   colMeans() %>% as.data.frame() %>% setNames("FRIDMAN\nSENESCENCE_UP")
 
+signatures = cbind(SASP_signautre_expression,SENESCENCE_signautre_expression)
+
+signatures_H1975 = signatures[startsWith(rownames(signatures),prefix = "H1975"),,drop=F]
+signatures_H1975_scaled = scale(signatures_H1975)
+
+signatures_HCC = signatures[startsWith(rownames(signatures),prefix = "HCC"),,drop=F]
+signatures_HCC_scaled = scale(signatures_HCC)
 
 
-all_signature_expression_zscore = t(scale(cbind(SASP_signautre_expression,SENESCENCE_signautre_expression))) %>% as.data.frame()
+all_signature_expression_zscore = t(rbind(signatures_H1975_scaled, signatures_HCC_scaled)) %>% as.data.frame()
 
 p1 = Heatmap(all_signature_expression_zscore, cluster_rows = F, cluster_columns = F, name = "Z-score TPM",column_title = "signatures")
 p1
 
 # expression heatmap of genes
 
-signautre_expression = bulk_Mar25_TPM[SASP_signature[SASP_signature %in% rownames(bulk_Mar25_TPM)],]  %>% t() %>% scale() %>% t() %>% as.data.frame() 
+signautre_expression = bulk_Mar25_TPM[SASP_signature[SASP_signature %in% rownames(bulk_Mar25_TPM)],]  %>% t() %>% as.data.frame()
+signatures_H1975 = signautre_expression[startsWith(rownames(signautre_expression),prefix = "H1975"),,drop=F]
+signatures_H1975_scaled = scale(signatures_H1975)
+
+signatures_HCC = signautre_expression[startsWith(rownames(signautre_expression),prefix = "HCC"),,drop=F]
+signatures_HCC_scaled = scale(signatures_HCC)
+
+all_signature_expression_zscore = t(rbind(signatures_H1975_scaled, signatures_HCC_scaled)) %>% as.data.frame()
 
 
-p2 = Heatmap(signautre_expression, cluster_rows = F, cluster_columns = F, name = "Z-score TPM",column_title = "SASP genes")
+
+all_signature_expression_zscore = all_signature_expression_zscore[complete.cases(all_signature_expression_zscore), ] #Remove rows with all or some NAs
+
+p2 = Heatmap(all_signature_expression_zscore, cluster_rows = T, cluster_columns = F, name = "Z-score TPM",column_title = "SASP genes")
 p2
 
 signautre_expression = bulk_Mar25_TPM[FRIDMAN_SENESCENCE_UP[FRIDMAN_SENESCENCE_UP %in% rownames(bulk_Mar25_TPM)],]  %>% t() %>% scale() %>% t() %>% as.data.frame() 
 
 
-p3 = Heatmap(signautre_expression, cluster_rows = F, cluster_columns = F, name = "Z-score TPM",column_title = "FRIDMAN_SENESCENCE_UP genes",row_names_gp = gpar(fontsize = 8))
+p3 = Heatmap(signautre_expression, cluster_rows = T, cluster_columns = F, name = "Z-score TPM",column_title = "FRIDMAN_SENESCENCE_UP genes",row_names_gp = gpar(fontsize = 8))
 
 ```
 
@@ -267,3 +282,29 @@ pdf(paste0(params$data_out_dir,"SENESCENCE_genes.pdf"),width = 12,height = 9)
 p3
 dev.off()
 ```
+
+#  all hallmarks
+```{r fig.height=15, fig.width=12}
+
+all_pathways = data.frame(row.names = names(bulk_Mar25_TPM))
+
+i=1
+for (pathway in names(genesets)) {
+  genes_in_data = genesets[[pathway]][genesets[[pathway]] %in% rownames(bulk_Mar25_TPM)]
+  mean_expression = bulk_Mar25_TPM[genes_in_data,] %>%  
+  colMeans() %>% as.data.frame() %>% setNames(pathway)
+  mean_expression = mean_expression[rownames(all_pathways),,drop=F] #order
+  all_pathways = cbind(all_pathways,mean_expression)
+  names(all_pathways)[i] = pathway
+  i=i+1
+}
+
+all_pathways_scaled = scale(all_pathways)
+
+
+
+p1 = Heatmap(t(all_pathways_scaled), cluster_rows = T, cluster_columns = F, name = "Z-score TPM",column_title = "signatures")
+p1
+
+```
+

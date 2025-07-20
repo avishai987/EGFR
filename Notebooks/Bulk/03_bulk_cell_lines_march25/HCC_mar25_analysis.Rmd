@@ -20,11 +20,9 @@ params:
 ---
 
 ```{r}
-if (interactive()) {
-  source("./pipe.R")
-  input = get_input(get_current_path())
-  output = get_output(get_current_path())
-}
+source("./pipe.R")
+input = pipeline$bulk_mar25_HCC$input
+output = pipeline$bulk_mar25_HCC$output
 ```
 
 
@@ -181,13 +179,14 @@ print_tab(plt1+plt2,title = paste(params$cell_line,"roxaVSctrl"))
 diff_genes = data.frame(row.names = rownames(cpVSop), 
                         cpVSop_FC = 2**cpVSop$log2FoldChange,
                         roxaVSctrl_FC = 2**roxaVSctrl$log2FoldChange,
-                        cpVSop_padj = cpVSop$padj)
+                        cpVSop_padj = cpVSop$padj,
+                        roxaVSctrl_padj = roxaVSctrl$padj)
 ```
 
 ```{r}
 library(org.Hs.eg.db)
-up_genes_df =  diff_genes %>% filter(cpVSop_FC > 2 & roxaVSctrl_FC<1.2 & cpVSop_padj<0.05) 
-down_genes_df = diff_genes %>% filter(cpVSop_FC < 0.5 & roxaVSctrl_FC>0.8 & cpVSop_padj<0.05)
+up_genes_df =  diff_genes %>% filter((cpVSop_FC > 1.3  | cpVSop_FC < 1/1.3) & cpVSop_padj<0.05 & roxaVSctrl_padj >0.05) 
+down_genes_df = diff_genes %>% filter((roxaVSctrl_FC > 1.3  | roxaVSctrl_FC < 1/1.3) & roxaVSctrl_padj<0.05 & cpVSop_padj>0.05)
 up_genes = up_genes_df %>% rownames()
 down_genes = down_genes_df %>% rownames()
 
@@ -214,7 +213,7 @@ diff_genes[c("SMAD2","SMAD3","SMAD4","TGFB1","TGFB2","TGFB3","TGFBR1","TGFBR2"),
 
 ```{r}
 # write a data frame from the list of up and down genes
-lst = list(up_genes = up_genes, down_genes = down_genes)
+lst = list(up_genes = up_genes,      down_genes = down_genes)
 df_from_list <- bind_rows(lapply(lst, function(x) as.data.frame(t(x)))) %>% set_rownames(names(lst)) %>% t()
 
 write.table(df_from_list,
@@ -243,4 +242,209 @@ if(length(down_genes)>=3){
 ```
 
 
+# scatter plot
+
+```{r}
+library(ggrepel)
+up_genes_df =  diff_genes %>% filter(cpVSop_FC > 1.2 & roxaVSctrl_FC<1.2 & cpVSop_padj<0.05) 
+down_genes_df = diff_genes %>% filter(cpVSop_FC < 0.8 & roxaVSctrl_FC>0.8 & cpVSop_padj<0.05)
+diff_genes_signif = rbind(up_genes_df,down_genes_df)
+
+ggplot(diff_genes_signif, aes(x=cpVSop_FC, y=roxaVSctrl_FC)) +
+  geom_point() + 
+  geom_text_repel(label=rownames(diff_genes_signif))
+```
+# order genes by cpVSop_FC/roxaVSctrl_FC values and than GSEA
+```{r}
+hif_targets =  scan(input$hif_targets, character(), quote = "")
+genesets[["HIF_targets"]] = hif_targets
+```
+
+#UP 
+```{r}
+diff_genes_filtered = diff_genes %>% filter(!is.na(cpVSop_FC) | !is.na(roxaVSctrl_FC)) %>% 
+  filter( cpVSop_padj < 1 ) %>% mutate(score = cpVSop_FC/roxaVSctrl_FC)
+
+
+ranked_vec = diff_genes_filtered$score
+names(ranked_vec) = rownames(diff_genes_filtered)
+ranked_vec = ranked_vec %>% sort(decreasing = T)
+
+```
+
+
+```{r}
+hyp_obj <-hypeR_fgsea(signature = ranked_vec,genesets = (genesets),up_only = T)
+plt = hyp_dots(hyp_obj,merge = F,fdr = 0.3)
+plt+ scale_y_continuous(trans = hypeR:::.reverselog_trans(10), 
+        breaks =exp(-seq(-log(min(plt$data$fdr)), -log(max(plt$data$fdr)), 
+            length.out = 6)) %>% signif(digits = 2))
+
+ fgsea::plotEnrichment(pathway = genesets$HIF_targets,stats = ranked_vec)
+
+ hypoxia_genes_cpVSop_hcc = hyp_obj[["data"]]%>% filter(label == "HIF_targets") %>%  pull(le) %>% strsplit(split = ",") %>% unlist()
+```
+# DOWN 
+```{r}
+diff_genes_filtered = diff_genes %>% filter(!is.na(cpVSop_FC) | !is.na(roxaVSctrl_FC)) %>% 
+  filter(cpVSop_FC<1 &  roxaVSctrl_FC<1  & cpVSop_padj < 1 ) %>% mutate(score = cpVSop_FC/roxaVSctrl_FC)
+
+
+ranked_vec = diff_genes_filtered$score
+names(ranked_vec) = rownames(diff_genes_filtered)
+ranked_vec = ranked_vec %>% sort(decreasing = T)
+
+```
+
+
+```{r}
+hyp_obj <-hypeR_fgsea(signature = ranked_vec,genesets = (genesets),up_only = T)
+plt = hyp_dots(hyp_obj,merge = F,fdr = 0.3)
+plt+ scale_y_continuous(trans = hypeR:::.reverselog_trans(10), 
+        breaks =exp(-seq(-log(min(plt$data$fdr)), -log(max(plt$data$fdr)), 
+            length.out = 6)) %>% signif(digits = 2))
+
+```
+
+# Average score
+
+```{r}
+
+hif_scores = cell_line_bulk[genesets$HIF_targets,] %>% colMeans() %>% data.frame(row.names = names(.), hif_score =.)
+hif_scores = merge(x = hif_scores,y = metadata,by = 0) %>% column_to_rownames("Row.names")
+hif_scores
+hif_scores$condition = factor(hif_scores$condition,levels = c("Veh","Rox","osi_short","osi_short_roxa","osi_persistor","osi_persist_roxa"))
+```
+```{r}
+summary_df <- hif_scores %>%
+  group_by(condition) %>%
+  dplyr::summarise(
+    Mean_Score = mean(hif_score),
+    SD_Score = sd(hif_score),
+    N = n(),
+    SE_Score = SD_Score / sqrt(N) # שגיאת תקן של הממוצע
+  )
+
+print(summary_df)
+```
+
+```{r}
+ggplot(hif_scores, aes(x = condition, y = hif_score)) +
+  # Add bars for the means
+  geom_bar(data = summary_df, aes(y = Mean_Score), stat = "identity", fill = "skyblue", color = "black", alpha = 0.7) +
+  # Add individual data points (jittered to prevent overlap)
+  geom_jitter(width = 0.2, height = 0, color = "darkblue", size = 2, alpha = 0.6) +
+  # Optional: Add error bars (Standard Error of the Mean)
+  geom_errorbar(data = summary_df, aes(y = Mean_Score, ymin = Mean_Score - SE_Score, ymax = Mean_Score + SE_Score),
+                width = 0.1, color = "black") +
+  # Add titles and customize appearance
+  labs(
+    title = paste0(params$cell_line,"- Comparison of Mean Scores"),
+    x = "Condition",
+    y = "HIF score"
+  ) +
+  theme_minimal() + # Minimalist theme
+  theme(plot.title = element_text(hjust = 0.5)) # Center the title
+```
+## per gene
+```{r}
+hif_scores = cell_line_bulk[genesets$HIF_targets,] %>% t() %>% as.data.frame()
+hif_scores= merge(x = hif_scores,y = metadata,by = 0) %>% column_to_rownames("Row.names")
+```
+
+```{r}
+hif_scores = cell_line_bulk[hif_targets,] %>% t() %>% as.data.frame()
+colnames(hif_scores) = paste0("Gene_",colnames(hif_scores))
+hif_scores = merge(x = hif_scores,y = metadata,by = 0) %>% column_to_rownames("Row.names")
+hif_scores$condition = factor(hif_scores$condition,levels = c("Veh","Rox","osi_short","osi_short_roxa","osi_persistor","osi_persist_roxa"))
+hif_scores = hif_scores %>% filter(condition %in% c("Veh","Rox","osi_persistor","osi_persist_roxa"))
+```
+
+```{r}
+# --- 2. Convert from 'Wide' to 'Long' Format (Tidy Data) ---
+# This is crucial for ggplot2 when plotting different features (genes) at once
+df_long <- hif_scores %>%
+  pivot_longer(
+    cols = starts_with("Gene"), # Selects all columns starting with "Gene"
+    names_to = "Gene",           # Creates a new column named 'Gene' for gene names
+    values_to = "Expression"     # Creates a new column named 'Expression' for expression values
+  )
+
+print("\nData Frame after converting to Long Format:")
+print(df_long)
+
+# --- 3. Calculate Summary Statistics (Mean, Standard Deviation, Confidence Interval) ---
+df_summary <- df_long %>%
+  group_by(condition, Gene) %>% # Group by both Condition and Gene
+  dplyr::summarize(
+    Mean_Expression = mean(Expression),
+    SD_Expression = sd(Expression),
+    N_Replicates = n(), # Number of replicates
+    # Calculate Standard Error of the Mean (SEM)
+    SEM_Expression = SD_Expression / sqrt(N_Replicates),
+    # Calculate 95% Confidence Interval (CI)
+    # Using approx. 1.96 * SEM for 95% CI (common practice for error bars)
+    CI_Lower = Mean_Expression - 1.96 * SEM_Expression, 
+    CI_Upper = Mean_Expression + 1.96 * SEM_Expression,
+    .groups = 'drop' # Ungroup the results after summarizing
+  )
+
+print("\nData Frame with Summary Statistics:")
+print(df_summary)
+
+# --- 4. Create the Plots (one per gene) ---
+
+# Loop through each gene and create a plot
+unique_genes <- unique(df_long$Gene)
+
+```
+
+```{r fig.height=15, fig.width=15}
+p_all_genes <- ggplot(df_long, aes(x = condition, y = Expression, fill = condition)) +
+  # Use stat_summary for bars and error bars to calculate means/CIs directly from df_long
+  stat_summary(fun = mean, geom = "bar", position = position_dodge(width = 0.9), color = "black") +
+  stat_summary(fun.data = mean_cl_normal, geom = "errorbar", width = 0.2, 
+               position = position_dodge(width = 0.9)) + # Error bars based on normal distribution CI
+  geom_point(position = position_jitterdodge(jitter.width = 0.05, dodge.width = 0.9), 
+             color = "darkblue", size = 1.5, alpha = 0.7) + # Individual replicate points
+  labs(
+    title = "Gene Expression Across Conditions",
+    x = "Condition",
+    y = "Expression Level"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  ) +
+  facet_wrap(~ Gene, scales = "free_y") # Create a separate plot for each gene (facet)
+
+print("\nSingle Plot with Facets for All Genes:")
+print(p_all_genes)
+```
+```{r}
+diff_genes["OSMR",]
+```
+
+
+
+
+```{r fig.width=15}
+library(org.Hs.eg.db)
+
+up_in_combo = diff_genes %>% filter(cpVSop_FC > 1.2 & cpVSop_padj<0.05) %>% rownames()
+down_in_combo = diff_genes %>% filter(cpVSop_FC < 1/1.2 & cpVSop_padj<0.05) %>% rownames()
+up_in_roxa =  diff_genes %>% filter(roxaVSctrl_FC > 1.2 & roxaVSctrl_padj<0.05) %>% rownames()
+down_in_roxa = diff_genes %>% filter(roxaVSctrl_FC < 1/1.2 & roxaVSctrl_padj<0.05) %>% rownames()
+all_list = list(up_in_combo = up_in_combo,down_in_combo= down_in_combo, up_in_roxa =up_in_roxa, down_in_roxa =down_in_roxa)
+ggvenn::ggvenn(data = all_list)
+```
+```{r}
+up_only_in_combo = up_in_combo[!up_in_combo %in% c(up_in_roxa,down_in_roxa)]
+only_down_in_combo = down_in_combo[!down_in_combo %in% c(up_in_roxa,down_in_roxa)]
+only_up_in_roxa = up_in_roxa[!up_in_roxa %in% c(up_in_combo,down_in_combo)]
+only_down_in_roxa = down_in_roxa[!down_in_roxa %in%  c(up_in_combo,down_in_combo)]
+
+HCC_uniqe_deg_list = list(up_only_in_combo,only_down_in_combo,only_up_in_roxa,only_down_in_roxa)
+```
 

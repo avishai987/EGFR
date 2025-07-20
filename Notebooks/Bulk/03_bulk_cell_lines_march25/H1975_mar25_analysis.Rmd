@@ -115,9 +115,8 @@ genesets = getGmt(input$genesets) %>% geneIds()
 
 
 dds <- DESeq(dds)
-cpVSop <- results(dds,contrast = c("condition","osi_persist_roxa","osi_persistor"))  %>% as.data.frame()
-# cpVSop$padj = p.adjust(cpVSop$pvalue, method = "fdr")
-roxaVSctrl <- results(dds,contrast = c("condition","Rox","Veh"))  %>% as.data.frame()
+cpVSop <- results(dds,contrast = c("condition","osi_persist_roxa","osi_persistor"),alpha = 0.5)  %>% as.data.frame()
+roxaVSctrl <- results(dds,contrast = c("condition","Rox","Veh"),alpha = 0.5)  %>% as.data.frame()
 diff_genes = data.frame(row.names = rownames(cpVSop), 
                         cpVSop_FC = cpVSop$log2FoldChange,
                         roxaVSctrl_FC = roxaVSctrl$log2FoldChange, 
@@ -183,7 +182,8 @@ plt1/plt2
 diff_genes = data.frame(row.names = rownames(cpVSop), 
                         cpVSop_FC = 2**cpVSop$log2FoldChange,
                         roxaVSctrl_FC = 2**roxaVSctrl$log2FoldChange,
-                        cpVSop_padj = cpVSop$padj)
+                        cpVSop_padj = cpVSop$padj,
+                        roxaVSctrl_padj = roxaVSctrl$padj)
 ```
 
 ```{r}
@@ -194,7 +194,7 @@ up_genes = up_genes_df %>% rownames()
 down_genes = down_genes_df %>% rownames()
 
 gene_descriptions <- AnnotationDbi::select(org.Hs.eg.db, keys = up_genes, columns = "GENENAME", keytype = "SYMBOL")
- /
+ 
 print_tab(cbind(up_genes_df,gene_description = gene_descriptions$GENENAME),
           title = "up")
 
@@ -244,14 +244,26 @@ if(length(down_genes)>=3){
 
 ```{r}
 library(ggrepel)
-up_genes_df =  diff_genes %>% filter(cpVSop_FC > 1.3 & roxaVSctrl_FC<1.2 & cpVSop_padj<0.05) 
-down_genes_df = diff_genes %>% filter(cpVSop_FC < 0.5 & roxaVSctrl_FC>0.8 & cpVSop_padj<0.05)
-diff_genes_signif = rbind(up_genes_df,down_genes_df)
-diff_genes_signif = diff_genes_signif %>% mutate(signif = if_else(condition = cpVSop_padj<0.05,true = "signif",false = "ns"))
-ggplot(diff_genes_signif, aes(x=cpVSop_FC, y=roxaVSctrl_FC)) +
+
+diff_genes_filtered = diff_genes %>% mutate(labels =if_else(condition = (roxaVSctrl_FC>20) |  (cpVSop_FC>20 ),true = rownames(diff_genes),false = NA))
+ggplot(diff_genes_filtered, aes(x=cpVSop_FC, y=roxaVSctrl_FC)) +
   geom_point() + 
-  geom_text_repel(label=rownames(diff_genes_signif),max.overlaps = 10)
+  geom_text_repel(label=diff_genes_filtered$labels,max.overlaps = 20,box.padding = 0.5)
+
+diff_genes_filtered = diff_genes %>% filter( (roxaVSctrl_FC>2) |  (cpVSop_FC>2 ))
+ggplot(diff_genes_filtered, aes(x=cpVSop_FC, y=roxaVSctrl_FC))+
+geom_bin2d(bins = 70) +
+  scale_fill_gradientn(colors = rainbow(7),breaks = seq(from = 0, to = 1000, by = 150))+
+  theme_bw()
 ```
+```{r}
+diff_genes_filtered = diff_genes %>% filter(cpVSop_FC > 2*roxaVSctrl_FC | 2*cpVSop_FC < roxaVSctrl_FC) %>% 
+  mutate(labels =if_else(condition = (roxaVSctrl_FC>20) |  (cpVSop_FC>20 ),true = rownames(.),false = NA))
+p = ggplot(diff_genes_filtered, aes(x=cpVSop_FC, y=roxaVSctrl_FC)) +
+  geom_point()
+p
+```
+
 
 #TGFb in OSI vctrl
 ```{r}
@@ -263,4 +275,169 @@ tgfb_fc = data.frame(row.names =tgfb_genes, combo_Persisters_vs_op = cpVSop[tgfb
                      osi_persisters_VS_osiShort =  opVSosiShort[tgfb_genes,"log2FoldChange"])
 tgfb_fc
 ```
+```{r}
+tgf_pathway = getGmt("KEGG_TGF_BETA_SIGNALING_PATHWAY.gmt") %>% geneIds()
+genesets [["KEGG_TGF_BETA_SIGNALING_PATHWAY.gmt"]] = tgf_pathway[[1]]
+```
 
+```{r}
+diff_genes_filtered = diff_genes %>% filter(!is.na(cpVSop_FC) | !is.na(roxaVSctrl_FC)) %>% 
+  filter(cpVSop_FC>1 & cpVSop_FC >=roxaVSctrl_FC & cpVSop_padj <1 & roxaVSctrl_FC>0.9 ) %>% mutate(score = cpVSop_FC/roxaVSctrl_FC)
+
+
+ranked_vec = diff_genes_filtered$score
+names(ranked_vec) = rownames(diff_genes_filtered)
+ranked_vec = ranked_vec %>% sort(decreasing = T)
+
+```
+
+
+```{r}
+hyp_obj <-hypeR_fgsea(signature = ranked_vec,genesets = (genesets),up_only = T)
+plt = hyp_dots(hyp_obj,merge = F,fdr = 0.3)
+plt+ scale_y_continuous(trans = hypeR:::.reverselog_trans(10), 
+        breaks =exp(-seq(-log(min(plt$data$fdr)), -log(max(plt$data$fdr)), 
+            length.out = 6)) %>% signif(digits = 2))
+
+ fgsea::plotEnrichment(pathway = genesets$HALLMARK_HYPOXIA,stats = ranked_vec)
+
+ hypoxia_genes_cpVSop_h1975 = hyp_obj[["data"]]%>% filter(label == "HALLMARK_HYPOXIA") %>%  pull(le) %>% strsplit(split = ",") %>% unlist()
+
+```
+
+```{r}
+diff_genes_filtered = diff_genes %>% filter(!is.na(cpVSop_FC) | !is.na(roxaVSctrl_FC)) %>% 
+  filter(cpVSop_FC<1 & cpVSop_FC <=roxaVSctrl_FC & cpVSop_padj <1) %>% mutate(score = roxaVSctrl_FC/cpVSop_FC)
+
+
+ranked_vec = diff_genes_filtered$score
+names(ranked_vec) = rownames(diff_genes_filtered)
+ranked_vec = ranked_vec %>% sort(decreasing = T)
+
+```
+
+
+```{r}
+hyp_obj <-hypeR_fgsea(signature = ranked_vec,genesets = (genesets),up_only = F)
+plt = hyp_dots(hyp_obj,merge = F,fdr = 0.3)
+plt
+ fgsea::plotEnrichment(pathway = genesets$HALLMARK_HYPOXIA,stats = ranked_vec)
+
+ hypoxia_genes_cpVSop = hyp_obj[["data"]][["up"]][["data"]] %>% filter(label == "HALLMARK_HYPOXIA") %>%  pull(le) %>% strsplit(split = ",") %>% unlist()
+```
+
+
+```{r}
+diff_genes_filtered = diff_genes %>% filter(!is.na(cpVSop_FC) | !is.na(roxaVSctrl_FC)) %>% 
+  filter(roxaVSctrl_FC>1 & roxaVSctrl_FC >cpVSop_FC & roxaVSctrl_padj <1) %>% mutate(score = roxaVSctrl_FC/cpVSop_FC)
+
+
+ranked_vec = diff_genes_filtered$score
+names(ranked_vec) = rownames(diff_genes_filtered)
+ranked_vec = ranked_vec %>% sort(decreasing = T)
+
+```
+
+```{r}
+hyp_obj <-hypeR_fgsea(signature = ranked_vec,genesets = (genesets),up_only = F)
+plt = hyp_dots(hyp_obj,merge = F,fdr = 0.3)
+plt
+
+ hypoxia_genes_roxaVSctrl = hyp_obj[["data"]][["up"]][["data"]] %>% filter(label == "HALLMARK_HYPOXIA") %>%  pull(le) %>% strsplit(split = ",") %>% unlist()
+```
+```{r}
+diff_genes[genesets$KEGG_TGF_BETA_SIGNALING_PATHWAY.gmt,]
+```
+# Average score
+
+```{r}
+
+hif_scores = cell_line_bulk[genesets$HIF_targets,] %>% colMeans() %>% data.frame(row.names = names(.), hif_score =.)
+hif_scores = merge(x = hif_scores,y = metadata,by = 0) %>% column_to_rownames("Row.names")
+hif_scores
+hif_scores$condition = factor(hif_scores$condition,levels = c("Veh","Rox","osi_short","osi_short_roxa","osi_persistor","osi_persist_roxa"))
+```
+```{r}
+summary_df <- hif_scores %>%
+  group_by(condition) %>%
+  dplyr::summarise(
+    Mean_Score = mean(hif_score),
+    SD_Score = sd(hif_score),
+    N = n(),
+    SE_Score = SD_Score / sqrt(N) # שגיאת תקן של הממוצע
+  )
+
+print(summary_df)
+```
+
+```{r}
+ggplot(hif_scores, aes(x = condition, y = hif_score)) +
+  # Add bars for the means
+  geom_bar(data = summary_df, aes(y = Mean_Score), stat = "identity", fill = "skyblue", color = "black", alpha = 0.7) +
+  # Add individual data points (jittered to prevent overlap)
+  geom_jitter(width = 0.2, height = 0, color = "darkblue", size = 2, alpha = 0.6) +
+  # Optional: Add error bars (Standard Error of the Mean)
+  geom_errorbar(data = summary_df, aes(y = Mean_Score, ymin = Mean_Score - SE_Score, ymax = Mean_Score + SE_Score),
+                width = 0.1, color = "black") +
+  # Add titles and customize appearance
+  labs(
+    title = paste0(params$cell_line,"- Comparison of Mean Scores"),
+    x = "Condition",
+    y = "HIF score"
+  ) +
+  theme_minimal() + # Minimalist theme
+  theme(plot.title = element_text(hjust = 0.5)) # Center the title
+```
+
+
+```{r}
+hif_targets =  scan(input$hif_targets, character(), quote = "")
+genesets[["HIF_targets"]] = hif_targets
+```
+
+
+
+
+```{r fig.width=15}
+library(org.Hs.eg.db)
+
+up_in_combo = diff_genes %>% filter(cpVSop_FC > 1.2 & cpVSop_padj<0.05) %>% rownames()
+down_in_combo = diff_genes %>% filter(cpVSop_FC < 1/1.2 & cpVSop_padj<0.05) %>% rownames()
+up_in_roxa =  diff_genes %>% filter(roxaVSctrl_FC > 1.2 & roxaVSctrl_padj<0.05) %>% rownames()
+down_in_roxa = diff_genes %>% filter(roxaVSctrl_FC < 1/1.2 & roxaVSctrl_padj<0.05) %>% rownames()
+all_list = list(up_in_combo = up_in_combo,down_in_combo= down_in_combo, up_in_roxa =up_in_roxa, down_in_roxa =down_in_roxa)
+ggvenn::ggvenn(data = all_list)
+```
+
+
+```{r}
+up_only_in_combo = up_in_combo[!up_in_combo %in% c(up_in_roxa,down_in_roxa)]
+only_down_in_combo = down_in_combo[!down_in_combo %in% c(up_in_roxa,down_in_roxa)]
+only_up_in_roxa = up_in_roxa[!up_in_roxa %in% c(up_in_combo,down_in_combo)]
+only_down_in_roxa = down_in_roxa[!down_in_roxa %in%  c(up_in_combo,down_in_combo)]
+H1975_uniqe_deg_list = list(up_only_in_combo = up_only_in_combo,only_down_in_combo = only_down_in_combo,only_up_in_roxa = only_up_in_roxa,only_down_in_roxa = only_down_in_roxa)
+
+
+```
+
+
+```{r}
+#TODO: move to all_cell_lines_analysis.Rmd
+for (i in 1:length(H1975_uniqe_deg_list)) {
+  common = intersect(H1975_uniqe_deg_list[[i]], HCC_uniqe_deg_list[[i]])
+  # print(hif_targets[hif_targets %in% common])
+  # print(common)
+  print(diff_genes[common,])
+  
+  if(length(common)>=3){
+  hyp_obj <- hypeR(common, genesets, test = "hypergeometric", fdr=1, plotting=F,
+                   background = rownames(bulk_Mar25_TPM))
+  plt2 = hyp_dots(hyp_obj,title = names(H1975_uniqe_deg_list)[i])
+  plt2 = plt2 + scale_y_continuous(trans = hypeR:::.reverselog_trans(10), 
+        breaks =exp(-seq(-log(min(plt2$data$fdr)), -log(max(plt2$data$fdr)), 
+            length.out = 6)) %>% signif(digits = 2))
+  print(plt2)
+  }
+  
+}
+```
