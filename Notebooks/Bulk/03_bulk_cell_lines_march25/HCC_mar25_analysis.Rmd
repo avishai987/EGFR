@@ -422,6 +422,8 @@ p_all_genes <- ggplot(df_long, aes(x = condition, y = Expression, fill = conditi
 print("\nSingle Plot with Facets for All Genes:")
 print(p_all_genes)
 ```
+
+
 ```{r}
 diff_genes["OSMR",]
 ```
@@ -431,20 +433,317 @@ diff_genes["OSMR",]
 
 ```{r fig.width=15}
 library(org.Hs.eg.db)
+fc_threshold =1.5
 
-up_in_combo = diff_genes %>% filter(cpVSop_FC > 1.2 & cpVSop_padj<0.05) %>% rownames()
-down_in_combo = diff_genes %>% filter(cpVSop_FC < 1/1.2 & cpVSop_padj<0.05) %>% rownames()
-up_in_roxa =  diff_genes %>% filter(roxaVSctrl_FC > 1.2 & roxaVSctrl_padj<0.05) %>% rownames()
-down_in_roxa = diff_genes %>% filter(roxaVSctrl_FC < 1/1.2 & roxaVSctrl_padj<0.05) %>% rownames()
+up_in_combo = diff_genes %>% filter(cpVSop_FC > fc_threshold & cpVSop_padj<0.05) %>% rownames()
+down_in_combo = diff_genes %>% filter(cpVSop_FC < 1/fc_threshold & cpVSop_padj<0.05) %>% rownames()
+up_in_roxa =  diff_genes %>% filter(roxaVSctrl_FC > fc_threshold & roxaVSctrl_padj<0.05) %>% rownames()
+down_in_roxa = diff_genes %>% filter(roxaVSctrl_FC < 1/fc_threshold & roxaVSctrl_padj<0.05) %>% rownames()
 all_list = list(up_in_combo = up_in_combo,down_in_combo= down_in_combo, up_in_roxa =up_in_roxa, down_in_roxa =down_in_roxa)
 ggvenn::ggvenn(data = all_list)
 ```
+
+
 ```{r}
-up_only_in_combo = up_in_combo[!up_in_combo %in% c(up_in_roxa,down_in_roxa)]
-only_down_in_combo = down_in_combo[!down_in_combo %in% c(up_in_roxa,down_in_roxa)]
-only_up_in_roxa = up_in_roxa[!up_in_roxa %in% c(up_in_combo,down_in_combo)]
-only_down_in_roxa = down_in_roxa[!down_in_roxa %in%  c(up_in_combo,down_in_combo)]
+up_only_in_combo = up_in_combo[!up_in_combo %in% c(up_in_roxa)]
+only_down_in_combo = down_in_combo[!down_in_combo %in% c(down_in_roxa)]
+only_up_in_roxa = up_in_roxa[!up_in_roxa %in% c(up_in_combo)]
+only_down_in_roxa = down_in_roxa[!down_in_roxa %in%  c(down_in_combo)]
 
 HCC_uniqe_deg_list = list(up_only_in_combo,only_down_in_combo,only_up_in_roxa,only_down_in_roxa)
+names(HCC_uniqe_deg_list) = c("up_only_in_combo","only_down_in_combo","only_up_in_roxa","only_down_in_roxa")
+```
+
+```{r}
+all_fdr_df = data.frame(row.names = names(genesets))
+for (i in 1:length(HCC_uniqe_deg_list)) {
+  geneset = HCC_uniqe_deg_list[[i]]
+  if (length(geneset)>=3) {
+    hyp_obj <- hypeR(geneset, genesets, test = "hypergeometric", fdr=1, plotting=F,
+               background = rownames(bulk_Mar25_TPM))
+    
+    all_fdr_df[[names(HCC_uniqe_deg_list)[i]]] = -log10(hyp_obj$data[names(genesets),"fdr"])
+    plt = hyp_dots(hyp_obj,title = paste(names(HCC_uniqe_deg_list)[i] ," - ",params$cell_line))
+    plt = plt+
+      scale_y_continuous(trans = hypeR:::.reverselog_trans(10), 
+        breaks =exp(-seq(-log(min(plt$data$fdr)), -log(max(plt$data$fdr)), 
+            length.out = 6)) %>% signif(digits = 2))
+    print(plt)
+  }
+}
+
+all_fdr_df =all_fdr_df[,c("up_only_in_combo", "only_up_in_roxa", "only_down_in_combo", "only_down_in_roxa")]
+
+```
+
+```{r fig.width=9}
+all_list = list(up_only_in_combo = up_only_in_combo, only_up_in_roxa =only_up_in_roxa, hif_targets =hif_targets)
+ggvenn::ggvenn(data = all_list)+ggtitle(params$cell_line)
+```
+
+
+```{r fig.height=10, fig.width=8}
+library(circlize)
+library(grid)
+library(ComplexHeatmap)
+threshold <- -log10(0.05)  
+
+col_fun <- colorRamp2(
+  c(0, threshold - 0.01, threshold, max(all_fdr_df, na.rm=TRUE)),
+  c("grey80", "grey80", "white", "red")
+)
+
+lgd <- Legend(
+  title = "-log10(FDR)",
+  col_fun = col_fun,
+  direction = "vertical"
+)
+
+# ציור heatmap בלי legend
+ht <- Heatmap(all_fdr_df,col = col_fun, row_names_gp = gpar(fontsize = 9),cluster_columns = F, show_heatmap_legend = FALSE, column_title= params$cell_line)
+
+draw(ht, padding = unit(c(2, 2, 2, 50), "mm"))
+pushViewport(viewport(x=0.8, y=0.7, width=unit(4, "cm"), height=unit(6, "cm"), just=c("left","center")))
+draw(lgd)
+popViewport()
+
+
+```
+
+# FC heatmaps
+
+```{r fig.height=6, fig.width=9}
+library(scales)
+library(ggdendro)
+library(patchwork)
+
+
+df = diff_genes[hif_targets,] %>% rownames_to_column("gene") %>% na.omit()
+# df$cpVSop_padj = rescale(-log10(df$cpVSop_padj), to = c(1.5, 3))
+# df$roxaVSctrl_padj = rescale(-log10(df$roxaVSctrl_padj), to = c(1.5, 3))
+# 
+# gene_names <- rownames(df)
+# n_genes <- length(gene_names)
+# 
+# 
+# empty_mat <- matrix(NA, nrow = n_genes, ncol = 1,
+#                     dimnames = list(gene_names, NULL))
+# make_circle_cell_fun <- function(fc_vec, padj_vec) {
+#   fun = function(j, i, x, y, width, height, fill) {
+#     grid.rect(x = x, y = y, width = width, height = height, 
+#     gp = gpar(col = "white", fill = "white"))
+#     
+#     fc <- fc_vec[i]
+#     padj <- padj_vec[i]
+# 
+#     # צבע לפי FC
+#     col <- colorRamp2(c(-2, 0, 2), c("blue", "white", "red"))(fc)
+#     
+#     # גודל לפי -log10(padj)
+#     r <- unit(padj, "mm")
+# 
+#     grid.circle(x = x, y = y, r = r,
+#                 gp = gpar(fill = col, col = "black", lwd = 0.3), default.units="mm")
+#   }
+#   return(fun)
+# }
+# 
+# ht_cpVSop <- Heatmap(
+#   empty_mat,
+#   name = "cpVSop",
+#   cell_fun = make_circle_cell_fun(df$cpVSop_FC, df$cpVSop_padj),
+#   cluster_rows = F,
+#   show_row_dend = F,
+#   show_column_names = FALSE,
+#   row_names_gp = gpar(fontsize = 7),
+#   width = unit(6, "mm"),
+#   show_heatmap_legend = F
+# )
+# 
+# ht_roxaVSctrl <- Heatmap(
+#   empty_mat,
+#   name = "roxaVSctrl",
+#   cell_fun = make_circle_cell_fun(df$roxaVSctrl_FC,  df$roxaVSctrl_padj),
+#   cluster_rows = FALSE,
+#   show_row_dend = FALSE,
+#   show_column_names = FALSE,
+#   row_names_gp = gpar(fontsize = 7),
+#   width = unit(6, "mm"),
+#   show_heatmap_legend = FALSE
+# )
+# 
+# draw(ht_cpVSop + ht_roxaVSctrl)
+
+
+df_long <- df %>%
+  pivot_longer(
+    cols = -gene,
+    names_to = c("condition", ".value"),
+    names_pattern = "(.+)_(FC|padj)"
+  )
+df_long = df_long %>% mutate(group = case_when(
+  gene %in% HCC_uniqe_deg_list$up_only_in_combo ~ "up_only_in_combo",
+  gene %in% HCC_uniqe_deg_list$only_down_in_combo ~ "only_down_in_combo",
+  gene %in% HCC_uniqe_deg_list$only_up_in_roxa ~ "only_up_in_roxa",
+  gene %in% HCC_uniqe_deg_list$only_down_in_roxa ~ "only_down_in_roxa",
+  .default = "non-unique"
+))
+fc_mat <- df[, c("cpVSop_FC", "roxaVSctrl_FC")]
+rownames(fc_mat) <- df$gene
+d <- dist(fc_mat)
+hc <- hclust(d)
+dend_data <- ggdendro::dendro_data(hc)
+
+gene_order <- rownames(fc_mat)[hc$order]
+df_long$gene <- factor(df_long$gene, levels = gene_order)
+
+dend_plot <- ggplot(ggdendro::segment(dend_data)) +
+  geom_segment(aes(x = y, xend = yend, y = x, yend = xend)) +  # change axis
+  scale_y_continuous(breaks = seq_along(gene_order), labels = gene_order, expand = c(0.01, 0.01)) +
+  scale_x_reverse() +  
+  theme_void() +
+  theme(plot.margin = margin(t = 10, r = 0, b = 10, l = 10))
+
+dot_plot = ggplot(df_long, aes(x = condition, y = gene)) +
+  geom_point(aes(size = -log10(padj), color = FC)) +
+  scale_color_gradient2(
+    low = "blue", mid = "white", high = "red", midpoint = 0, limits = c(-max(df_long$FC), max(df_long$FC))
+  ) +
+  scale_size(range = c(2, 6)) +
+  theme_minimal() +
+  labs(
+    title = "Dotplot: FC by Color, Significance by Size",
+    x = "Condition",
+    y = "Gene",
+    color = "FC",
+    size = "-log10(FDR)"
+  ) +
+  theme(axis.text.y = element_text(size = 6))+
+    geom_tile(data = distinct(df_long[, c("gene", "group")]),
+            aes(x = "group", fill = group),
+            width = 0.1, height = 0.8) +
+  scale_x_discrete(limits = c("group", unique(df_long$condition)))
+
+final_plot <- dend_plot + dot_plot + plot_layout(ncol = 2, widths = c(1, 4))
+final_plot
+
+```
+```{r}
+genesets$HALLMARK_HYPOXIA[genesets$HALLMARK_HYPOXIA %in% HCC_uniqe_deg_list$only_up_in_roxa ]
+genesets$HIF_targets[genesets$HIF_targets %in% HCC_uniqe_deg_list$only_up_in_roxa ]
+```
+
+
+```{r}
+
+library(ggpubr)
+library(rstatix)
+
+barplot_for_conditions <- function(data, signature, name) {
+  scores_df = data[signature,] %>% colMeans() %>% data.frame(row.names = names(.), score =.)
+  scores_df = merge(x = scores_df,y = metadata,by = 0) %>% column_to_rownames("Row.names")
+  scores_df
+  scores_df$condition = factor(scores_df$condition,levels = 
+                                 c("Veh","Rox","osi_short","osi_short_roxa","osi_persistor","osi_persist_roxa"))
+  summary_df <- scores_df %>%
+    group_by(condition) %>%
+    dplyr::summarise(
+      Mean_Score = mean(score),
+      SD_Score = sd(score),
+      N = n(),
+      SE_Score = SD_Score / sqrt(N)
+    )
+  
+  stat.test <- scores_df %>%
+    t_test(score ~ condition) %>%
+    add_significance()
+  
+  my_comparisons <- list( c("Veh", "Rox"), c("Rox","osi_short"), c("osi_short","osi_short_roxa"), c("osi_short_roxa","osi_persistor"), c("osi_persistor","osi_persist_roxa"))
+  
+  comparisons_df <- do.call(rbind, my_comparisons) %>%
+  as.data.frame() %>%
+  setNames(c("group1", "group2"))
+  
+  stat.test <- stat.test %>%
+  semi_join(comparisons_df, by = c("group1", "group2")) %>% 
+    add_xy_position(step.increase = 0)
+  
+  p =  ggplot(scores_df, aes(x = condition, y = score)) +
+  # Add bars for the means
+  geom_bar(data = summary_df, aes(y = Mean_Score), stat = "identity", fill = "skyblue", color = "black", alpha = 0.7) +
+  # Add individual data points (jittered to prevent overlap)
+  geom_jitter(width = 0.2, height = 0, color = "darkblue", size = 2, alpha = 0.6) +
+  # Optional: Add error bars (Standard Error of the Mean)
+  geom_errorbar(data = summary_df, aes(y = Mean_Score, ymin = Mean_Score - SE_Score, ymax = Mean_Score + SE_Score),
+  width = 0.1, color = "black") +
+  # Add titles and customize appearance
+  labs(
+  title = paste0(params$cell_line,"- Comparison of Mean ",name," Scores"),
+  x = "Condition",
+  y = name
+  ) +
+  theme_minimal() + # Minimalist theme
+  theme(plot.title = element_text(hjust = 0.5))+  # Center the title
+  stat_pvalue_manual(stat.test, label = "p.adj",bracket.shorten = 0.1)
+  return(p)
+}
+
+
+CORDENONSI_YAP = getGmt("./input_data/pathways_from_papers/CORDENONSI_YAP_CONSERVED_SIGNATURE.gmt") %>%
+geneIds() %>% unlist()
+
+go_smad = getGmt("./input_data/pathways_from_papers/GOBP_POSITIVE_REGULATION_OF_SMAD_PROTEIN_SIGNAL_TRANSDUCTION.gmt") %>%
+geneIds() %>% unlist()
+
+barplot_for_conditions(bulk_Mar25_TPM,signature = genesets$HIF_targets,name = "hif_targets")
+barplot_for_conditions(bulk_Mar25_TPM,signature = CORDENONSI_YAP,name = "CORDENONSI_YAP")
+barplot_for_conditions(bulk_Mar25_TPM,signature =go_smad,name = "go_SMAD_PROTEIN_SIGNAL")
+barplot_for_conditions(bulk_Mar25_TPM,signature =genesets$HALLMARK_EPITHELIAL_MESENCHYMAL_TRANSITION,name = "EMT")
+barplot_for_conditions(bulk_Mar25_TPM,signature = CORDENONSI_YAP,name = "CORDENONSI_YAP")
+barplot_for_conditions(bulk_Mar25_TPM,signature =go_smad,name = "go_SMAD_PROTEIN_SIGNAL")
+barplot_for_conditions(bulk_Mar25_TPM,signature =genesets$HALLMARK_EPITHELIAL_MESENCHYMAL_TRANSITION,name = "EMT")
+
+mek_activation = c("DUSP4",
+"ELF1",
+"LGALS3",
+"ANKRD15",
+"TRIB2",
+"ETV4",
+"ETV5",
+"MAP2K3",
+"SPRY2",
+"LZTS1",
+"PROS1",
+"ZFP106",
+"DUSP6",
+"PHLDA1",
+"S100A6",
+"SERPINB1",
+"SLCO4A1",
+"FXYD5")
+
+compensatory_resistance = c("CLU",
+"BASP1",
+"COL12A1",
+"CRIM1",
+"GPR176",
+"STAC",
+"FZD2",
+"COL5A1",
+"LOX",
+"SERPINE1",
+"CD274",
+"G0S2",
+"IL6")
+
+mek_activation = mek_activation[mek_activation %in% rownames(bulk_Mar25_TPM)]
+barplot_for_conditions(bulk_Mar25_TPM,signature =mek_activation,name = "mek_activation")
+barplot_for_conditions(bulk_Mar25_TPM,signature =compensatory_resistance,name = "compensatory_resistance")
+
+
+```
+
+```{r}
+
 ```
 
