@@ -400,7 +400,7 @@ genesets[["HIF_targets"]] = hif_targets
 
 ```{r fig.width=15}
 library(org.Hs.eg.db)
-fc_threshold =1.5
+fc_threshold =1.2
 up_in_combo = diff_genes %>% filter(cpVSop_FC >fc_threshold & cpVSop_padj<0.05) %>% rownames()
 down_in_combo = diff_genes %>% filter(cpVSop_FC < 1/fc_threshold & cpVSop_padj<0.05) %>% rownames()
 up_in_roxa =  diff_genes %>% filter(roxaVSctrl_FC > fc_threshold & roxaVSctrl_padj<0.05) %>% rownames()
@@ -449,14 +449,16 @@ library(ComplexHeatmap)
 threshold <- -log10(0.05)  
 
 col_fun <- colorRamp2(
-  c(0, threshold - 0.01, threshold, max(all_fdr_df, na.rm=TRUE)),
-  c("grey80", "grey80", "white", "red")
+  c(-2, threshold-0.01, threshold, max(all_fdr_df, na.rm=TRUE)),
+  c( "grey80","grey80", "white", "red")
 )
 
 lgd <- Legend(
   title = "-log10(FDR)",
   col_fun = col_fun,
-  direction = "vertical"
+  direction = "vertical",
+  labels = c("0","-log10(0.05)",seq(from = 10, to = max(all_fdr_df), by = 10)),
+  at =c(-2,threshold,seq(from = 10, to = max(all_fdr_df), by = 10
 )
 
 # ציור heatmap בלי legend

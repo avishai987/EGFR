@@ -30,6 +30,21 @@ output = pipeline$bulk_mar25_HCC$output
 suppressPackageStartupMessages(library(GSEABase))
 source_from_github(repositoy = "DEG_functions",version = "0.2.54")
 ```
+#signatures
+
+```{r}
+genesets = getGmt(input$genesets) %>% geneIds()
+# add senesence signatures to genesets
+SASP_signature = c("CCL2", "CCL5", "CCL7", "IL1A", "IL1B", "IL32","SCG2", "INHBA", "INHA", "WNT7A", "CSF2", "TNFRSF11B", "GREM1", "CMTM3")
+FRIDMAN_SENESCENCE_UP  = getGmt(input$SENESCENCE) %>% geneIds() %>%  unlist() %>% base::unname()
+
+genesets = c(genesets, list(SASP = SASP_signature,
+                        FRIDMAN_SENESCENCE_UP = FRIDMAN_SENESCENCE_UP))
+
+hif_targets =  scan(input$hif_targets, character(), quote = "")
+genesets[["HIF_targets"]] = hif_targets
+
+```
 
 # Create data
 ```{r}
@@ -110,7 +125,6 @@ autoplot(PCAdata, data = metadata,colour = "condition",label = FALSE, main=paste
 
 ## DEG FC {.tabset}
 ```{r}
-genesets = getGmt(input$genesets) %>% geneIds()
 
 
 dds <- DESeq(dds)
@@ -140,16 +154,11 @@ breaks_fun = function(limits){
 suppressPackageStartupMessages(library(GSEABase))
 ranked_vec = cpVSop[,"log2FoldChange"]%>% setNames(rownames(cpVSop)) %>% na.omit() %>%  #order by FC
   sort(decreasing = T) # sort
-# add senesence signatures to genesets
-SASP_signature = c("CCL2", "CCL5", "CCL7", "IL1A", "IL1B", "IL32","SCG2", "INHBA", "INHA", "WNT7A", "CSF2", "TNFRSF11B", "GREM1", "CMTM3")
-FRIDMAN_SENESCENCE_UP  = getGmt(input$SENESCENCE) %>% geneIds() %>%  unlist() %>% base::unname()
-
-genesets = c(genesets, list(SASP = SASP_signature,
-                        FRIDMAN_SENESCENCE_UP = FRIDMAN_SENESCENCE_UP))
 
 
-hyp_obj <- hypeR_fgsea(ranked_vec, genesets, up_only = F)
-plt = hyp_dots(hyp_obj,merge = F)
+
+hyp_obj_combo <- hypeR_fgsea(ranked_vec, genesets, up_only = F)
+plt = hyp_dots(hyp_obj_combo,merge = F)
 plt1 = plt$up+ aes(size=nes)+ggtitle("up in comboPersistor")+
   scale_y_continuous(trans = hypeR:::.reverselog_trans(10), 
         breaks =breaks_fun)
@@ -162,8 +171,8 @@ print_tab(plt1+plt2,title = paste(params$cell_line,"cpVSop"))
 ranked_vec = roxaVSctrl[,"log2FoldChange"]%>% setNames(rownames(roxaVSctrl)) %>% na.omit() %>% # make named vector
   sort(decreasing = T) # sort 
 
-hyp_obj <- hypeR_fgsea(ranked_vec, genesets, up_only = F)
-plt = hyp_dots(hyp_obj,merge = F)
+hyp_obj_rox <- hypeR_fgsea(ranked_vec, genesets, up_only = F)
+plt = hyp_dots(hyp_obj_rox,merge = F)
 plt1 = plt$up+ aes(size=nes)+ggtitle("up in roxa")+
   scale_y_continuous(trans = hypeR:::.reverselog_trans(10), 
         breaks =breaks_fun)
@@ -255,10 +264,7 @@ ggplot(diff_genes_signif, aes(x=cpVSop_FC, y=roxaVSctrl_FC)) +
   geom_text_repel(label=rownames(diff_genes_signif))
 ```
 # order genes by cpVSop_FC/roxaVSctrl_FC values and than GSEA
-```{r}
-hif_targets =  scan(input$hif_targets, character(), quote = "")
-genesets[["HIF_targets"]] = hif_targets
-```
+
 
 #UP 
 ```{r}
@@ -496,7 +502,9 @@ col_fun <- colorRamp2(
 lgd <- Legend(
   title = "-log10(FDR)",
   col_fun = col_fun,
-  direction = "vertical"
+  direction = "vertical",
+  labels = c("0","-log10(0.05)",seq(from = 10, to = max(all_fdr_df), by = 10)),
+  at =c(-2,threshold,seq(from = 10, to = max(all_fdr_df), by = 10))
 )
 
 # ציור heatmap בלי legend
@@ -519,61 +527,6 @@ library(patchwork)
 
 
 df = diff_genes[hif_targets,] %>% rownames_to_column("gene") %>% na.omit()
-# df$cpVSop_padj = rescale(-log10(df$cpVSop_padj), to = c(1.5, 3))
-# df$roxaVSctrl_padj = rescale(-log10(df$roxaVSctrl_padj), to = c(1.5, 3))
-# 
-# gene_names <- rownames(df)
-# n_genes <- length(gene_names)
-# 
-# 
-# empty_mat <- matrix(NA, nrow = n_genes, ncol = 1,
-#                     dimnames = list(gene_names, NULL))
-# make_circle_cell_fun <- function(fc_vec, padj_vec) {
-#   fun = function(j, i, x, y, width, height, fill) {
-#     grid.rect(x = x, y = y, width = width, height = height, 
-#     gp = gpar(col = "white", fill = "white"))
-#     
-#     fc <- fc_vec[i]
-#     padj <- padj_vec[i]
-# 
-#     # צבע לפי FC
-#     col <- colorRamp2(c(-2, 0, 2), c("blue", "white", "red"))(fc)
-#     
-#     # גודל לפי -log10(padj)
-#     r <- unit(padj, "mm")
-# 
-#     grid.circle(x = x, y = y, r = r,
-#                 gp = gpar(fill = col, col = "black", lwd = 0.3), default.units="mm")
-#   }
-#   return(fun)
-# }
-# 
-# ht_cpVSop <- Heatmap(
-#   empty_mat,
-#   name = "cpVSop",
-#   cell_fun = make_circle_cell_fun(df$cpVSop_FC, df$cpVSop_padj),
-#   cluster_rows = F,
-#   show_row_dend = F,
-#   show_column_names = FALSE,
-#   row_names_gp = gpar(fontsize = 7),
-#   width = unit(6, "mm"),
-#   show_heatmap_legend = F
-# )
-# 
-# ht_roxaVSctrl <- Heatmap(
-#   empty_mat,
-#   name = "roxaVSctrl",
-#   cell_fun = make_circle_cell_fun(df$roxaVSctrl_FC,  df$roxaVSctrl_padj),
-#   cluster_rows = FALSE,
-#   show_row_dend = FALSE,
-#   show_column_names = FALSE,
-#   row_names_gp = gpar(fontsize = 7),
-#   width = unit(6, "mm"),
-#   show_heatmap_legend = FALSE
-# )
-# 
-# draw(ht_cpVSop + ht_roxaVSctrl)
-
 
 df_long <- df %>%
   pivot_longer(
@@ -587,7 +540,14 @@ df_long = df_long %>% mutate(group = case_when(
   gene %in% HCC_uniqe_deg_list$only_up_in_roxa ~ "only_up_in_roxa",
   gene %in% HCC_uniqe_deg_list$only_down_in_roxa ~ "only_down_in_roxa",
   .default = "non-unique"
-))
+)) %>%
+  mutate(sig_label = case_when(
+    padj < 0.001 ~ "***",
+    padj < 0.01  ~ "**",
+    padj < 0.05  ~ "*",
+    TRUE         ~ "ns"
+  ))
+
 fc_mat <- df[, c("cpVSop_FC", "roxaVSctrl_FC")]
 rownames(fc_mat) <- df$gene
 d <- dist(fc_mat)
@@ -626,8 +586,51 @@ dot_plot = ggplot(df_long, aes(x = condition, y = gene)) +
 
 final_plot <- dend_plot + dot_plot + plot_layout(ncol = 2, widths = c(1, 4))
 final_plot
+library(ggtext)
+group_colors <- c(
+  "up_only_in_combo" = "lightgreen",
+  "only_down_in_combo" = "steelblue",
+  "only_up_in_roxa" = "darkgreen",
+  "only_down_in_roxa" = "darkblue",
+  "non-unique" = "black"
+
+)
+
+gene_colors <- df_long %>%
+  select(gene, group) %>%
+  distinct() %>%
+  mutate(col = group_colors[group]) %>%
+  { setNames(.$col, .$gene) }
+
+label_html <- function(x) {
+  sprintf(
+    "<span style='color:%s'>%s</span>",
+    gene_colors[x],  # לוקח את הצבע המתאים
+    x                # ושם הגן עצמו
+  )
+}
+
+colors = df_long$gene %>% unique()
+ggplot(df_long, aes(x = gene, y = FC, fill = condition)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  theme_minimal() +
+  labs(x = "Gene", y = "Fold Change", title = "Fold Change per Gene") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+   geom_hline(yintercept = 1.2, linetype = "dashed", color = "black")+
+  scale_x_discrete(
+    labels = label_html
+  ) +
+  theme(
+    axis.text.x = element_markdown(angle = 45, hjust = 1),  # מאפשר HTML/CSS בתוויות
+    legend.position = "bottom"
+  )+
+   geom_text(aes(label = sig_label),
+            position = position_dodge(width = 0.9),
+            vjust = -0.5, size = 4)
 
 ```
+
+
 ```{r}
 genesets$HALLMARK_HYPOXIA[genesets$HALLMARK_HYPOXIA %in% HCC_uniqe_deg_list$only_up_in_roxa ]
 genesets$HIF_targets[genesets$HIF_targets %in% HCC_uniqe_deg_list$only_up_in_roxa ]
@@ -744,6 +747,14 @@ barplot_for_conditions(bulk_Mar25_TPM,signature =compensatory_resistance,name = 
 ```
 
 ```{r}
+
+combo_genes = hyp_obj_combo[["data"]][["up"]][["data"]] %>% filter(label == "HIF_targets") %>% pull(le) %>% strsplit(split = ",") %>% unlist()
+rox_genes = hyp_obj_rox[["data"]][["up"]][["data"]] %>% filter(label == "HIF_targets") %>% pull(le) %>% strsplit(split = ",") %>% unlist()
+ggvenn::ggvenn(data = list(combo_genes= combo_genes, rox_genes = rox_genes))
+
+uniq_combo = combo_genes [!combo_genes %in% rox_genes]
+
+uniq_rox = rox_genes [!rox_genes %in% combo_genes]
 
 ```
 
