@@ -308,3 +308,24 @@ p1
 
 ```
 
+```{r}
+#TODO: read H1975_uniqe_deg_list and H1975_uniqe_deg_list
+for (i in 1:length(H1975_uniqe_deg_list)) {
+  common = intersect(H1975_uniqe_deg_list[[i]], HCC_uniqe_deg_list[[i]])
+  # print(hif_targets[hif_targets %in% common])
+  # print(common)
+  print(diff_genes[common,])
+  
+  if(length(common)>=3){
+  hyp_obj <- hypeR(common, genesets, test = "hypergeometric", fdr=1, plotting=F,
+                   background = rownames(bulk_Mar25_TPM))
+  plt2 = hyp_dots(hyp_obj,title = names(H1975_uniqe_deg_list)[i])
+  plt2 = plt2 + scale_y_continuous(trans = hypeR:::.reverselog_trans(10), 
+        breaks =exp(-seq(-log(min(plt2$data$fdr)), -log(max(plt2$data$fdr)), 
+            length.out = 6)) %>% signif(digits = 2))
+  print(plt2)
+  }
+  
+}
+```
+
