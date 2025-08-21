@@ -1,4 +1,3 @@
-knitr::opts_knit$set(progress = TRUE, verbose = TRUE) #print commands when rendering
 library(magrittr)
 library(stringr)
 # env path:
@@ -132,24 +131,24 @@ pipeline[["xeno_sipsic_analysis"]] = list(
   )
 )
 
-pipeline[["xeno_sipsic_known_pathways"]] = list(
-  input = list(
-    script = "./Notebooks/xeno/06_known_pathways.Rmd",
-    xeno = "./Reports/xeno/00_preprocess/xeno.qs",
-    hallmarks_logFC_df = pipeline$xeno_sipsic_analysis$output$logFC_df,
-    hallmarks_fdr_df = pipeline$xeno_sipsic_analysis$output$fdr_df,
-    kurppa = "./input_data/pathways_from_papers/Kurppa_PMC7146079_table_s1_YAP signature.xlsx",
-    hadrek = "./input_data/pathways_from_papers/Hadrek_PMC11068778_sup_data_3.xlsx",
-    SENESCENCE = "./input_data/pathways_from_papers/FRIDMAN_SENESCENCE_UP.v2024.1.Hs.gmt",
-    maynard = "./input_data/pathways_from_papers/Maynard_PMC7484178_Table_S2.csv",
-    ferroptosis  = "./input_data/pathways_from_papers/GOBP_FERROPTOSIS.v2024.1.Hs.gmt",
-    esrra = "./input_data/pathways_from_papers/ESRRA _gene_signature.xlsx",
-    hif_targets = "./input_data/HIF_targets_Lombardi_PMC9869179.txt"
-  ),
-  output = list(
-    report ="./Reports/xeno/06_known_pathways/06_known_pathways.html"
-  )
-)
+# pipeline[["xeno_sipsic_known_pathways"]] = list(
+#   input = list(
+#     script = "./Notebooks/xeno/06_known_pathways.Rmd",
+#     xeno = "./Reports/xeno/00_preprocess/xeno.qs",
+#     hallmarks_logFC_df = pipeline$xeno_sipsic_analysis$output$logFC_df,
+#     hallmarks_fdr_df = pipeline$xeno_sipsic_analysis$output$fdr_df,
+#     kurppa = "./input_data/pathways_from_papers/Kurppa_PMC7146079_table_s1_YAP signature.xlsx",
+#     hadrek = "./input_data/pathways_from_papers/Hadrek_PMC11068778_sup_data_3.xlsx",
+#     SENESCENCE = "./input_data/pathways_from_papers/FRIDMAN_SENESCENCE_UP.v2024.1.Hs.gmt",
+#     maynard = "./input_data/pathways_from_papers/Maynard_PMC7484178_Table_S2.csv",
+#     ferroptosis  = "./input_data/pathways_from_papers/GOBP_FERROPTOSIS.v2024.1.Hs.gmt",
+#     esrra = "./input_data/pathways_from_papers/ESRRA _gene_signature.xlsx",
+#     hif_targets = "./input_data/HIF_targets_Lombardi_PMC9869179.txt"
+#   ),
+#   output = list(
+#     report ="./Reports/xeno/06_known_pathways/06_known_pathways.html"
+#   )
+# )
 
 ####################################### Xenogratfs cNMF ####################################################
 
@@ -167,7 +166,16 @@ pipeline[["xeno_cnmf_preprocess"]] = list(
   )
 )
 
-# run cnmf script with "sbatch ./Notebooks/xeno/04_cnmf/02_run_cnmf/sbatch_cnmf_script.sh", adjust script for paths
+#Note: recommended to run in background ("sbatch")
+pipeline[["xeno_cnmf_run"]] = list(
+  input = list(
+    script = "./Notebooks/xeno/04_cnmf/02_run_cnmf/sbatch_cnmf_script.sh"
+  ),
+  output = list(
+    cnmf_object = "Reports/xeno/04_cnmf/02_run_cnmf_1.7/models_2Kvargenes_corrected_noTPM_cnmf_obj.pckl"
+  ),
+  shell = substitute(paste(pipeline[[i]]$input$script))
+)
 
 pipeline[["calculate_programs"]] = list(
   input = list(
@@ -336,214 +344,52 @@ pipeline[["march25_all_analysis"]] = list(
     report ="./Reports/Bulk/03_bulk_cell_lines_march25/all_cell_lines_analysis/all_cell_lines_analysis.html"
   )
 )
+
+
+
+
 ######################################## functions ###############################################
 
-contains_subdirectories <- function(path) {
-  items <- list.files(path, full.names = TRUE, recursive = FALSE, include.dirs = TRUE)
-  # Check which of the listed items are directories
-  # file.info() provides file/directory information, and $isdir indicates if it's a directory.
-  is_directory <- file.info(items)$isdir
-  if (any(is_directory)){
-    message("contains subdirectories")
-    user_input <- readline(prompt = "continue? y/n \n")
-    if (user_input == "y"){}
-    else {stop("aborting")}
+# contains_subdirectories <- function(path) {
+#   items <- list.files(path, full.names = TRUE, recursive = FALSE, include.dirs = TRUE)
+#   # Check which of the listed items are directories
+#   # file.info() provides file/directory information, and $isdir indicates if it's a directory.
+#   is_directory <- file.info(items)$isdir
+#   if (any(is_directory)){
+#     message("contains subdirectories")
+#     user_input <- readline(prompt = "continue? y/n \n")
+#     if (user_input == "y"){}
+#     else {stop("aborting")}
+#   }
+# }
+
+
+
+######################################## make ###############################################
+library(MakefileR)
+mkfile = makefile() 
+all_rules = c()
+mkfile = mkfile + make_rule(".Phony", "all")
+for (i in 1:length(pipeline)) {
+  all_rules = c(all_rules,  names(pipeline)[[i]])
+}
+mkfile = mkfile + make_rule("all", all_rules)
+
+for (i in 1:length(pipeline)) {
+  mkfile = mkfile +   make_comment(c("============", names(pipeline)[[i]], "============")) + # comment
+    make_rule(names(pipeline)[[i]], unlist(pipeline[[i]]$output), paste("@echo  $@ is up to date") ) #define rule output
+  if(is.null(pipeline[[i]]$shell)){
+    mkfile = mkfile + make_rule(targets = unlist(pipeline[[i]]$output), deps = unlist(pipeline[[i]]$input), #run rscript, add & for grouped tagets
+              script =paste("Rscript render.R",
+                            names(pipeline)[[i]]
+                            ))
+  }else{
+    mkfile = mkfile + make_rule(targets = unlist(pipeline[[i]]$output), deps = unlist(pipeline[[i]]$input),
+                                script = eval(pipeline[[i]]$shell))
   }
+
 }
 
 
-my_render <- function(notebook_path, report, set_params = list()){
-    knitr::opts_knit$set(progress = TRUE, verbose = TRUE)
-    
-    if (dir.exists(dirname(report))) {
-      contains_subdirectories(dirname(report)) # check that dir contains only files before deleteing 
-      unlink(dirname(report),recursive = T)
-    }
-    set_params[["data_out_dir"]] = dirname(report) %s+% "/"
-    message("Rendering to:")
-    message(dirname(report))
-    
-    rmarkdown::render(
-      input = notebook_path,
-      output_format = "html_document",
-      output_file = report,
-      knit_root_dir = getwd(),
-      output_dir = dirname(report),
-      params = set_params
-    )
-
-    session_info_output <- capture.output(session_info())
-    writeLines(session_info_output, dirname(report) %s+% "/session_info.txt")
-}
-
-#################################### makepipe ####################################################################
-
-
-library(makepipe)
-makepipe::reset_pipeline()
-makepipe_pipe <- get_pipeline()
-
-i=1
-make_with_recipe(
-  recipe = my_render(notebook_path =pipeline[[1]]$input$script,
-                     report = pipeline[[1]]$output$report),
-  targets = unlist(pipeline[[i]]$output),
-  dependencies = unlist(pipeline[[i]]$input),
-  label =names(pipeline)[i],build = F
-)
-
-
-i=2
-make_with_recipe(
-  recipe = my_render(notebook_path =pipeline[[2]]$input$script,
-                     report = pipeline[[2]]$output$report),
-  targets = unlist(pipeline[[i]]$output),
-  dependencies = unlist(pipeline[[i]]$input),
-  label =names(pipeline)[i],build = F
-)
-
-i=3
-make_with_recipe(
-  recipe = my_render(notebook_path =pipeline[[3]]$input$script,
-                     report = pipeline[[3]]$output$report),
-  targets = unlist(pipeline[[i]]$output),
-  dependencies = unlist(pipeline[[i]]$input),
-  label =names(pipeline)[i],build = F
-)
-
-i=4
-make_with_recipe(
-  recipe = my_render(notebook_path =pipeline[[4]]$input$script,
-                     report = pipeline[[4]]$output$report),
-  targets = unlist(pipeline[[i]]$output),
-  dependencies = unlist(pipeline[[i]]$input),
-  label =names(pipeline)[i],build = F
-)
-i=5
-make_with_recipe(
-  recipe = my_render(notebook_path =pipeline[[5]]$input$script,
-                     report = pipeline[[5]]$output$report),
-  targets = unlist(pipeline[[i]]$output),
-  dependencies = unlist(pipeline[[i]]$input),
-  label =names(pipeline)[i],build = F
-)
-
-i=6
-make_with_recipe(
-  recipe = my_render(notebook_path =pipeline[[6]]$input$script,
-                     report = pipeline[[6]]$output$report),
-  targets = unlist(pipeline[[i]]$output),
-  dependencies = unlist(pipeline[[i]]$input),
-  label =names(pipeline)[i],build = F
-)
-
-i=7
-make_with_recipe(
-  recipe = my_render(notebook_path =pipeline[[7]]$input$script,
-                     report = pipeline[[7]]$output$report),
-  targets = unlist(pipeline[[i]]$output),
-  dependencies = unlist(pipeline[[i]]$input),
-  label =names(pipeline)[i],build = F
-)
-i=8
-make_with_recipe(
-  recipe = my_render(notebook_path =pipeline[[8]]$input$script,
-                     report = pipeline[[8]]$output$report),
-  targets = unlist(pipeline[[i]]$output),
-  dependencies = unlist(pipeline[[i]]$input),
-  label =names(pipeline)[i],build = F
-)
-
-i=9
-make_with_recipe(
-  recipe = my_render(notebook_path =pipeline[[9]]$input$script,
-                     report = pipeline[[9]]$output$report),
-  targets = unlist(pipeline[[i]]$output),
-  dependencies = unlist(pipeline[[i]]$input),
-  label =names(pipeline)[i],build = F
-)
-
-i=10
-make_with_recipe(
-  recipe = my_render(notebook_path =pipeline[[10]]$input$script,
-                     report = pipeline[[10]]$output$report),
-  targets = unlist(pipeline[[i]]$output),
-  dependencies = unlist(pipeline[[i]]$input),
-  label =names(pipeline)[i],build = F
-)
-
-# i=11
-# make_with_recipe(
-#   recipe = my_render(notebook_path =pipeline[[11]]$input$script,
-#                      report = pipeline[[11]]$output$report),
-#   targets = unlist(pipeline[[i]]$output),
-#   dependencies = unlist(pipeline[[i]]$input),
-#   label =names(pipeline)[i],build = F
-# )
-
-i=12
-make_with_recipe(
-  recipe = my_render(notebook_path =pipeline[[12]]$input$script,
-                     report = pipeline[[12]]$output$report),
-  targets = unlist(pipeline[[i]]$output),
-  dependencies = unlist(pipeline[[i]]$input),
-  label =names(pipeline)[i],build = F
-)
-
-
-
-i=13
-make_with_recipe(
-  recipe = my_render(notebook_path =pipeline[[13]]$input$script,
-                     report = pipeline[[13]]$output$report),
-  targets = unlist(pipeline[[i]]$output),
-  dependencies = unlist(pipeline[[i]]$input),
-  label =names(pipeline)[i],build = F
-)
-
-i=14
-make_with_recipe(
-  recipe = my_render(notebook_path =pipeline[[14]]$input$script,
-                     report = pipeline[[14]]$output$report),
-  targets = unlist(pipeline[[i]]$output),
-  dependencies = unlist(pipeline[[i]]$input),
-  label =names(pipeline)[i],build = F
-)
-
-i=15
-make_with_recipe(
-  recipe = my_render(notebook_path =pipeline[[15]]$input$script,
-                     report = pipeline[[15]]$output$report),
-  targets = unlist(pipeline[[i]]$output),
-  dependencies = unlist(pipeline[[i]]$input),
-  label =names(pipeline)[i],build = F
-)
-
-
-i=16
-make_with_recipe(
-  recipe = my_render(notebook_path =pipeline[[16]]$input$script,
-                     report = pipeline[[16]]$output$report),
-  targets = unlist(pipeline[[i]]$output),
-  dependencies = unlist(pipeline[[i]]$input),
-  label =names(pipeline)[i],build = F
-)
-
-i=17
-make_with_recipe(
-  recipe = my_render(notebook_path =pipeline[[17]]$input$script,
-                     report = pipeline[[17]]$output$report),
-  targets = unlist(pipeline[[i]]$output),
-  dependencies = unlist(pipeline[[i]]$input),
-  label =names(pipeline)[i],build = F
-)
-
-i=18
-make_with_recipe(
-  recipe = my_render(notebook_path =pipeline[[18]]$input$script,
-                     report = pipeline[[18]]$output$report),
-  targets = unlist(pipeline[[i]]$output),
-  dependencies = unlist(pipeline[[i]]$input),
-  label =names(pipeline)[i],build = F
-)
+write_makefile(makefile = mkfile,file_name = "Makefile")
 
