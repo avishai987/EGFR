@@ -458,8 +458,9 @@ lgd <- Legend(
   col_fun = col_fun,
   direction = "vertical",
   labels = c("0","-log10(0.05)",seq(from = 10, to = max(all_fdr_df), by = 10)),
-  at =c(-2,threshold,seq(from = 10, to = max(all_fdr_df), by = 10
-)
+  at =c(-2,threshold,seq(from = 10, to = max(all_fdr_df), by = 10)
+        )
+  )
 
 # ציור heatmap בלי legend
 ht <- Heatmap(all_fdr_df,col = col_fun, row_names_gp = gpar(fontsize = 9),cluster_columns = F, show_heatmap_legend = FALSE, column_title= params$cell_line)
@@ -478,31 +479,10 @@ all_list = list(up_only_in_combo = up_only_in_combo, only_up_in_roxa =only_up_in
 ggvenn::ggvenn(data = all_list)+ggtitle(params$cell_line)
 ```
 
-```{r}
-
-```
 
 
-```{r}
-#TODO: move to all_cell_lines_analysis.Rmd
-for (i in 1:length(H1975_uniqe_deg_list)) {
-  common = intersect(H1975_uniqe_deg_list[[i]], HCC_uniqe_deg_list[[i]])
-  # print(hif_targets[hif_targets %in% common])
-  # print(common)
-  print(diff_genes[common,])
-  
-  if(length(common)>=3){
-  hyp_obj <- hypeR(common, genesets, test = "hypergeometric", fdr=1, plotting=F,
-                   background = rownames(bulk_Mar25_TPM))
-  plt2 = hyp_dots(hyp_obj,title = names(H1975_uniqe_deg_list)[i])
-  plt2 = plt2 + scale_y_continuous(trans = hypeR:::.reverselog_trans(10), 
-        breaks =exp(-seq(-log(min(plt2$data$fdr)), -log(max(plt2$data$fdr)), 
-            length.out = 6)) %>% signif(digits = 2))
-  print(plt2)
-  }
-  
-}
-```
+
+
 ```{r fig.height=6, fig.width=9}
 library(scales)
 library(ggdendro)
@@ -517,10 +497,10 @@ df_long <- df %>%
     names_pattern = "(.+)_(FC|padj)"
   )
 df_long = df_long %>% mutate(group = case_when(
-  gene %in% HCC_uniqe_deg_list$up_only_in_combo ~ "up_only_in_combo",
-  gene %in% HCC_uniqe_deg_list$only_down_in_combo ~ "only_down_in_combo",
-  gene %in% HCC_uniqe_deg_list$only_up_in_roxa ~ "only_up_in_roxa",
-  gene %in% HCC_uniqe_deg_list$only_down_in_roxa ~ "only_down_in_roxa",
+  gene %in% H1975_uniqe_deg_list$up_only_in_combo ~ "up_only_in_combo",
+  gene %in% H1975_uniqe_deg_list$only_down_in_combo ~ "only_down_in_combo",
+  gene %in% H1975_uniqe_deg_list$only_up_in_roxa ~ "only_up_in_roxa",
+  gene %in% H1975_uniqe_deg_list$only_down_in_roxa ~ "only_down_in_roxa",
   .default = "non-unique"
 ))
 fc_mat <- df[, c("cpVSop_FC", "roxaVSctrl_FC")]

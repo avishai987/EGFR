@@ -285,7 +285,7 @@ plt = hyp_dots(hyp_obj,merge = F,fdr = 0.3)
 plt+ scale_y_continuous(trans = hypeR:::.reverselog_trans(10), 
         breaks =exp(-seq(-log(min(plt$data$fdr)), -log(max(plt$data$fdr)), 
             length.out = 6)) %>% signif(digits = 2))
-
+plt
  fgsea::plotEnrichment(pathway = genesets$HIF_targets,stats = ranked_vec)
 
  hypoxia_genes_cpVSop_hcc = hyp_obj[["data"]]%>% filter(label == "HIF_targets") %>%  pull(le) %>% strsplit(split = ",") %>% unlist()
@@ -439,7 +439,7 @@ diff_genes["OSMR",]
 
 ```{r fig.width=15}
 library(org.Hs.eg.db)
-fc_threshold =1.5
+fc_threshold =1.2
 
 up_in_combo = diff_genes %>% filter(cpVSop_FC > fc_threshold & cpVSop_padj<0.05) %>% rownames()
 down_in_combo = diff_genes %>% filter(cpVSop_FC < 1/fc_threshold & cpVSop_padj<0.05) %>% rownames()
@@ -616,7 +616,7 @@ ggplot(df_long, aes(x = gene, y = FC, fill = condition)) +
   theme_minimal() +
   labs(x = "Gene", y = "Fold Change", title = "Fold Change per Gene") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))+
-   geom_hline(yintercept = 1.2, linetype = "dashed", color = "black")+
+   geom_hline(yintercept = fc_threshold, linetype = "dashed", color = "black")+
   scale_x_discrete(
     labels = label_html
   ) +
@@ -756,5 +756,15 @@ uniq_combo = combo_genes [!combo_genes %in% rox_genes]
 
 uniq_rox = rox_genes [!rox_genes %in% combo_genes]
 
+```
+
+```{r}
+barplot_for_conditions(bulk_Mar25_TPM,signature =c("NDRG1"),name = "EMT")
+signature = "NDRG1"
+ scores_df = bulk_Mar25_TPM[signature,] 
+```
+
+```{r}
+430/55
 ```
 
