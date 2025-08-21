@@ -165,11 +165,130 @@ breaks_fun = function(limits){
 
 hyp_obj <- hypeR_fgsea(ranked_vec, genesets, up_only = F)
 plt = hyp_dots(hyp_obj,merge = F)
-plt1 = plt$up+ aes(size=nes)+ggtitle("higher FC when rox in combo than veh")+
+plt1 = plt$up+ aes(size=nes)+ggtitle("higher rox effect in DTP than parental")+
   scale_y_continuous(trans = hypeR:::.reverselog_trans(10), 
         breaks =breaks_fun)
-plt2 = plt$dn+ aes(size=abs(nes))+ggtitle("higher FC when rox in veh than combo")+
+plt2 = plt$dn+ aes(size=abs(nes))+ggtitle("higher rox effect in parental than DTP")+
   scale_y_continuous(trans = hypeR:::.reverselog_trans(10), 
         breaks =breaks_fun)
 plt1+plt2
+```
+```{r}
+#from https://www.r-bloggers.com/2024/05/a-guide-to-designs-and-contrasts-in-deseq2/
+roxa_within_ctrl = results(dds, contrast=c("roxa", "yes", "no"))
+roxa_within_persisters = results(dds, contrast=list(c("roxa_yes_vs_no", "stateosi_persistent.roxayes")))
+
+```
+
+```{r}
+up_driving_genes = hyp_obj[["data"]][["up"]][["data"]] %>% filter(fdr<0.05) %>% pull(le) %>% strsplit(split = ",")
+names(up_driving_genes) = hyp_obj[["data"]][["up"]][["data"]] %>% filter(fdr<0.05) %>% pull(label)
+head(up_driving_genes)
+```
+
+```{r}
+fc_parental_vec = c()
+fc_dtp_vec = c()
+
+for (geneset_name in names(up_driving_genes)) {
+  genes = up_driving_genes[[geneset_name]]
+  scores = cell_line_bulk[genes,] %>% colMeans() %>% data.frame(row.names = names(.), score =.)
+  scores = merge(x = scores,y = metadata,by = 0) %>% column_to_rownames("Row.names")
+  scores$condition = factor(scores$condition,levels = c("Veh","Rox","osi_short","osi_short_roxa","osi_persistor","osi_persist_roxa"))
+  fc_parental = mean(scores %>% filter(condition == "Rox") %>% pull(score)) /mean(scores %>% filter(condition == "Veh") %>% pull(score))
+  fc_dtp = mean(scores %>% filter(condition == "osi_persist_roxa") %>% pull(score)) /mean(scores %>% filter(condition == "osi_persistor") %>%
+                                                                                            pull(score))
+  fc_parental_vec = c(fc_parental_vec,fc_parental)
+  fc_dtp_vec = c(fc_dtp_vec,fc_dtp)
+
+}
+all_fc = data.frame(pathway = names(up_driving_genes),fc_dtp = fc_dtp_vec, fc_parental = fc_parental_vec )
+all_fc
+```
+
+```{r}
+
+# Reshape the data from wide to long format
+fc_long <- all_fc %>%
+  pivot_longer(
+    cols = c(fc_dtp, fc_parental),
+    names_to = "group",
+    values_to = "fold_change"
+  )
+fc_long$pathway <- factor(fc_long$pathway, levels = names(up_driving_genes))
+
+# Create the grouped bar plot with a dashed reference line
+ggplot(fc_long, aes(x = pathway, y = fold_change, fill = group)) +
+  geom_col(position = "dodge", color = "black") +
+  # Add the dashed horizontal line at y = 1
+  geom_hline(yintercept = 1, linetype = "dashed", color = "blue", linewidth = 0.8) +
+  labs(
+    title = "Up in dtp FC",
+    x = "Pathway",
+    y = "Fold Change",
+    fill = "Group"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.margin = unit(c(1, 1, 1, 2), "cm")  
+
+  )
+```
+## down
+```{r}
+down_driving_genes = hyp_obj[["data"]][["dn"]][["data"]] %>% filter(fdr<0.05) %>% pull(le) %>% strsplit(split = ",")
+names(down_driving_genes) = hyp_obj[["data"]][["dn"]][["data"]] %>% filter(fdr<0.05) %>% pull(label)
+head(down_driving_genes)
+```
+
+```{r}
+fc_parental_vec = c()
+fc_dtp_vec = c()
+
+for (geneset_name in names(down_driving_genes)) {
+  genes = down_driving_genes[[geneset_name]]
+  scores = cell_line_bulk[genes,] %>% colMeans() %>% data.frame(row.names = names(.), score =.)
+  scores = merge(x = scores,y = metadata,by = 0) %>% column_to_rownames("Row.names")
+  scores$condition = factor(scores$condition,levels = c("Veh","Rox","osi_short","osi_short_roxa","osi_persistor","osi_persist_roxa"))
+  fc_parental = mean(scores %>% filter(condition == "Rox") %>% pull(score)) /mean(scores %>% filter(condition == "Veh") %>% pull(score))
+  fc_dtp = mean(scores %>% filter(condition == "osi_persist_roxa") %>% pull(score)) /mean(scores %>% filter(condition == "osi_persistor") %>%
+                                                                                            pull(score))
+  fc_parental_vec = c(fc_parental_vec,fc_parental)
+  fc_dtp_vec = c(fc_dtp_vec,fc_dtp)
+
+}
+all_fc = data.frame(pathway = names(down_driving_genes),fc_dtp = fc_dtp_vec, fc_parental = fc_parental_vec )
+all_fc
+```
+
+```{r}
+
+# Reshape the data from wide to long format
+fc_long <- all_fc %>%
+  pivot_longer(
+    cols = c(fc_dtp, fc_parental),
+    names_to = "group",
+    values_to = "fold_change"
+  )
+fc_long$pathway <- factor(fc_long$pathway, levels = names(down_driving_genes))
+
+# Create the grouped bar plot with a dashed reference line
+ggplot(fc_long, aes(x = pathway, y = fold_change, fill = group)) +
+  geom_col(position = "dodge", color = "black") +
+  # Add the dashed horizontal line at y = 1
+  geom_hline(yintercept = 1, linetype = "dashed", color = "blue", linewidth = 0.8) +
+  labs(
+    title = "Up in parental FC",
+    x = "Pathway",
+    y = "Fold Change",
+    fill = "Group"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  ) +
+  theme(
+    plot.margin = unit(c(1, 1, 1, 2), "cm")  
+  )
 ```
