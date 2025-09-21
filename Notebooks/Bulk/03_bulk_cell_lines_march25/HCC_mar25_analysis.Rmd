@@ -129,7 +129,6 @@ autoplot(PCAdata, data = metadata,colour = "condition",label = FALSE, main=paste
 
 dds <- DESeq(dds)
 cpVSop <- results(dds,contrast = c("condition","osi_persist_roxa","osi_persistor"))  %>% as.data.frame()
-# cpVSop$padj = p.adjust(cpVSop$pvalue, method = "fdr")
 roxaVSctrl <- results(dds,contrast = c("condition","Rox","Veh"))  %>% as.data.frame()
 diff_genes = data.frame(row.names = rownames(cpVSop), 
                         cpVSop_FC = cpVSop$log2FoldChange,
@@ -194,6 +193,7 @@ diff_genes = data.frame(row.names = rownames(cpVSop),
 
 ```{r}
 library(org.Hs.eg.db)
+# significant FC and pval in one but bot significant in other
 up_genes_df =  diff_genes %>% filter((cpVSop_FC > 1.3  | cpVSop_FC < 1/1.3) & cpVSop_padj<0.05 & roxaVSctrl_padj >0.05) 
 down_genes_df = diff_genes %>% filter((roxaVSctrl_FC > 1.3  | roxaVSctrl_FC < 1/1.3) & roxaVSctrl_padj<0.05 & cpVSop_padj>0.05)
 up_genes = up_genes_df %>% rownames()
@@ -210,19 +210,11 @@ print_tab(cbind(down_genes_df,gene_description = gene_descriptions$GENENAME),
           title = "down")
 
 ```
-```{r}
-#Genes from H1975
-diff_genes[c("TGFBI", "KRT17"),]
-diff_genes[c("ALPG", "ALDH3B1", "ANPEP", "TPSP2"),]
 
-#TGFB
-diff_genes[c("SMAD2","SMAD3","SMAD4","TGFB1","TGFB2","TGFB3","TGFBR1","TGFBR2"),]
-
-```
 
 ```{r}
 # write a data frame from the list of up and down genes
-lst = list(up_genes = up_genes,      down_genes = down_genes)
+lst = list(up_genes = up_genes, down_genes = down_genes)
 df_from_list <- bind_rows(lapply(lst, function(x) as.data.frame(t(x)))) %>% set_rownames(names(lst)) %>% t()
 
 write.table(df_from_list,
@@ -230,7 +222,7 @@ write.table(df_from_list,
             sep = "\t", row.names = FALSE, quote = FALSE)
 ```
 
-
+## exclusively up or down GSEA
 ```{r}
 if(length(up_genes)>=3){
   hyp_obj <- hypeR(up_genes, genesets, test = "hypergeometric", fdr=1, plotting=F,
@@ -239,19 +231,20 @@ if(length(up_genes)>=3){
   print(plt1)
 }
 
-```
-
-```{r}
 if(length(down_genes)>=3){
   hyp_obj <- hypeR(down_genes, genesets, test = "hypergeometric", fdr=1, plotting=F,
                    background = rownames(bulk_Mar25_TPM))
   plt2 = hyp_dots(hyp_obj,title = paste("down in comboVSosi but not in roxaVSctrl - ",params$cell_line))
   print(plt2)
 }
+
 ```
 
 
-# scatter plot
+
+
+# scatter plot 
+looking for genes in the sides 
 
 ```{r}
 library(ggrepel)
@@ -262,57 +255,10 @@ diff_genes_signif = rbind(up_genes_df,down_genes_df)
 ggplot(diff_genes_signif, aes(x=cpVSop_FC, y=roxaVSctrl_FC)) +
   geom_point() + 
   geom_text_repel(label=rownames(diff_genes_signif))
-```
-# order genes by cpVSop_FC/roxaVSctrl_FC values and than GSEA
-
-
-#UP 
-```{r}
-diff_genes_filtered = diff_genes %>% filter(!is.na(cpVSop_FC) | !is.na(roxaVSctrl_FC)) %>% 
-  filter( cpVSop_padj < 1 ) %>% mutate(score = cpVSop_FC/roxaVSctrl_FC)
-
-
-ranked_vec = diff_genes_filtered$score
-names(ranked_vec) = rownames(diff_genes_filtered)
-ranked_vec = ranked_vec %>% sort(decreasing = T)
 
 ```
 
-
-```{r}
-hyp_obj <-hypeR_fgsea(signature = ranked_vec,genesets = (genesets),up_only = T)
-plt = hyp_dots(hyp_obj,merge = F,fdr = 0.3)
-plt+ scale_y_continuous(trans = hypeR:::.reverselog_trans(10), 
-        breaks =exp(-seq(-log(min(plt$data$fdr)), -log(max(plt$data$fdr)), 
-            length.out = 6)) %>% signif(digits = 2))
-plt
- fgsea::plotEnrichment(pathway = genesets$HIF_targets,stats = ranked_vec)
-
- hypoxia_genes_cpVSop_hcc = hyp_obj[["data"]]%>% filter(label == "HIF_targets") %>%  pull(le) %>% strsplit(split = ",") %>% unlist()
-```
-# DOWN 
-```{r}
-diff_genes_filtered = diff_genes %>% filter(!is.na(cpVSop_FC) | !is.na(roxaVSctrl_FC)) %>% 
-  filter(cpVSop_FC<1 &  roxaVSctrl_FC<1  & cpVSop_padj < 1 ) %>% mutate(score = cpVSop_FC/roxaVSctrl_FC)
-
-
-ranked_vec = diff_genes_filtered$score
-names(ranked_vec) = rownames(diff_genes_filtered)
-ranked_vec = ranked_vec %>% sort(decreasing = T)
-
-```
-
-
-```{r}
-hyp_obj <-hypeR_fgsea(signature = ranked_vec,genesets = (genesets),up_only = T)
-plt = hyp_dots(hyp_obj,merge = F,fdr = 0.3)
-plt+ scale_y_continuous(trans = hypeR:::.reverselog_trans(10), 
-        breaks =exp(-seq(-log(min(plt$data$fdr)), -log(max(plt$data$fdr)), 
-            length.out = 6)) %>% signif(digits = 2))
-
-```
-
-# Average score
+# HIF score
 
 ```{r}
 
@@ -764,7 +710,4 @@ signature = "NDRG1"
  scores_df = bulk_Mar25_TPM[signature,] 
 ```
 
-```{r}
-430/55
-```
 
