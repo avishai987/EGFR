@@ -44,6 +44,48 @@ genesets = c(genesets, list(SASP = SASP_signature,
 hif_targets =  scan(input$hif_targets, character(), quote = "")
 genesets[["HIF_targets"]] = hif_targets
 
+
+CORDENONSI_YAP = getGmt("./input_data/pathways_from_papers/CORDENONSI_YAP_CONSERVED_SIGNATURE.gmt") %>%
+geneIds() %>% unlist()
+
+go_smad = getGmt("./input_data/pathways_from_papers/GOBP_POSITIVE_REGULATION_OF_SMAD_PROTEIN_SIGNAL_TRANSDUCTION.gmt") %>%
+geneIds() %>% unlist()
+
+
+mek_activation = c("DUSP4",
+"ELF1",
+"LGALS3",
+"ANKRD15",
+"TRIB2",
+"ETV4",
+"ETV5",
+"MAP2K3",
+"SPRY2",
+"LZTS1",
+"PROS1",
+"ZFP106",
+"DUSP6",
+"PHLDA1",
+"S100A6",
+"SERPINB1",
+"SLCO4A1",
+"FXYD5")
+
+compensatory_resistance = c("CLU",
+"BASP1",
+"COL12A1",
+"CRIM1",
+"GPR176",
+"STAC",
+"FZD2",
+"COL5A1",
+"LOX",
+"SERPINE1",
+"CD274",
+"G0S2",
+"IL6")
+
+
 ```
 
 # Create data
@@ -121,184 +163,83 @@ autoplot(PCAdata, data = metadata,colour = "condition",label = FALSE, main=paste
 
 
 ```
-
-
-## DEG FC {.tabset}
+# signatures barplots
 ```{r}
+library(ggpubr)
+library(rstatix)
 
-
-dds <- DESeq(dds)
-cpVSop <- results(dds,contrast = c("condition","osi_persist_roxa","osi_persistor"))  %>% as.data.frame()
-roxaVSctrl <- results(dds,contrast = c("condition","Rox","Veh"))  %>% as.data.frame()
-diff_genes = data.frame(row.names = rownames(cpVSop), 
-                        cpVSop_FC = cpVSop$log2FoldChange,
-                        roxaVSctrl_FC = roxaVSctrl$log2FoldChange, 
-                        cpVSop_padj = cpVSop$padj)
-```
-
-```{r}
-# create 6 breaks between plot limits in log scale and then exponent, otherwise breaks not good
-breaks_fun = function(limits){ 
-  breaks = exp(-seq(-log(limits[1]), -log(limits[2]), length.out = 6))
-  breaks[1] = breaks[1] * 0.95 #adjust extreme ticks to prevent truncation
-  breaks[7] = breaks[7] * 1.05
-  return(signif(breaks, digits = 2))
-}
-
-```
-
-
-
-```{r fig.height=6, fig.width=13, results='asis'}
-suppressPackageStartupMessages(library(GSEABase))
-ranked_vec = cpVSop[,"log2FoldChange"]%>% setNames(rownames(cpVSop)) %>% na.omit() %>%  #order by FC
-  sort(decreasing = T) # sort
-
-
-
-hyp_obj_combo <- hypeR_fgsea(ranked_vec, genesets, up_only = F)
-plt = hyp_dots(hyp_obj_combo,merge = F)
-plt1 = plt$up+ aes(size=nes)+ggtitle("up in comboPersistor")+
-  scale_y_continuous(trans = hypeR:::.reverselog_trans(10), 
-        breaks =breaks_fun)
-plt2 = plt$dn+ aes(size=abs(nes))+ggtitle("up in osiPersistors")+
-  scale_y_continuous(trans = hypeR:::.reverselog_trans(10), 
-        breaks =breaks_fun)
-print_tab(plt1+plt2,title = paste(params$cell_line,"cpVSop"))
-
-
-ranked_vec = roxaVSctrl[,"log2FoldChange"]%>% setNames(rownames(roxaVSctrl)) %>% na.omit() %>% # make named vector
-  sort(decreasing = T) # sort 
-
-hyp_obj_rox <- hypeR_fgsea(ranked_vec, genesets, up_only = F)
-plt = hyp_dots(hyp_obj_rox,merge = F)
-plt1 = plt$up+ aes(size=nes)+ggtitle("up in roxa")+
-  scale_y_continuous(trans = hypeR:::.reverselog_trans(10), 
-        breaks =breaks_fun)
-plt2 = plt$dn+ aes(size=abs(nes))+ggtitle("up in ctrl")+
-  scale_y_continuous(trans = hypeR:::.reverselog_trans(10), 
-        breaks =breaks_fun)
-print_tab(plt1+plt2,title = paste(params$cell_line,"roxaVSctrl"))
-```
-
-# DEG in comboVSosi but not in roxaVSctrl 
-
-```{r}
-diff_genes = data.frame(row.names = rownames(cpVSop), 
-                        cpVSop_FC = 2**cpVSop$log2FoldChange,
-                        roxaVSctrl_FC = 2**roxaVSctrl$log2FoldChange,
-                        cpVSop_padj = cpVSop$padj,
-                        roxaVSctrl_padj = roxaVSctrl$padj)
-```
-
-```{r}
-library(org.Hs.eg.db)
-# significant FC and pval in one but bot significant in other
-up_genes_df =  diff_genes %>% filter((cpVSop_FC > 1.3  | cpVSop_FC < 1/1.3) & cpVSop_padj<0.05 & roxaVSctrl_padj >0.05) 
-down_genes_df = diff_genes %>% filter((roxaVSctrl_FC > 1.3  | roxaVSctrl_FC < 1/1.3) & roxaVSctrl_padj<0.05 & cpVSop_padj>0.05)
-up_genes = up_genes_df %>% rownames()
-down_genes = down_genes_df %>% rownames()
-
-gene_descriptions <- AnnotationDbi::select(org.Hs.eg.db, keys = up_genes, columns = "GENENAME", keytype = "SYMBOL")
-
-print_tab(cbind(up_genes_df,gene_description = gene_descriptions$GENENAME),
-          title = "up")
-
-gene_descriptions <- AnnotationDbi::select(org.Hs.eg.db, keys = down_genes, columns = "GENENAME", keytype = "SYMBOL")
-
-print_tab(cbind(down_genes_df,gene_description = gene_descriptions$GENENAME),
-          title = "down")
-
-```
-
-
-```{r}
-# write a data frame from the list of up and down genes
-lst = list(up_genes = up_genes, down_genes = down_genes)
-df_from_list <- bind_rows(lapply(lst, function(x) as.data.frame(t(x)))) %>% set_rownames(names(lst)) %>% t()
-
-write.table(df_from_list,
-            file = paste0(params$data_out_dir, paste0(basename(output$up_in_persistors))),
-            sep = "\t", row.names = FALSE, quote = FALSE)
-```
-
-## exclusively up or down GSEA
-```{r}
-if(length(up_genes)>=3){
-  hyp_obj <- hypeR(up_genes, genesets, test = "hypergeometric", fdr=1, plotting=F,
-                 background = rownames(bulk_Mar25_TPM))
-  plt1 = hyp_dots(hyp_obj,title = paste("up in comboVSosi but not in roxaVSctrl -",params$cell_line))
-  print(plt1)
-}
-
-if(length(down_genes)>=3){
-  hyp_obj <- hypeR(down_genes, genesets, test = "hypergeometric", fdr=1, plotting=F,
-                   background = rownames(bulk_Mar25_TPM))
-  plt2 = hyp_dots(hyp_obj,title = paste("down in comboVSosi but not in roxaVSctrl - ",params$cell_line))
-  print(plt2)
-}
-
-```
-
-
-
-
-# scatter plot 
-looking for genes in the sides 
-
-```{r}
-library(ggrepel)
-up_genes_df =  diff_genes %>% filter(cpVSop_FC > 1.2 & roxaVSctrl_FC<1.2 & cpVSop_padj<0.05) 
-down_genes_df = diff_genes %>% filter(cpVSop_FC < 0.8 & roxaVSctrl_FC>0.8 & cpVSop_padj<0.05)
-diff_genes_signif = rbind(up_genes_df,down_genes_df)
-
-ggplot(diff_genes_signif, aes(x=cpVSop_FC, y=roxaVSctrl_FC)) +
-  geom_point() + 
-  geom_text_repel(label=rownames(diff_genes_signif))
-
-```
-
-# HIF score
-
-```{r}
-
-hif_scores = cell_line_bulk[genesets$HIF_targets,] %>% colMeans() %>% data.frame(row.names = names(.), hif_score =.)
-hif_scores = merge(x = hif_scores,y = metadata,by = 0) %>% column_to_rownames("Row.names")
-hif_scores
-hif_scores$condition = factor(hif_scores$condition,levels = c("Veh","Rox","osi_short","osi_short_roxa","osi_persistor","osi_persist_roxa"))
-```
-```{r}
-summary_df <- hif_scores %>%
-  group_by(condition) %>%
-  dplyr::summarise(
-    Mean_Score = mean(hif_score),
-    SD_Score = sd(hif_score),
-    N = n(),
-    SE_Score = SD_Score / sqrt(N) # שגיאת תקן של הממוצע
-  )
-
-print(summary_df)
-```
-
-```{r}
-ggplot(hif_scores, aes(x = condition, y = hif_score)) +
+barplot_for_conditions <- function(data, signature, name) {
+  scores_df = data[signature,] %>% colMeans() %>% data.frame(row.names = names(.), score =.)
+  scores_df = merge(x = scores_df,y = metadata,by = 0) %>% column_to_rownames("Row.names")
+  scores_df
+  scores_df$condition = factor(scores_df$condition,levels = 
+                                 c("Veh","Rox","osi_short","osi_short_roxa","osi_persistor","osi_persist_roxa"))
+  summary_df <- scores_df %>%
+    group_by(condition) %>%
+    dplyr::summarise(
+      Mean_Score = mean(score),
+      SD_Score = sd(score),
+      N = n(),
+      SE_Score = SD_Score / sqrt(N)
+    )
+  
+  stat.test <- scores_df %>%
+    t_test(score ~ condition) %>%
+    add_significance()
+  
+  my_comparisons <- list( c("Veh", "Rox"), c("Rox","osi_short"), c("osi_short","osi_short_roxa"), c("osi_short_roxa","osi_persistor"), c("osi_persistor","osi_persist_roxa"))
+  
+  comparisons_df <- do.call(rbind, my_comparisons) %>%
+  as.data.frame() %>%
+  setNames(c("group1", "group2"))
+  
+  stat.test <- stat.test %>%
+  semi_join(comparisons_df, by = c("group1", "group2")) %>% 
+    add_xy_position(step.increase = 0)
+  
+  p =  ggplot(scores_df, aes(x = condition, y = score)) +
   # Add bars for the means
   geom_bar(data = summary_df, aes(y = Mean_Score), stat = "identity", fill = "skyblue", color = "black", alpha = 0.7) +
   # Add individual data points (jittered to prevent overlap)
   geom_jitter(width = 0.2, height = 0, color = "darkblue", size = 2, alpha = 0.6) +
   # Optional: Add error bars (Standard Error of the Mean)
   geom_errorbar(data = summary_df, aes(y = Mean_Score, ymin = Mean_Score - SE_Score, ymax = Mean_Score + SE_Score),
-                width = 0.1, color = "black") +
+  width = 0.1, color = "black") +
   # Add titles and customize appearance
   labs(
-    title = paste0(params$cell_line,"- Comparison of Mean Scores"),
-    x = "Condition",
-    y = "HIF score"
+  title = paste0(params$cell_line,"- Comparison of Mean ",name," Scores"),
+  x = "Condition",
+  y = name
   ) +
   theme_minimal() + # Minimalist theme
-  theme(plot.title = element_text(hjust = 0.5)) # Center the title
+  theme(plot.title = element_text(hjust = 0.5))+  # Center the title
+  stat_pvalue_manual(stat.test, label = "p.adj",bracket.shorten = 0.1)
+  return(p)
+}
+
 ```
-## per gene
+
+
+```{r}
+
+barplot_for_conditions(bulk_Mar25_TPM,signature = genesets$HIF_targets,name = "hif_targets")
+barplot_for_conditions(bulk_Mar25_TPM,signature = CORDENONSI_YAP,name = "CORDENONSI_YAP")
+barplot_for_conditions(bulk_Mar25_TPM,signature =go_smad,name = "go_SMAD_PROTEIN_SIGNAL")
+barplot_for_conditions(bulk_Mar25_TPM,signature =genesets$HALLMARK_EPITHELIAL_MESENCHYMAL_TRANSITION,name = "EMT")
+barplot_for_conditions(bulk_Mar25_TPM,signature = CORDENONSI_YAP,name = "CORDENONSI_YAP")
+barplot_for_conditions(bulk_Mar25_TPM,signature =go_smad,name = "go_SMAD_PROTEIN_SIGNAL")
+barplot_for_conditions(bulk_Mar25_TPM,signature =genesets$HALLMARK_EPITHELIAL_MESENCHYMAL_TRANSITION,name = "EMT")
+
+mek_activation = mek_activation[mek_activation %in% rownames(bulk_Mar25_TPM)]
+barplot_for_conditions(bulk_Mar25_TPM,signature =mek_activation,name = "mek_activation")
+barplot_for_conditions(bulk_Mar25_TPM,signature =compensatory_resistance,name = "compensatory_resistance")
+barplot_for_conditions(bulk_Mar25_TPM,signature =c("NDRG1"),name = "EMT")
+
+
+```
+
+
+## HIF per gene
 ```{r}
 hif_scores = cell_line_bulk[genesets$HIF_targets,] %>% t() %>% as.data.frame()
 hif_scores= merge(x = hif_scores,y = metadata,by = 0) %>% column_to_rownames("Row.names")
@@ -376,9 +317,145 @@ print(p_all_genes)
 ```
 
 
+
+
+## DEG FC {.tabset}
 ```{r}
-diff_genes["OSMR",]
+
+
+dds <- DESeq(dds)
+cpVSop <- results(dds,contrast = c("condition","osi_persist_roxa","osi_persistor"))  %>% as.data.frame()
+roxaVSctrl <- results(dds,contrast = c("condition","Rox","Veh"))  %>% as.data.frame()
+diff_genes = data.frame(row.names = rownames(cpVSop), 
+                        cpVSop_FC = cpVSop$log2FoldChange,
+                        roxaVSctrl_FC = roxaVSctrl$log2FoldChange, 
+                        cpVSop_padj = cpVSop$padj)
 ```
+
+```{r}
+# create 6 breaks between plot limits in log scale and then exponent, otherwise breaks not good
+breaks_fun = function(limits){ 
+  breaks = exp(-seq(-log(limits[1]), -log(limits[2]), length.out = 6))
+  breaks[1] = breaks[1] * 0.95 #adjust extreme ticks to prevent truncation
+  breaks[7] = breaks[7] * 1.05
+  return(signif(breaks, digits = 2))
+}
+
+```
+
+
+
+```{r fig.height=6, fig.width=13, results='asis'}
+suppressPackageStartupMessages(library(GSEABase))
+ranked_vec = cpVSop[,"log2FoldChange"]%>% setNames(rownames(cpVSop)) %>% na.omit() %>%  #order by FC
+  sort(decreasing = T) # sort
+
+
+
+hyp_obj_combo <- hypeR_fgsea(ranked_vec, genesets, up_only = F)
+plt = hyp_dots(hyp_obj_combo,merge = F)
+plt1 = plt$up+ aes(size=nes)+ggtitle("up in comboPersistor")+
+  scale_y_continuous(trans = hypeR:::.reverselog_trans(10), 
+        breaks =breaks_fun)
+plt2 = plt$dn+ aes(size=abs(nes))+ggtitle("up in osiPersistors")+
+  scale_y_continuous(trans = hypeR:::.reverselog_trans(10), 
+        breaks =breaks_fun)
+print_tab(plt1+plt2,title = paste(params$cell_line,"cpVSop"))
+
+
+ranked_vec = roxaVSctrl[,"log2FoldChange"]%>% setNames(rownames(roxaVSctrl)) %>% na.omit() %>% # make named vector
+  sort(decreasing = T) # sort 
+
+hyp_obj_rox <- hypeR_fgsea(ranked_vec, genesets, up_only = F)
+plt = hyp_dots(hyp_obj_rox,merge = F)
+plt1 = plt$up+ aes(size=nes)+ggtitle("up in roxa")+
+  scale_y_continuous(trans = hypeR:::.reverselog_trans(10), 
+        breaks =breaks_fun)
+plt2 = plt$dn+ aes(size=abs(nes))+ggtitle("up in ctrl")+
+  scale_y_continuous(trans = hypeR:::.reverselog_trans(10), 
+        breaks =breaks_fun)
+print_tab(plt1+plt2,title = paste(params$cell_line,"roxaVSctrl"))
+```
+
+# DEG in comboVSosi but not in roxaVSctrl - only up threshold
+
+```{r}
+diff_genes = data.frame(row.names = rownames(cpVSop), 
+                        cpVSop_FC = 2**cpVSop$log2FoldChange,
+                        roxaVSctrl_FC = 2**roxaVSctrl$log2FoldChange,
+                        cpVSop_padj = cpVSop$padj,
+                        roxaVSctrl_padj = roxaVSctrl$padj)
+```
+
+```{r}
+library(org.Hs.eg.db)
+# significant FC and pval in one but bot significant in other
+up_genes_df =  diff_genes %>% filter((cpVSop_FC > 1.3  | cpVSop_FC < 1/1.3) & cpVSop_padj<0.05 & roxaVSctrl_padj >0.05) 
+down_genes_df = diff_genes %>% filter((roxaVSctrl_FC > 1.3  | roxaVSctrl_FC < 1/1.3) & roxaVSctrl_padj<0.05 & cpVSop_padj>0.05)
+up_genes = up_genes_df %>% rownames()
+down_genes = down_genes_df %>% rownames()
+
+gene_descriptions <- AnnotationDbi::select(org.Hs.eg.db, keys = up_genes, columns = "GENENAME", keytype = "SYMBOL")
+
+print_tab(cbind(up_genes_df,gene_description = gene_descriptions$GENENAME),
+          title = "up")
+
+gene_descriptions <- AnnotationDbi::select(org.Hs.eg.db, keys = down_genes, columns = "GENENAME", keytype = "SYMBOL")
+
+print_tab(cbind(down_genes_df,gene_description = gene_descriptions$GENENAME),
+          title = "down")
+
+```
+
+
+```{r}
+# write a data frame from the list of up and down genes
+lst = list(up_genes = up_genes, down_genes = down_genes)
+df_from_list <- bind_rows(lapply(lst, function(x) as.data.frame(t(x)))) %>% set_rownames(names(lst)) %>% t()
+
+write.table(df_from_list,
+            file = paste0(params$data_out_dir, paste0(basename(output$up_in_persistors))),
+            sep = "\t", row.names = FALSE, quote = FALSE)
+```
+
+## exclusively up or down GSEA
+```{r}
+if(length(up_genes)>=3){
+  hyp_obj <- hypeR(up_genes, genesets, test = "hypergeometric", fdr=1, plotting=F,
+                 background = rownames(bulk_Mar25_TPM))
+  plt1 = hyp_dots(hyp_obj,title = paste("up in comboVSosi but not in roxaVSctrl -",params$cell_line))
+  print(plt1)
+}
+
+if(length(down_genes)>=3){
+  hyp_obj <- hypeR(down_genes, genesets, test = "hypergeometric", fdr=1, plotting=F,
+                   background = rownames(bulk_Mar25_TPM))
+  plt2 = hyp_dots(hyp_obj,title = paste("down in comboVSosi but not in roxaVSctrl - ",params$cell_line))
+  print(plt2)
+}
+
+```
+
+
+
+
+# scatter plot 
+looking for genes in the sides 
+
+```{r}
+library(ggrepel)
+up_genes_df =  diff_genes %>% filter(cpVSop_FC > 1.2 & roxaVSctrl_FC<1.2 & cpVSop_padj<0.05) 
+down_genes_df = diff_genes %>% filter(cpVSop_FC < 0.8 & roxaVSctrl_FC>0.8 & cpVSop_padj<0.05)
+diff_genes_signif = rbind(up_genes_df,down_genes_df)
+
+ggplot(diff_genes_signif, aes(x=cpVSop_FC, y=roxaVSctrl_FC)) +
+  geom_point() + 
+  geom_text_repel(label=rownames(diff_genes_signif))
+
+```
+
+
+# set up and down thresholds
 
 
 
@@ -432,6 +509,17 @@ all_fdr_df =all_fdr_df[,c("up_only_in_combo", "only_up_in_roxa", "only_down_in_c
 all_list = list(up_only_in_combo = up_only_in_combo, only_up_in_roxa =only_up_in_roxa, hif_targets =hif_targets)
 ggvenn::ggvenn(data = all_list)+ggtitle(params$cell_line)
 ```
+```{r}
+# leading genes overlap
+combo_genes = hyp_obj_combo[["data"]][["up"]][["data"]] %>% filter(label == "HIF_targets") %>% pull(le) %>% strsplit(split = ",") %>% unlist()
+rox_genes = hyp_obj_rox[["data"]][["up"]][["data"]] %>% filter(label == "HIF_targets") %>% pull(le) %>% strsplit(split = ",") %>% unlist()
+ggvenn::ggvenn(data = list(combo_genes= combo_genes, rox_genes = rox_genes))
+
+uniq_combo = combo_genes [!combo_genes %in% rox_genes]
+
+uniq_rox = rox_genes [!rox_genes %in% combo_genes]
+
+```
 
 
 ```{r fig.height=10, fig.width=8}
@@ -453,7 +541,6 @@ lgd <- Legend(
   at =c(-2,threshold,seq(from = 10, to = max(all_fdr_df), by = 10))
 )
 
-# ציור heatmap בלי legend
 ht <- Heatmap(all_fdr_df,col = col_fun, row_names_gp = gpar(fontsize = 9),cluster_columns = F, show_heatmap_legend = FALSE, column_title= params$cell_line)
 
 draw(ht, padding = unit(c(2, 2, 2, 50), "mm"))
@@ -577,137 +664,12 @@ ggplot(df_long, aes(x = gene, y = FC, fill = condition)) +
 ```
 
 
-```{r}
-genesets$HALLMARK_HYPOXIA[genesets$HALLMARK_HYPOXIA %in% HCC_uniqe_deg_list$only_up_in_roxa ]
-genesets$HIF_targets[genesets$HIF_targets %in% HCC_uniqe_deg_list$only_up_in_roxa ]
-```
 
 
-```{r}
-
-library(ggpubr)
-library(rstatix)
-
-barplot_for_conditions <- function(data, signature, name) {
-  scores_df = data[signature,] %>% colMeans() %>% data.frame(row.names = names(.), score =.)
-  scores_df = merge(x = scores_df,y = metadata,by = 0) %>% column_to_rownames("Row.names")
-  scores_df
-  scores_df$condition = factor(scores_df$condition,levels = 
-                                 c("Veh","Rox","osi_short","osi_short_roxa","osi_persistor","osi_persist_roxa"))
-  summary_df <- scores_df %>%
-    group_by(condition) %>%
-    dplyr::summarise(
-      Mean_Score = mean(score),
-      SD_Score = sd(score),
-      N = n(),
-      SE_Score = SD_Score / sqrt(N)
-    )
-  
-  stat.test <- scores_df %>%
-    t_test(score ~ condition) %>%
-    add_significance()
-  
-  my_comparisons <- list( c("Veh", "Rox"), c("Rox","osi_short"), c("osi_short","osi_short_roxa"), c("osi_short_roxa","osi_persistor"), c("osi_persistor","osi_persist_roxa"))
-  
-  comparisons_df <- do.call(rbind, my_comparisons) %>%
-  as.data.frame() %>%
-  setNames(c("group1", "group2"))
-  
-  stat.test <- stat.test %>%
-  semi_join(comparisons_df, by = c("group1", "group2")) %>% 
-    add_xy_position(step.increase = 0)
-  
-  p =  ggplot(scores_df, aes(x = condition, y = score)) +
-  # Add bars for the means
-  geom_bar(data = summary_df, aes(y = Mean_Score), stat = "identity", fill = "skyblue", color = "black", alpha = 0.7) +
-  # Add individual data points (jittered to prevent overlap)
-  geom_jitter(width = 0.2, height = 0, color = "darkblue", size = 2, alpha = 0.6) +
-  # Optional: Add error bars (Standard Error of the Mean)
-  geom_errorbar(data = summary_df, aes(y = Mean_Score, ymin = Mean_Score - SE_Score, ymax = Mean_Score + SE_Score),
-  width = 0.1, color = "black") +
-  # Add titles and customize appearance
-  labs(
-  title = paste0(params$cell_line,"- Comparison of Mean ",name," Scores"),
-  x = "Condition",
-  y = name
-  ) +
-  theme_minimal() + # Minimalist theme
-  theme(plot.title = element_text(hjust = 0.5))+  # Center the title
-  stat_pvalue_manual(stat.test, label = "p.adj",bracket.shorten = 0.1)
-  return(p)
-}
 
 
-CORDENONSI_YAP = getGmt("./input_data/pathways_from_papers/CORDENONSI_YAP_CONSERVED_SIGNATURE.gmt") %>%
-geneIds() %>% unlist()
-
-go_smad = getGmt("./input_data/pathways_from_papers/GOBP_POSITIVE_REGULATION_OF_SMAD_PROTEIN_SIGNAL_TRANSDUCTION.gmt") %>%
-geneIds() %>% unlist()
-
-barplot_for_conditions(bulk_Mar25_TPM,signature = genesets$HIF_targets,name = "hif_targets")
-barplot_for_conditions(bulk_Mar25_TPM,signature = CORDENONSI_YAP,name = "CORDENONSI_YAP")
-barplot_for_conditions(bulk_Mar25_TPM,signature =go_smad,name = "go_SMAD_PROTEIN_SIGNAL")
-barplot_for_conditions(bulk_Mar25_TPM,signature =genesets$HALLMARK_EPITHELIAL_MESENCHYMAL_TRANSITION,name = "EMT")
-barplot_for_conditions(bulk_Mar25_TPM,signature = CORDENONSI_YAP,name = "CORDENONSI_YAP")
-barplot_for_conditions(bulk_Mar25_TPM,signature =go_smad,name = "go_SMAD_PROTEIN_SIGNAL")
-barplot_for_conditions(bulk_Mar25_TPM,signature =genesets$HALLMARK_EPITHELIAL_MESENCHYMAL_TRANSITION,name = "EMT")
-
-mek_activation = c("DUSP4",
-"ELF1",
-"LGALS3",
-"ANKRD15",
-"TRIB2",
-"ETV4",
-"ETV5",
-"MAP2K3",
-"SPRY2",
-"LZTS1",
-"PROS1",
-"ZFP106",
-"DUSP6",
-"PHLDA1",
-"S100A6",
-"SERPINB1",
-"SLCO4A1",
-"FXYD5")
-
-compensatory_resistance = c("CLU",
-"BASP1",
-"COL12A1",
-"CRIM1",
-"GPR176",
-"STAC",
-"FZD2",
-"COL5A1",
-"LOX",
-"SERPINE1",
-"CD274",
-"G0S2",
-"IL6")
-
-mek_activation = mek_activation[mek_activation %in% rownames(bulk_Mar25_TPM)]
-barplot_for_conditions(bulk_Mar25_TPM,signature =mek_activation,name = "mek_activation")
-barplot_for_conditions(bulk_Mar25_TPM,signature =compensatory_resistance,name = "compensatory_resistance")
 
 
-```
 
-```{r}
-
-combo_genes = hyp_obj_combo[["data"]][["up"]][["data"]] %>% filter(label == "HIF_targets") %>% pull(le) %>% strsplit(split = ",") %>% unlist()
-rox_genes = hyp_obj_rox[["data"]][["up"]][["data"]] %>% filter(label == "HIF_targets") %>% pull(le) %>% strsplit(split = ",") %>% unlist()
-ggvenn::ggvenn(data = list(combo_genes= combo_genes, rox_genes = rox_genes))
-
-uniq_combo = combo_genes [!combo_genes %in% rox_genes]
-
-uniq_rox = rox_genes [!rox_genes %in% combo_genes]
-
-```
-
-```{r}
-barplot_for_conditions(bulk_Mar25_TPM,signature =c("NDRG1"),name = "EMT")
-signature = "NDRG1"
- scores_df = bulk_Mar25_TPM[signature,] 
-```
 
 
