@@ -107,7 +107,7 @@ library("RColorBrewer")
 sampleDistMatrix <- as.matrix(sampleDists)
 colnames(sampleDistMatrix) <- NULL
 colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
-p = pheatmap(sampleDistMatrix,
+p = pheatmap::pheatmap(sampleDistMatrix,
          clustering_distance_rows=sampleDists,
          clustering_distance_cols=sampleDists,
          col=colors, main = "Sample euclidean distance Matrix")
@@ -179,6 +179,7 @@ dev.off()
 # expression heatmap of signatures
 SASP_signature = c("CCL2", "CCL5", "CCL7", "IL1A", "IL1B", "IL32","SCG2", "INHBA", "INHA", "WNT7A", "CSF2", "TNFRSF11B", "GREM1", "CMTM3")
 FRIDMAN_SENESCENCE_UP  = getGmt(input$SENESCENCE) %>% geneIds() %>%  unlist() %>% base::unname()
+hif_targets =  scan(input$hif_targets, character(), quote = "")
 
 
 SASP_signautre_expression = bulk_Mar25_TPM[SASP_signature[SASP_signature %in% rownames(bulk_Mar25_TPM)],] %>%  
@@ -218,15 +219,72 @@ all_signature_expression_zscore = all_signature_expression_zscore[complete.cases
 p2 = Heatmap(all_signature_expression_zscore, cluster_rows = T, cluster_columns = F, name = "Z-score TPM",column_title = "SASP genes")
 p2
 
-signautre_expression = bulk_Mar25_TPM[FRIDMAN_SENESCENCE_UP[FRIDMAN_SENESCENCE_UP %in% rownames(bulk_Mar25_TPM)],]  %>% t() %>% scale() %>% t() %>% as.data.frame() 
+# signautre_expression = bulk_Mar25_TPM[FRIDMAN_SENESCENCE_UP[FRIDMAN_SENESCENCE_UP %in% rownames(bulk_Mar25_TPM)],]  %>% t() %>% scale() %>% t() %>% as.data.frame() 
+# 
+# 
+# p3 = Heatmap(signautre_expression, cluster_rows = T, cluster_columns = F, name = "Z-score TPM",column_title = "FRIDMAN_SENESCENCE_UP genes",row_names_gp = gpar(fontsize = 8))
+
+```
+```{r fig.height=5, fig.width=12}
+ library(dplyr)
+# create metadata
+cell.labels = names(bulk_Mar25_TPM)
+condition = str_extract(cell.labels, "Veh|osi_short_[1-9]|Rox|osi_short_roxa|osi_persistor|osi_persist_roxa") %>% gsub(pattern = "_[1-9]",replacement = "") %>% factor(levels = c("Veh","Rox","osi_short","osi_short_roxa","osi_persistor","osi_persist_roxa"))
+cell_type = str_extract(cell.labels, "HCC|H1975")
+
+metadata = data.frame(condition = condition,cell_type =cell_type, row.names = colnames(bulk_Mar25_TPM))
+#z score per cell line, mean over replicates
+
+all_signatures = list("hif_targets" = hif_targets,"FRIDMAN_SENESCENCE_UP" = FRIDMAN_SENESCENCE_UP,"SASP_signature" = SASP_signature)
+signautre_scores = list()
+for (signautre_name in names(all_signatures)) {
+  signature = all_signatures[[signautre_name]]
+  scores_df = bulk_Mar25_TPM[signature,] %>% colMeans() %>% data.frame(row.names = names(.), score =.) 
+  names(scores_df)[names(scores_df) == "score"] <- signautre_name
+  
+  signautre_scores[[signautre_name]] = scores_df
+}
+final_df <- do.call(cbind, signautre_scores)
+
+final_df = merge(x = final_df,y = metadata,by = 0) %>% column_to_rownames("Row.names")
+
+all_data = list()
+for (cell_line in c("HCC","H1975")) {
+  cell_line_data = final_df %>% filter(cell_type == cell_line)
+  cell_line_data = cell_line_data %>%   group_by(condition) %>% 
+    dplyr::summarise(hif_targets_mean = mean(hif_targets),
+                     FRIDMAN_SENESCENCE_UP_mean = mean(FRIDMAN_SENESCENCE_UP),
+                     SASP_signature_mean = mean(SASP_signature) )  %>% 
+    mutate(
+      scaled_hif_targets_mean = as.vector(scale(hif_targets_mean)),
+      scaled_FRIDMAN_SENESCENCE_UP_mean = as.vector(scale(FRIDMAN_SENESCENCE_UP_mean)),
+      scaled_SASP_signature_mean = as.vector(scale(SASP_signature_mean))
+    ) %>% 
+    mutate(cell_type = cell_line) %>% as.data.frame()
+  all_data[[cell_line]] = cell_line_data
+}
+all_data_df = rbindlist(all_data) %>% as.data.frame()
+rownames(all_data_df) = paste0(all_data_df$cell_type,"_",all_data_df$condition) 
+all_data_df_to_plot = all_data_df %>%   select(-condition)%>% select(-cell_type) %>%  t() %>% as.data.frame()
+all_data_df_to_plot = all_data_df_to_plot[startsWith(x = rownames(all_data_df_to_plot),prefix = "scaled"),] # take jst scaled rows
+
+ha2 = columnAnnotation(cell_line = all_data_df$cell_type,
+                       col = list(cell_line = c(HCC = "green",H1975 = "orange")))
 
 
-p3 = Heatmap(signautre_expression, cluster_rows = T, cluster_columns = F, name = "Z-score TPM",column_title = "FRIDMAN_SENESCENCE_UP genes",row_names_gp = gpar(fontsize = 8))
+
+
+p1 = Heatmap(all_data_df_to_plot, cluster_rows = F, cluster_columns = F, name = "Z-score TPM",
+             top_annotation = ha2,column_split  = all_data_df$cell_type ,column_gap = unit(4, "mm"))
+
+
+p1
+
 
 ```
 
 ```{r fig.height=12, fig.width=9}
-p3
+# p3
 ```
 ```{r}
 # calculate fold change in SASP HCC
@@ -278,9 +336,9 @@ pdf(paste0(params$data_out_dir,"SASP_genes.pdf"),width = 10,height = 6)
 p2
 dev.off()
 
-pdf(paste0(params$data_out_dir,"SENESCENCE_genes.pdf"),width = 12,height = 9)
-p3
-dev.off()
+# pdf(paste0(params$data_out_dir,"SENESCENCE_genes.pdf"),width = 12,height = 9)
+# p3
+# dev.off()
 ```
 
 #  all hallmarks
