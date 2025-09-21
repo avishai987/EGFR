@@ -184,15 +184,56 @@ roxa_within_persisters = results(dds, contrast=list(c("roxa_yes_vs_no", "stateos
 up_driving_genes = hyp_obj[["data"]][["up"]][["data"]] %>% filter(fdr<0.05) %>% pull(le) %>% strsplit(split = ",")
 names(up_driving_genes) = hyp_obj[["data"]][["up"]][["data"]] %>% filter(fdr<0.05) %>% pull(label)
 head(up_driving_genes)
+
+
+# Find the maximum length among all list elements
+max_len <- max(sapply(up_driving_genes, length))
+
+# Pad shorter elements with NA
+padded_list <- lapply(up_driving_genes, function(x) {
+  length(x) <- max_len
+  x
+})
+
+# Convert the padded list to a data frame
+df_to_export <- as.data.frame(padded_list)
+
+
+write_csv(x = df_to_export,file = "./temp_data/HCC_up_driving_genes.csv")
+
+```
+
+```{r}
+dn_driving_genes = hyp_obj[["data"]][["dn"]][["data"]] %>% filter(fdr<0.05) %>% pull(le) %>% strsplit(split = ",")
+names(dn_driving_genes) = hyp_obj[["data"]][["dn"]][["data"]] %>% filter(fdr<0.05) %>% pull(label)
+head(dn_driving_genes)
+
+
+# Find the maximum length among all list elements
+max_len <- max(sapply(dn_driving_genes, length))
+
+# Pad shorter elements with NA
+padded_list <- lapply(dn_driving_genes, function(x) {
+  length(x) <- max_len
+  x
+})
+
+# Convert the padded list to a data frame
+df_to_export <- as.data.frame(padded_list)
+
+
+write_csv(x = df_to_export,file = "./temp_data/HCC_dn_driving_genes.csv")
+
 ```
 
 ```{r}
 fc_parental_vec = c()
 fc_dtp_vec = c()
-
-for (geneset_name in names(up_driving_genes)) {
-  genes = up_driving_genes[[geneset_name]]
-  scores = cell_line_bulk[genes,] %>% colMeans() %>% data.frame(row.names = names(.), score =.)
+pathways_to_check = c(names(up_driving_genes),"SASP","FRIDMAN_SENESCENCE_UP")
+for (geneset_name in pathways_to_check) {
+  genes = genesets[[geneset_name]] 
+  # genes = up_driving_genes[[geneset_name]] #for only driving genes
+  scores = cell_line_bulk[genes,] %>% na.omit %>% colMeans() %>% data.frame(row.names = names(.), score =.)
   scores = merge(x = scores,y = metadata,by = 0) %>% column_to_rownames("Row.names")
   scores$condition = factor(scores$condition,levels = c("Veh","Rox","osi_short","osi_short_roxa","osi_persistor","osi_persist_roxa"))
   fc_parental = mean(scores %>% filter(condition == "Rox") %>% pull(score)) /mean(scores %>% filter(condition == "Veh") %>% pull(score))
@@ -202,7 +243,7 @@ for (geneset_name in names(up_driving_genes)) {
   fc_dtp_vec = c(fc_dtp_vec,fc_dtp)
 
 }
-all_fc = data.frame(pathway = names(up_driving_genes),fc_dtp = fc_dtp_vec, fc_parental = fc_parental_vec )
+all_fc = data.frame(pathway = pathways_to_check,fc_dtp = fc_dtp_vec, fc_parental = fc_parental_vec )
 all_fc
 ```
 
@@ -215,15 +256,14 @@ fc_long <- all_fc %>%
     names_to = "group",
     values_to = "fold_change"
   )
-fc_long$pathway <- factor(fc_long$pathway, levels = names(up_driving_genes))
+fc_long$pathway <- factor(fc_long$pathway, levels = pathways_to_check)
 
 # Create the grouped bar plot with a dashed reference line
-ggplot(fc_long, aes(x = pathway, y = fold_change, fill = group)) +
+p = ggplot(fc_long, aes(x = pathway, y = fold_change, fill = group)) +
   geom_col(position = "dodge", color = "black") +
   # Add the dashed horizontal line at y = 1
   geom_hline(yintercept = 1, linetype = "dashed", color = "blue", linewidth = 0.8) +
   labs(
-    title = "Up in dtp FC",
     x = "Pathway",
     y = "Fold Change",
     fill = "Group"
@@ -232,8 +272,11 @@ ggplot(fc_long, aes(x = pathway, y = fold_change, fill = group)) +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1),
     plot.margin = unit(c(1, 1, 1, 2), "cm")  
+  ) 
+p + scale_x_discrete(limits = names(up_driving_genes)) + ggtitle("higher effect in DTP")
+p + scale_x_discrete(limits = c("SASP","FRIDMAN_SENESCENCE_UP")) + ggtitle("senescence pathways")
 
-  )
+
 ```
 ## down
 ```{r}
@@ -247,8 +290,9 @@ fc_parental_vec = c()
 fc_dtp_vec = c()
 
 for (geneset_name in names(down_driving_genes)) {
-  genes = down_driving_genes[[geneset_name]]
-  scores = cell_line_bulk[genes,] %>% colMeans() %>% data.frame(row.names = names(.), score =.)
+  # genes = down_driving_genes[[geneset_name]]
+  genes = genesets[[geneset_name]] 
+  scores = cell_line_bulk[genes,] %>% na.omit %>% colMeans() %>% data.frame(row.names = names(.), score =.)
   scores = merge(x = scores,y = metadata,by = 0) %>% column_to_rownames("Row.names")
   scores$condition = factor(scores$condition,levels = c("Veh","Rox","osi_short","osi_short_roxa","osi_persistor","osi_persist_roxa"))
   fc_parental = mean(scores %>% filter(condition == "Rox") %>% pull(score)) /mean(scores %>% filter(condition == "Veh") %>% pull(score))
