@@ -221,14 +221,19 @@ barplot_for_conditions <- function(data, signature, name) {
 
 
 ```{r}
+#HIF
 
 barplot_for_conditions(bulk_Mar25_TPM,signature = genesets$HIF_targets,name = "hif_targets")
+
+#senesence
+barplot_for_conditions(bulk_Mar25_TPM,signature = SASP_signature,name = "SASP_signature")
+barplot_for_conditions(bulk_Mar25_TPM,signature = FRIDMAN_SENESCENCE_UP,name = "FRIDMAN_SENESCENCE_UP")
+
+
 barplot_for_conditions(bulk_Mar25_TPM,signature = CORDENONSI_YAP,name = "CORDENONSI_YAP")
 barplot_for_conditions(bulk_Mar25_TPM,signature =go_smad,name = "go_SMAD_PROTEIN_SIGNAL")
 barplot_for_conditions(bulk_Mar25_TPM,signature =genesets$HALLMARK_EPITHELIAL_MESENCHYMAL_TRANSITION,name = "EMT")
-barplot_for_conditions(bulk_Mar25_TPM,signature = CORDENONSI_YAP,name = "CORDENONSI_YAP")
-barplot_for_conditions(bulk_Mar25_TPM,signature =go_smad,name = "go_SMAD_PROTEIN_SIGNAL")
-barplot_for_conditions(bulk_Mar25_TPM,signature =genesets$HALLMARK_EPITHELIAL_MESENCHYMAL_TRANSITION,name = "EMT")
+
 
 mek_activation = mek_activation[mek_activation %in% rownames(bulk_Mar25_TPM)]
 barplot_for_conditions(bulk_Mar25_TPM,signature =mek_activation,name = "mek_activation")
@@ -474,13 +479,29 @@ ggvenn::ggvenn(data = all_list)
 
 
 ```{r}
+greater_than = 2
 up_only_in_combo = up_in_combo[!up_in_combo %in% c(up_in_roxa)]
+up_only_in_combo = up_only_in_combo[diff_genes[up_only_in_combo,"cpVSop_FC"] /
+                                      diff_genes[up_only_in_combo,"roxaVSctrl_FC"] > greater_than] #need to be X times FC
+
 only_down_in_combo = down_in_combo[!down_in_combo %in% c(down_in_roxa)]
+only_down_in_combo = only_down_in_combo[diff_genes[only_down_in_combo,"cpVSop_FC"] /
+                                      diff_genes[only_down_in_combo,"roxaVSctrl_FC"] < 1/greater_than] #need to be X times FC
+
 only_up_in_roxa = up_in_roxa[!up_in_roxa %in% c(up_in_combo)]
+only_up_in_roxa = only_up_in_roxa[diff_genes[only_up_in_roxa,"roxaVSctrl_FC"] /
+                                      diff_genes[only_up_in_roxa,"cpVSop_FC"] > greater_than] #need to be X times FC
+
 only_down_in_roxa = down_in_roxa[!down_in_roxa %in%  c(down_in_combo)]
+only_down_in_roxa = only_down_in_roxa[diff_genes[only_down_in_roxa,"roxaVSctrl_FC"] /
+                                      diff_genes[only_down_in_roxa,"cpVSop_FC "] < 1/greater_than] #need to be X times FC
 
 HCC_uniqe_deg_list = list(up_only_in_combo,only_down_in_combo,only_up_in_roxa,only_down_in_roxa)
 names(HCC_uniqe_deg_list) = c("up_only_in_combo","only_down_in_combo","only_up_in_roxa","only_down_in_roxa")
+```
+
+```{r}
+HCC_uniqe_deg_list
 ```
 
 ```{r}
@@ -501,7 +522,6 @@ for (i in 1:length(HCC_uniqe_deg_list)) {
   }
 }
 
-all_fdr_df =all_fdr_df[,c("up_only_in_combo", "only_up_in_roxa", "only_down_in_combo", "only_down_in_roxa")]
 
 ```
 
@@ -509,23 +529,25 @@ all_fdr_df =all_fdr_df[,c("up_only_in_combo", "only_up_in_roxa", "only_down_in_c
 all_list = list(up_only_in_combo = up_only_in_combo, only_up_in_roxa =only_up_in_roxa, hif_targets =hif_targets)
 ggvenn::ggvenn(data = all_list)+ggtitle(params$cell_line)
 ```
+
 ```{r}
-# leading genes overlap
-combo_genes = hyp_obj_combo[["data"]][["up"]][["data"]] %>% filter(label == "HIF_targets") %>% pull(le) %>% strsplit(split = ",") %>% unlist()
-rox_genes = hyp_obj_rox[["data"]][["up"]][["data"]] %>% filter(label == "HIF_targets") %>% pull(le) %>% strsplit(split = ",") %>% unlist()
-ggvenn::ggvenn(data = list(combo_genes= combo_genes, rox_genes = rox_genes))
+# write
+df_from_list <- bind_rows(lapply(HCC_uniqe_deg_list, function(x) as.data.frame(t(x)))) %>% set_rownames(names(HCC_uniqe_deg_list)) %>% t()
 
-uniq_combo = combo_genes [!combo_genes %in% rox_genes]
-
-uniq_rox = rox_genes [!rox_genes %in% combo_genes]
-
+write.table(df_from_list,
+            file = paste0(params$data_out_dir, "one_threshold_exclusive_DEG_HCC.tsv"),
+            sep = "\t", row.names = FALSE, quote = FALSE)
 ```
 
+# FDR heatmap
 
 ```{r fig.height=10, fig.width=8}
 library(circlize)
 library(grid)
 library(ComplexHeatmap)
+all_fdr_df =all_fdr_df[,c("up_only_in_combo")]
+
+
 threshold <- -log10(0.05)  
 
 col_fun <- colorRamp2(
@@ -537,8 +559,8 @@ lgd <- Legend(
   title = "-log10(FDR)",
   col_fun = col_fun,
   direction = "vertical",
-  labels = c("0","-log10(0.05)",seq(from = 10, to = max(all_fdr_df), by = 10)),
-  at =c(-2,threshold,seq(from = 10, to = max(all_fdr_df), by = 10))
+  labels = c("0","-log10(0.05)",seq(from = threshold, to = max(all_fdr_df), by = 1)),
+  at =c(-2,threshold,seq(from = threshold, to = max(all_fdr_df), by = 1))
 )
 
 ht <- Heatmap(all_fdr_df,col = col_fun, row_names_gp = gpar(fontsize = 9),cluster_columns = F, show_heatmap_legend = FALSE, column_title= params$cell_line)
