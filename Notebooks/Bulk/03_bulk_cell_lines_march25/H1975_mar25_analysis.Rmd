@@ -481,7 +481,7 @@ ggvenn::ggvenn(data = all_list)
 
 
 ```{r}
-greater_than = 2
+greater_than = 1.5
 up_only_in_combo = up_in_combo[!up_in_combo %in% c(up_in_roxa)]
 up_only_in_combo = up_only_in_combo[diff_genes[up_only_in_combo,"cpVSop_FC"] /
                                       diff_genes[up_only_in_combo,"roxaVSctrl_FC"] > greater_than] #need to be X times FC
@@ -503,6 +503,7 @@ names(H1975_uniqe_deg_list) = c("up_only_in_combo","only_down_in_combo","only_up
 ```
 
 ```{r}
+cat("H1975 exclusive DEG\n\n")
 H1975_uniqe_deg_list
 ```
 
