@@ -244,7 +244,50 @@ barplot_for_conditions(bulk_Mar25_TPM,signature =c("NDRG1"),name = "EMT")
 
 
 ```
+# Heatmap
 
+```{r}
+
+all_genesets_tpm = list()
+
+for (pathway in names(genesets)) {
+  pathway_genes = genesets[[pathway]]
+  pathway_genes = pathway_genes[pathway_genes %in% rownames(bulk_Mar25_TPM)]
+  scores_df = bulk_Mar25_TPM[pathway_genes,] %>% colMeans() %>% data.frame(row.names = names(.), score =.)
+  scores_df = merge(x = scores_df,y = metadata,by = 0) %>% column_to_rownames("Row.names")
+  scores_df$condition = factor(scores_df$condition,levels = 
+                                 c("Veh","Rox","osi_short","osi_short_roxa","osi_persistor","osi_persist_roxa"))
+  summary_df <- scores_df %>%
+  group_by(condition) %>%
+  dplyr::summarise(
+    Mean_Score = mean(score),
+    SD_Score = sd(score),
+    N = n(),
+    SE_Score = SD_Score / sqrt(N)
+  )
+  means = summary_df$Mean_Score  %>% scale() %>% as.vector() %>% setNames(summary_df$condition)
+  all_genesets_tpm[[pathway]] = means
+}
+
+all_genesets_tpm_df = all_genesets_tpm %>% as.data.frame() %>% t()
+```
+
+```{r fig.height=11, fig.width=10}
+
+
+ht <- Heatmap(all_genesets_tpm_df, show_heatmap_legend = FALSE, column_title= params$cell_line,
+              column_order  = colnames(all_genesets_tpm_df))
+col_fun = colorRamp2(c(min(all_genesets_tpm_df), max(all_genesets_tpm_df)), c("blue", "red"))
+
+lgd <- Legend(
+  title = "TPM mean \nZ score",col_fun = col_fun)
+
+draw(ht, padding = unit(c(2, 2, 2, 75), "mm"))
+pushViewport(viewport(x=0.8, y=0.7, width=unit(4, "cm"), height=unit(6, "cm"), just=c("left","center")))
+draw(lgd,x = unit(2, "cm"), y = unit(9, "cm"))
+popViewport()
+
+```
 
 ## HIF per gene
 ```{r}
