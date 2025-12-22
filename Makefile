@@ -2,36 +2,36 @@
 
 .Phony: all
 
-all: xeno_preprocess patients_preprocess xeno_clustering patients_clustering patients_deg patients_run_sipsic patients_sipsic_analysis xenografts_deg xenografts_run_sipsic xeno_sipsic_analysis xeno_cnmf_preprocess xeno_cnmf_run calculate_programs models_programs_analysis bivona_preprocess patients_bivona_programs_calc patients_programs_analysis bivona_programs_analysis bulk_cell_lines_OSI bulk_mar25_HCC bulk_mar25_H1975 march25_all_analysis
+all: xeno_preprocess patients_preprocess xeno_clustering patients_clustering patients_deg patients_run_sipsic patients_sipsic_analysis xenografts_deg xenografts_run_sipsic xeno_sipsic_analysis xeno_cnmf_preprocess xeno_cnmf_run calculate_programs models_programs_analysis bivona_preprocess patients_bivona_programs_calc patients_programs_analysis bivona_programs_analysis bulk_cell_lines_OSI Bulk_preprocess Bulk_PCA Bulk_TPM_heatmap Bulk_GSVA
 
 # ============
 # xeno_preprocess
 # ============
 
-xeno_preprocess: ./Reports/xeno/00_preprocess/01_preprocess.html ./Reports/xeno/00_preprocess/xeno.qs
+xeno_preprocess: ./Reports/xeno/01_preprocess/01_preprocess.html ./Reports/xeno/01_preprocess/xeno.qs2
 	@echo  $@ is up to date
 
-./Reports/xeno/00_preprocess/01_preprocess.html ./Reports/xeno/00_preprocess/xeno.qs: ./Notebooks/xeno/00_preprocess.Rmd
+./Reports/xeno/01_preprocess/01_preprocess.html ./Reports/xeno/01_preprocess/xeno.qs2: ./Notebooks/xeno/01_preprocess.Rmd
 	Rscript render.R xeno_preprocess
 
 # ============
 # patients_preprocess
 # ============
 
-patients_preprocess: ./Reports/patients/00_preprocess/00_preprocess.html ./Reports/patients/00_preprocess/patients.qs
+patients_preprocess: ./Reports/patients/01_preprocess/01_preprocess.html ./Reports/patients/01_preprocess/patients.qs2
 	@echo  $@ is up to date
 
-./Reports/patients/00_preprocess/00_preprocess.html ./Reports/patients/00_preprocess/patients.qs: ./Notebooks/patients/00_preprocess.Rmd ./input_data/patients_raw/fc.txt.gz
+./Reports/patients/01_preprocess/01_preprocess.html ./Reports/patients/01_preprocess/patients.qs2: ./Notebooks/patients/01_preprocess.Rmd ./input_data/patients_raw/fc.txt.gz
 	Rscript render.R patients_preprocess
 
 # ============
 # xeno_clustering
 # ============
 
-xeno_clustering: ./Reports/xeno/001_clustering/001_clustering.html
+xeno_clustering: ./Reports/xeno/02_clustering/02_clustering.html
 	@echo  $@ is up to date
 
-./Reports/xeno/001_clustering/001_clustering.html: ./Notebooks/xeno/001_clustering.Rmd ./Reports/xeno/00_preprocess/xeno.qs
+./Reports/xeno/02_clustering/02_clustering.html: ./Notebooks/xeno/02_clustering.Rmd ./Reports/xeno/01_preprocess/xeno.qs2
 	Rscript render.R xeno_clustering
 
 # ============
@@ -41,7 +41,7 @@ xeno_clustering: ./Reports/xeno/001_clustering/001_clustering.html
 patients_clustering: ./Reports/patients/001_clustering/001_clustering.html
 	@echo  $@ is up to date
 
-./Reports/patients/001_clustering/001_clustering.html: ./Notebooks/patients/001_clustering.Rmd ./Reports/patients/00_preprocess/patients.qs
+./Reports/patients/001_clustering/001_clustering.html: ./Notebooks/patients/001_clustering.Rmd ./Reports/patients/01_preprocess/patients.qs2
 	Rscript render.R patients_clustering
 
 # ============
@@ -51,7 +51,7 @@ patients_clustering: ./Reports/patients/001_clustering/001_clustering.html
 patients_deg: ./Reports/patients/01_DEG/01_DEG.html
 	@echo  $@ is up to date
 
-./Reports/patients/01_DEG/01_DEG.html: ./Notebooks/patients/01_DEG.Rmd ./Reports/patients/00_preprocess/patients.qs ./input_data/HIF_targets_Lombardi_PMC9869179.txt ./input_data/h.all.v2023.2.Hs.symbols.gmt
+./Reports/patients/01_DEG/01_DEG.html: ./Notebooks/patients/01_DEG.Rmd ./Reports/patients/01_preprocess/patients.qs2 ./input_data/Pathways/pathways_from_papers/HIF_targets_Lombardi_PMC9869179.txt ./input_data/Pathways/h.all.v2025.1.Hs.symbols.gmt
 	Rscript render.R patients_deg
 
 # ============
@@ -61,7 +61,7 @@ patients_deg: ./Reports/patients/01_DEG/01_DEG.html
 patients_run_sipsic: ./Reports/patients/02_run_sipsic/02_run_sipsic.html ./Reports/patients/02_run_sipsic/patients_pathwayScoresMatrix.RDS
 	@echo  $@ is up to date
 
-./Reports/patients/02_run_sipsic/02_run_sipsic.html ./Reports/patients/02_run_sipsic/patients_pathwayScoresMatrix.RDS: ./Notebooks/patients/02_run_sipsic.Rmd ./Reports/patients/00_preprocess/patients.qs ./input_data/HIF_targets_Lombardi_PMC9869179.txt ./input_data/h.all.v2023.2.Hs.symbols.gmt
+./Reports/patients/02_run_sipsic/02_run_sipsic.html ./Reports/patients/02_run_sipsic/patients_pathwayScoresMatrix.RDS: ./Notebooks/patients/02_run_sipsic.Rmd ./Reports/patients/01_preprocess/patients.qs2 ./input_data/Pathways/pathways_from_papers/HIF_targets_Lombardi_PMC9869179.txt ./input_data/Pathways/h.all.v2025.1.Hs.symbols.gmt
 	Rscript render.R patients_run_sipsic
 
 # ============
@@ -71,17 +71,17 @@ patients_run_sipsic: ./Reports/patients/02_run_sipsic/02_run_sipsic.html ./Repor
 patients_sipsic_analysis: ./Reports/patients/03_sipsic_analysis/03_sipsic_analysis.html
 	@echo  $@ is up to date
 
-./Reports/patients/03_sipsic_analysis/03_sipsic_analysis.html: ./Notebooks/patients/03_sipsic_analysis.Rmd ./Reports/patients/00_preprocess/patients.qs ./Reports/patients/02_run_sipsic/patients_pathwayScoresMatrix.RDS
+./Reports/patients/03_sipsic_analysis/03_sipsic_analysis.html: ./Notebooks/patients/03_sipsic_analysis.Rmd ./Reports/patients/01_preprocess/patients.qs2 ./Reports/patients/02_run_sipsic/patients_pathwayScoresMatrix.RDS
 	Rscript render.R patients_sipsic_analysis
 
 # ============
 # xenografts_deg
 # ============
 
-xenografts_deg: ./Reports/xeno/01_DEG/01_DEG.html
+xenografts_deg: ./Reports/xeno/03_DEG/03_DEG.html
 	@echo  $@ is up to date
 
-./Reports/xeno/01_DEG/01_DEG.html: ./Notebooks/xeno/01_DEG.Rmd ./Reports/xeno/00_preprocess/xeno.qs ./input_data/HIF_targets_Lombardi_PMC9869179.txt ./input_data/h.all.v2023.2.Hs.symbols.gmt
+./Reports/xeno/03_DEG/03_DEG.html: ./Notebooks/xeno/03_DEG.Rmd ./Reports/xeno/01_preprocess/xeno.qs2 ./input_data/Pathways/pathways_from_papers/HIF_targets_Lombardi_PMC9869179.txt ./input_data/Pathways/h.all.v2025.1.Hs.symbols.gmt
 	Rscript render.R xenografts_deg
 
 # ============
@@ -91,7 +91,7 @@ xenografts_deg: ./Reports/xeno/01_DEG/01_DEG.html
 xenografts_run_sipsic: ./Reports/xeno/02_run_SiPSiC/02_run_SiPSiC.html ./Reports/xeno/02_run_SiPSiC/xeno_pathwayScoresMatrix.RDS
 	@echo  $@ is up to date
 
-./Reports/xeno/02_run_SiPSiC/02_run_SiPSiC.html ./Reports/xeno/02_run_SiPSiC/xeno_pathwayScoresMatrix.RDS: ./Notebooks/xeno/02_run_SiPSiC.Rmd ./Reports/xeno/00_preprocess/xeno.qs ./input_data/HIF_targets_Lombardi_PMC9869179.txt ./input_data/h.all.v2023.2.Hs.symbols.gmt
+./Reports/xeno/02_run_SiPSiC/02_run_SiPSiC.html ./Reports/xeno/02_run_SiPSiC/xeno_pathwayScoresMatrix.RDS: ./Notebooks/xeno/02_run_SiPSiC.Rmd ./Reports/xeno/01_preprocess/xeno.qs2 ./input_data/Pathways/pathways_from_papers/HIF_targets_Lombardi_PMC9869179.txt ./input_data/Pathways/h.all.v2025.1.Hs.symbols.gmt
 	Rscript render.R xenografts_run_sipsic
 
 # ============
@@ -101,7 +101,7 @@ xenografts_run_sipsic: ./Reports/xeno/02_run_SiPSiC/02_run_SiPSiC.html ./Reports
 xeno_sipsic_analysis: ./Reports/xeno/03_SiPSiC/03_SiPSiC.html ./Reports/xeno/03_SiPSiC/xeno_sipsic_hallmarks_logFC.tsv ./Reports/xeno/03_SiPSiC/xeno_sipsic_hallmarks_fdr_df.tsv
 	@echo  $@ is up to date
 
-./Reports/xeno/03_SiPSiC/03_SiPSiC.html ./Reports/xeno/03_SiPSiC/xeno_sipsic_hallmarks_logFC.tsv ./Reports/xeno/03_SiPSiC/xeno_sipsic_hallmarks_fdr_df.tsv: ./Notebooks/xeno/03_SiPSiC.Rmd ./Reports/xeno/00_preprocess/xeno.qs ./Reports/xeno/02_run_SiPSiC/xeno_pathwayScoresMatrix.RDS
+./Reports/xeno/03_SiPSiC/03_SiPSiC.html ./Reports/xeno/03_SiPSiC/xeno_sipsic_hallmarks_logFC.tsv ./Reports/xeno/03_SiPSiC/xeno_sipsic_hallmarks_fdr_df.tsv: ./Notebooks/xeno/03_SiPSiC.Rmd ./Reports/xeno/01_preprocess/xeno.qs2 ./Reports/xeno/02_run_SiPSiC/xeno_pathwayScoresMatrix.RDS
 	Rscript render.R xeno_sipsic_analysis
 
 # ============
@@ -111,7 +111,7 @@ xeno_sipsic_analysis: ./Reports/xeno/03_SiPSiC/03_SiPSiC.html ./Reports/xeno/03_
 xeno_cnmf_preprocess: ./Reports/xeno/04_cnmf/01_create_data_for_cnmf/01_create_data_for_cnmf.html ./Reports/xeno/04_cnmf/01_create_data_for_cnmf/xeno_counts_filtered.h5ad
 	@echo  $@ is up to date
 
-./Reports/xeno/04_cnmf/01_create_data_for_cnmf/01_create_data_for_cnmf.html ./Reports/xeno/04_cnmf/01_create_data_for_cnmf/xeno_counts_filtered.h5ad: ./Notebooks/xeno/04_cnmf/01_create_data_for_cnmf.Rmd ./Reports/xeno/00_preprocess/xeno.qs
+./Reports/xeno/04_cnmf/01_create_data_for_cnmf/01_create_data_for_cnmf.html ./Reports/xeno/04_cnmf/01_create_data_for_cnmf/xeno_counts_filtered.h5ad: ./Notebooks/xeno/04_cnmf/01_create_data_for_cnmf.Rmd ./Reports/xeno/01_preprocess/xeno.qs2
 	Rscript render.R xeno_cnmf_preprocess
 
 # ============
@@ -131,7 +131,7 @@ Reports/xeno/04_cnmf/02_run_cnmf_1.7/models_2Kvargenes_corrected_noTPM_cnmf_obj.
 calculate_programs: ./Reports/xeno/04_cnmf/04_calculate_programs/04_calculate_programs.html ./Reports/xeno/04_cnmf/04_calculate_programs/cell_usage_by_TPM.RDS ./Reports/xeno/04_cnmf/04_calculate_programs/gep_scores.RDS
 	@echo  $@ is up to date
 
-./Reports/xeno/04_cnmf/04_calculate_programs/04_calculate_programs.html ./Reports/xeno/04_cnmf/04_calculate_programs/cell_usage_by_TPM.RDS ./Reports/xeno/04_cnmf/04_calculate_programs/gep_scores.RDS: Notebooks/xeno/04_cnmf/04_calculate_programs.Rmd ./Reports/xeno/00_preprocess/xeno.qs Reports/xeno/04_cnmf/02_run_cnmf_1.7/models_2Kvargenes_corrected_noTPM_cnmf_obj.pckl ./input_data/h.all.v2023.2.Hs.symbols.gmt
+./Reports/xeno/04_cnmf/04_calculate_programs/04_calculate_programs.html ./Reports/xeno/04_cnmf/04_calculate_programs/cell_usage_by_TPM.RDS ./Reports/xeno/04_cnmf/04_calculate_programs/gep_scores.RDS: Notebooks/xeno/04_cnmf/04_calculate_programs.Rmd ./Reports/xeno/01_preprocess/xeno.qs2 Reports/xeno/04_cnmf/02_run_cnmf_1.7/models_2Kvargenes_corrected_noTPM_cnmf_obj.pckl ./input_data/Pathways/h.all.v2025.1.Hs.symbols.gmt
 	Rscript render.R calculate_programs
 
 # ============
@@ -141,7 +141,7 @@ calculate_programs: ./Reports/xeno/04_cnmf/04_calculate_programs/04_calculate_pr
 models_programs_analysis: ./Reports/xeno/04_cnmf/05_models_cnmf_analysis_k5/05_models_cnmf_analysis_k5.html
 	@echo  $@ is up to date
 
-./Reports/xeno/04_cnmf/05_models_cnmf_analysis_k5/05_models_cnmf_analysis_k5.html: ./Notebooks/xeno/04_cnmf/05_models_cnmf_analysis_k5.Rmd ./Reports/xeno/00_preprocess/xeno.qs ./Reports/xeno/04_cnmf/04_calculate_programs/cell_usage_by_TPM.RDS ./Reports/xeno/04_cnmf/04_calculate_programs/gep_scores.RDS ./input_data/HIF_targets_Lombardi_PMC9869179.txt ./input_data/h.all.v2023.2.Hs.symbols.gmt
+./Reports/xeno/04_cnmf/05_models_cnmf_analysis_k5/05_models_cnmf_analysis_k5.html: ./Notebooks/xeno/04_cnmf/05_models_cnmf_analysis_k5.Rmd ./Reports/xeno/01_preprocess/xeno.qs2 ./Reports/xeno/04_cnmf/04_calculate_programs/cell_usage_by_TPM.RDS ./Reports/xeno/04_cnmf/04_calculate_programs/gep_scores.RDS ./input_data/Pathways/pathways_from_papers/HIF_targets_Lombardi_PMC9869179.txt ./input_data/Pathways/h.all.v2025.1.Hs.symbols.gmt
 	Rscript render.R models_programs_analysis
 
 # ============
@@ -161,7 +161,7 @@ bivona_preprocess: ./Reports/Bivona/01_preprocess/01_preprocess.html ./Reports/B
 patients_bivona_programs_calc: ./Reports/patients/04_patients_cnmf_k5_from_xeno_calc/04_patients_cnmf_k5_from_xeno_calc.html ./Reports/patients/04_patients_cnmf_k5_from_xeno_calc/patients_cell_usage.RDS ./Reports/patients/04_patients_cnmf_k5_from_xeno_calc/bivona_cell_usage.RDS
 	@echo  $@ is up to date
 
-./Reports/patients/04_patients_cnmf_k5_from_xeno_calc/04_patients_cnmf_k5_from_xeno_calc.html ./Reports/patients/04_patients_cnmf_k5_from_xeno_calc/patients_cell_usage.RDS ./Reports/patients/04_patients_cnmf_k5_from_xeno_calc/bivona_cell_usage.RDS: ./Notebooks/patients/04_patients_cnmf_k5_from_xeno_calc.Rmd ./Reports/patients/00_preprocess/patients.qs ./Reports/Bivona/01_preprocess/bivona.qs ./Reports/xeno/04_cnmf/04_calculate_programs/gep_scores.RDS Reports/xeno/04_cnmf/02_run_cnmf_1.7/models_2Kvargenes_corrected_noTPM_cnmf_obj.pckl
+./Reports/patients/04_patients_cnmf_k5_from_xeno_calc/04_patients_cnmf_k5_from_xeno_calc.html ./Reports/patients/04_patients_cnmf_k5_from_xeno_calc/patients_cell_usage.RDS ./Reports/patients/04_patients_cnmf_k5_from_xeno_calc/bivona_cell_usage.RDS: ./Notebooks/patients/04_patients_cnmf_k5_from_xeno_calc.Rmd ./Reports/patients/01_preprocess/patients.qs2 ./Reports/Bivona/01_preprocess/bivona.qs ./Reports/xeno/04_cnmf/04_calculate_programs/gep_scores.RDS Reports/xeno/04_cnmf/02_run_cnmf_1.7/models_2Kvargenes_corrected_noTPM_cnmf_obj.pckl
 	Rscript render.R patients_bivona_programs_calc
 
 # ============
@@ -171,7 +171,7 @@ patients_bivona_programs_calc: ./Reports/patients/04_patients_cnmf_k5_from_xeno_
 patients_programs_analysis: ./Reports/patients/05_patients_cnmf_k5_from_xeno/05_patients_cnmf_k5_from_xeno.html
 	@echo  $@ is up to date
 
-./Reports/patients/05_patients_cnmf_k5_from_xeno/05_patients_cnmf_k5_from_xeno.html: ./Notebooks/patients/05_patients_cnmf_k5_from_xeno.Rmd ./Reports/patients/00_preprocess/patients.qs ./Reports/patients/04_patients_cnmf_k5_from_xeno_calc/patients_cell_usage.RDS ./input_data/h.all.v2023.2.Hs.symbols.gmt ./input_data/HIF_targets_Lombardi_PMC9869179.txt
+./Reports/patients/05_patients_cnmf_k5_from_xeno/05_patients_cnmf_k5_from_xeno.html: ./Notebooks/patients/05_patients_cnmf_k5_from_xeno.Rmd ./Reports/patients/01_preprocess/patients.qs2 ./Reports/patients/04_patients_cnmf_k5_from_xeno_calc/patients_cell_usage.RDS ./input_data/Pathways/h.all.v2025.1.Hs.symbols.gmt ./input_data/Pathways/pathways_from_papers/HIF_targets_Lombardi_PMC9869179.txt
 	Rscript render.R patients_programs_analysis
 
 # ============
@@ -181,7 +181,7 @@ patients_programs_analysis: ./Reports/patients/05_patients_cnmf_k5_from_xeno/05_
 bivona_programs_analysis: ./Reports/Bivona/02_bivona_cnmf_analysis/02_bivona_cnmf_analysis.html
 	@echo  $@ is up to date
 
-./Reports/Bivona/02_bivona_cnmf_analysis/02_bivona_cnmf_analysis.html: ./Notebooks/Bivona/02_bivona_cnmf_analysis.Rmd ./Reports/Bivona/01_preprocess/bivona.qs ./Reports/patients/04_patients_cnmf_k5_from_xeno_calc/bivona_cell_usage.RDS ./input_data/h.all.v2023.2.Hs.symbols.gmt ./input_data/HIF_targets_Lombardi_PMC9869179.txt
+./Reports/Bivona/02_bivona_cnmf_analysis/02_bivona_cnmf_analysis.html: ./Notebooks/Bivona/02_bivona_cnmf_analysis.Rmd ./Reports/Bivona/01_preprocess/bivona.qs ./Reports/patients/04_patients_cnmf_k5_from_xeno_calc/bivona_cell_usage.RDS ./input_data/Pathways/h.all.v2025.1.Hs.symbols.gmt ./input_data/Pathways/pathways_from_papers/HIF_targets_Lombardi_PMC9869179.txt
 	Rscript render.R bivona_programs_analysis
 
 # ============
@@ -191,35 +191,45 @@ bivona_programs_analysis: ./Reports/Bivona/02_bivona_cnmf_analysis/02_bivona_cnm
 bulk_cell_lines_OSI: ./Reports/Bulk/01_cell_lines_OSI/01_cell_lines_OSI.html
 	@echo  $@ is up to date
 
-./Reports/Bulk/01_cell_lines_OSI/01_cell_lines_OSI.html: ./Notebooks/Bulk/01_cell_lines_OSI.Rmd ./input_data/cell_lines/OSI_bulk/OSI_bulk_cell_lines_noMTGLKI_tpm.txt ./input_data/HIF_targets_Lombardi_PMC9869179.txt
+./Reports/Bulk/01_cell_lines_OSI/01_cell_lines_OSI.html: ./Notebooks/Bulk/01_cell_lines_OSI.Rmd ./input_data/cell_lines/OSI_bulk/OSI_bulk_cell_lines_noMTGLKI_tpm.txt ./input_data/Pathways/pathways_from_papers/HIF_targets_Lombardi_PMC9869179.txt
 	Rscript render.R bulk_cell_lines_OSI
 
 # ============
-# bulk_mar25_HCC
+# Bulk_preprocess
 # ============
 
-bulk_mar25_HCC: ./Reports/Bulk/03_bulk_cell_lines_march25/mar25_analysis_HCC/mar25_analysis_HCC.html ./Reports/Bulk/03_bulk_cell_lines_march25/mar25_analysis_HCC/HCC_comboVSosi_not_roxaVSctrl.txt
+Bulk_preprocess: ./Reports/Bulk/03_bulk_cell_lines_march25/01_preprocess/01_preprocess.html ./Reports/Bulk/03_bulk_cell_lines_march25/01_preprocess/bulk_Mar25_TPM_list.RDS ./Reports/Bulk/03_bulk_cell_lines_march25/01_preprocess/metadata_list.RDS
 	@echo  $@ is up to date
 
-./Reports/Bulk/03_bulk_cell_lines_march25/mar25_analysis_HCC/mar25_analysis_HCC.html ./Reports/Bulk/03_bulk_cell_lines_march25/mar25_analysis_HCC/HCC_comboVSosi_not_roxaVSctrl.txt: ./Notebooks/Bulk/03_bulk_cell_lines_march25/HCC_mar25_analysis.Rmd ./input_data/cell_lines/OSI_roxa_march25/Mar25_noMTGLKI_tpm.txt ./input_data/HIF_targets_Lombardi_PMC9869179.txt ./input_data/cell_lines/OSI_roxa_march25/RK_BIFSAMPLE.xlsx ./input_data/h.all.v2023.2.Hs.symbols.gmt ./input_data/pathways_from_papers/FRIDMAN_SENESCENCE_UP.v2024.1.Hs.gmt
-	Rscript render.R bulk_mar25_HCC
+./Reports/Bulk/03_bulk_cell_lines_march25/01_preprocess/01_preprocess.html ./Reports/Bulk/03_bulk_cell_lines_march25/01_preprocess/bulk_Mar25_TPM_list.RDS ./Reports/Bulk/03_bulk_cell_lines_march25/01_preprocess/metadata_list.RDS: ./Notebooks/Bulk/03_bulk_cell_lines_march25/01_preprocess.Rmd ./input_data/cell_lines/OSI_roxa_march25/Mar25_noMTGLKI_tpm.txt ./input_data/cell_lines/OSI_roxa_march25/RK_BIFSAMPLE.xlsx
+	Rscript render.R Bulk_preprocess
 
 # ============
-# bulk_mar25_H1975
+# Bulk_PCA
 # ============
 
-bulk_mar25_H1975: ./Reports/Bulk/03_bulk_cell_lines_march25/mar25_analysis_H1975/mar25_analysis_H1975.html ./Reports/Bulk/03_bulk_cell_lines_march25/mar25_analysis_H1975/H1975_comboVSosi_not_roxaVSctrl.txt
+Bulk_PCA: ./Reports/Bulk/03_bulk_cell_lines_march25/02_PCA/02_PCA.html
 	@echo  $@ is up to date
 
-./Reports/Bulk/03_bulk_cell_lines_march25/mar25_analysis_H1975/mar25_analysis_H1975.html ./Reports/Bulk/03_bulk_cell_lines_march25/mar25_analysis_H1975/H1975_comboVSosi_not_roxaVSctrl.txt: ./Notebooks/Bulk/03_bulk_cell_lines_march25/H1975_mar25_analysis.Rmd ./input_data/cell_lines/OSI_roxa_march25/Mar25_noMTGLKI_tpm.txt ./input_data/HIF_targets_Lombardi_PMC9869179.txt ./input_data/cell_lines/OSI_roxa_march25/RK_BIFSAMPLE.xlsx ./input_data/h.all.v2023.2.Hs.symbols.gmt ./input_data/pathways_from_papers/FRIDMAN_SENESCENCE_UP.v2024.1.Hs.gmt
-	Rscript render.R bulk_mar25_H1975
+./Reports/Bulk/03_bulk_cell_lines_march25/02_PCA/02_PCA.html: ./Notebooks/Bulk/03_bulk_cell_lines_march25/02_PCA.Rmd ./Reports/Bulk/03_bulk_cell_lines_march25/01_preprocess/bulk_Mar25_TPM_list.RDS ./Reports/Bulk/03_bulk_cell_lines_march25/01_preprocess/metadata_list.RDS
+	Rscript render.R Bulk_PCA
 
 # ============
-# march25_all_analysis
+# Bulk_TPM_heatmap
 # ============
 
-march25_all_analysis: ./Reports/Bulk/03_bulk_cell_lines_march25/all_cell_lines_analysis/all_cell_lines_analysis.html
+Bulk_TPM_heatmap: ./Reports/Bulk/03_bulk_cell_lines_march25/03_TPM_heatmap/03_TPM_heatmap.html
 	@echo  $@ is up to date
 
-./Reports/Bulk/03_bulk_cell_lines_march25/all_cell_lines_analysis/all_cell_lines_analysis.html: ./Notebooks/Bulk/03_bulk_cell_lines_march25/all_cell_lines_analysis.Rmd ./input_data/cell_lines/OSI_roxa_march25/Mar25_noMTGLKI_tpm.txt ./input_data/HIF_targets_Lombardi_PMC9869179.txt ./input_data/cell_lines/OSI_roxa_march25/RK_BIFSAMPLE.xlsx ./input_data/h.all.v2023.2.Hs.symbols.gmt ./Reports/Bulk/03_bulk_cell_lines_march25/mar25_analysis_HCC/HCC_comboVSosi_not_roxaVSctrl.txt ./Reports/Bulk/03_bulk_cell_lines_march25/mar25_analysis_H1975/H1975_comboVSosi_not_roxaVSctrl.txt ./input_data/pathways_from_papers/FRIDMAN_SENESCENCE_UP.v2024.1.Hs.gmt
-	Rscript render.R march25_all_analysis
+./Reports/Bulk/03_bulk_cell_lines_march25/03_TPM_heatmap/03_TPM_heatmap.html: ./Notebooks/Bulk/03_bulk_cell_lines_march25/03_TPM_heatmap.Rmd ./Reports/Bulk/03_bulk_cell_lines_march25/01_preprocess/bulk_Mar25_TPM_list.RDS ./Reports/Bulk/03_bulk_cell_lines_march25/01_preprocess/metadata_list.RDS ./input_data/Pathways/msigdb.v2025.1.Hs.symbols.RDS ./input_data/Pathways/h.all.v2025.1.Hs.symbols.gmt ./input_data/Pathways/pathways_from_papers/HIF_targets_Lombardi_PMC9869179.txt ./input_data/Pathways/SASP_genes.txt
+	Rscript render.R Bulk_TPM_heatmap
+
+# ============
+# Bulk_GSVA
+# ============
+
+Bulk_GSVA: ./Reports/Bulk/03_bulk_cell_lines_march25/04_GSVA/04_GSVA.html
+	@echo  $@ is up to date
+
+./Reports/Bulk/03_bulk_cell_lines_march25/04_GSVA/04_GSVA.html: ./Notebooks/Bulk/03_bulk_cell_lines_march25/04_GSVA.Rmd ./Reports/Bulk/03_bulk_cell_lines_march25/01_preprocess/bulk_Mar25_TPM_list.RDS ./Reports/Bulk/03_bulk_cell_lines_march25/01_preprocess/metadata_list.RDS ./input_data/Pathways/msigdb.v2025.1.Hs.symbols.RDS ./input_data/Pathways/h.all.v2025.1.Hs.symbols.gmt ./input_data/Pathways/pathways_from_papers/HIF_targets_Lombardi_PMC9869179.txt ./input_data/Pathways/SASP_genes.txt
+	Rscript render.R Bulk_GSVA
