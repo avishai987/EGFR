@@ -1,0 +1,117 @@
+---
+title: 'bulk RNA-seq PCA' 
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+output: 
+  html_document: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: TRUE
+    number_sections: true
+    toc_depth: 2
+    df_print: paged
+editor_options: 
+  chunk_output_type: inline
+params:
+  data_out_dir: "./temp_data/"
+---
+
+
+```{r}
+source("./pipe.R")
+input = pipeline$Bulk_PCA$input
+output = pipeline$Bulk_PCA$output
+```
+
+```{r}
+bulk_Mar25_TPM_list = readRDS(input$bulk_Mar25_TPM_list)
+metadata_list = readRDS(input$metadata_list)
+```
+
+```{r}
+suppressPackageStartupMessages(library(DESeq2))
+library(dplyr)
+library(ggplot2)
+library("ggfortify")
+library(pheatmap)
+```
+
+```{r}
+all_data = do.call(cbind, unname(bulk_Mar25_TPM_list))
+cell.labels = names(all_data)
+condition = str_extract(cell.labels, "HCC|H1975")
+metadata = data.frame(condition = condition, row.names = colnames(all_data))
+
+```
+
+# All cell lines PCA
+```{r}
+dds <- DESeqDataSetFromMatrix(countData = round(all_data),
+                              colData = metadata,
+                              design = ~condition)
+```
+## filtering
+```{r}
+nrow(dds)
+dds1 <- dds[ rowSums(counts(dds)) >= 3, ] # filter low count genes
+nrow(dds1)
+```
+
+## PCA
+```{r}
+vst = vst(dds1, blind=T, fitType  = "local") # variance stabilizing transformation
+```
+
+```{r}
+PCAdata <- prcomp(t(assay(vst)))
+autoplot(PCAdata, data = metadata,colour = "condition",label = FALSE, main="PCA") # Show dots
+```
+
+## Distance plot
+```{r fig.height=6}
+vsd <- vst(dds, blind=T)
+sampleDists <- dist(t(assay(vsd)), method = "euclidean")
+library("RColorBrewer")
+sampleDistMatrix <- as.matrix(sampleDists)
+colnames(sampleDistMatrix) <- NULL
+colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+p = pheatmap::pheatmap(sampleDistMatrix,
+         clustering_distance_rows=sampleDists,
+         clustering_distance_cols=sampleDists,
+         col=colors, main = "Sample euclidean distance Matrix")
+p
+```
+# Per cell line
+
+
+```{r}
+
+for (cell_line in names(bulk_Mar25_TPM_list)) {
+  
+  data = bulk_Mar25_TPM_list[[cell_line]]
+  metadata = metadata_list[[cell_line]]
+  
+  dds <- DESeqDataSetFromMatrix(countData = round(data),
+                                colData = metadata,
+                                design = ~condition)
+  # filtering
+  nrow(dds)
+  dds1 <- dds[ rowSums(counts(dds)) >= 3, ] # filter low count genes
+  nrow(dds1)
+  vst = vst(dds1, blind=T, fitType  = "local") # variance stabilizing transformation
+  
+  # plot PCA
+  PCAdata <- prcomp(t(assay(vst)))
+  p = autoplot(PCAdata, data = metadata,colour = "condition",label = FALSE, main=paste(cell_line,"PCA")) + 
+    scale_color_manual(values = rainbow(6)) 
+  print(p)
+}
+
+
+
+```
+
+
+

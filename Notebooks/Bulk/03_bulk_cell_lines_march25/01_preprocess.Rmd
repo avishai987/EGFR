@@ -1,0 +1,96 @@
+---
+title: 'bulk RNA-seq preprocess' 
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+output: 
+  html_document: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: TRUE
+    number_sections: true
+    toc_depth: 2
+    df_print: paged
+editor_options: 
+  chunk_output_type: inline
+params:
+  data_out_dir: "./temp_data/"
+---
+```{r}
+source("./pipe.R")
+input = pipeline$Bulk_preprocess$input
+output = pipeline$Bulk_preprocess$output
+```
+
+```{r}
+library(dplyr)
+```
+
+```{r}
+bulk_Mar25_raw = read.table(
+  file = input$rna_counts,
+  sep = "\t",
+  header = TRUE
+) %>% as.data.frame() 
+
+
+bulk_Mar25_TPM = bulk_Mar25_raw %>%   dplyr::select(!c("Geneid","Chr", "Start", "End", "Strand","Length")) #keep only counts
+rownames(bulk_Mar25_TPM) = make.unique(bulk_Mar25_TPM[,"gene_name",drop=T]) #set genes names
+bulk_Mar25_TPM  = bulk_Mar25_TPM %>% dplyr::select(!c("gene_name"))
+colnames(bulk_Mar25_TPM) = gsub(pattern = ".bam",replacement = "",x = colnames(bulk_Mar25_TPM))
+
+
+```
+
+```{r}
+#adjust sample names
+#read xlsx file
+library(readxl)
+sample_description = readxl::read_xlsx(input$sample_description, sheet = 1) %>% 
+  as.data.frame() 
+
+ sample_description = sample_description %>%  mutate(new_name = paste(sample_description$`Group Name\r\n(Required)`,c(1:3),sep = "_")) 
+
+
+bulk_Mar25_TPM = bulk_Mar25_TPM[,sample_description$`Sample Name`]
+colnames(bulk_Mar25_TPM) = sample_description$new_name
+colnames(bulk_Mar25_TPM)  = colnames(bulk_Mar25_TPM) %>%  
+  gsub(pattern = "_Osi_",replacement = "_osi_short_") %>% 
+  gsub(pattern = "_OsiRox_",replacement = "_osi_short_roxa_") %>% 
+  gsub(pattern = "_Per_",replacement = "_osi_persistor_") %>% 
+  gsub(pattern = "_PerRox_",replacement = "_osi_persist_roxa_") 
+
+
+```
+
+
+```{r}
+# get cell line
+bulk_Mar25_TPM_list = list(HCC827 = bulk_Mar25_TPM[,startsWith(colnames(bulk_Mar25_TPM),"HCC"),],
+                           H1975 = bulk_Mar25_TPM[,startsWith(colnames(bulk_Mar25_TPM),"H1975")])
+
+```
+
+```{r}
+
+metadata_list = list()
+
+for (cell_line in names(bulk_Mar25_TPM_list)){
+cell_line_bulk = bulk_Mar25_TPM_list[[cell_line]]
+# create metadata
+cell.labels = names(cell_line_bulk)
+condition = str_extract(cell.labels, "Veh|osi_short_[1-9]|Rox|osi_short_roxa|osi_persistor|osi_persist_roxa") %>% gsub(pattern = "_[1-9]",replacement = "")
+peristor = str_extract(cell.labels, "short|persist")
+metadata = data.frame(condition = condition, row.names = colnames(cell_line_bulk))
+metadata$condition = factor(metadata$condition,levels =
+c("Veh","Rox","osi_short","osi_short_roxa","osi_persistor","osi_persist_roxa"))
+metadata_list[[cell_line]] = metadata
+}
+
+saveRDS(bulk_Mar25_TPM_list, file = params$data_out_dir %s+%  basename(output$bulk_Mar25_TPM_list))
+saveRDS(metadata_list, file = params$data_out_dir %s+%  basename(output$metadata_list))
+```
+
+
+

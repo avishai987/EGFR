@@ -1,43 +1,47 @@
 library(magrittr)
 library(stringr)
+library(stringi)
+
 # env path:
 cnmf_conda_env_path = "/sci/labs/yotamd/lab_share/avishai.wizel/python_envs/miniconda/envs/cnmf_1.7"
 
 #input data:
 patients_count_matrix = "./input_data/patients_raw/fc.txt.gz"
-hif_targets= "./input_data/HIF_targets_Lombardi_PMC9869179.txt"
-msigDB_hallmarks = "./input_data/h.all.v2023.2.Hs.symbols.gmt"
-
+xeno_counts_dir = "./input_data/xeno_raw/"
+hif_targets= "./input_data/Pathways/pathways_from_papers/HIF_targets_Lombardi_PMC9869179.txt"
+msigDB_hallmarks = "./input_data/Pathways/h.all.v2025.1.Hs.symbols.gmt"
+msigdb = "./input_data/Pathways/msigdb.v2025.1.Hs.symbols.RDS"
 pipeline = list()
 ####################################### Preprocess ####################################################
 
 pipeline[["xeno_preprocess"]] = list(
   input = list(
-    script = "./Notebooks/xeno/00_preprocess.Rmd"
+    script = "./Notebooks/xeno/01_preprocess.Rmd"
   ),
   output = list(
-    report ="./Reports/xeno/00_preprocess/01_preprocess.html",
-    xeno = "./Reports/xeno/00_preprocess/xeno.qs")
+    report ="./Reports/xeno/01_preprocess/01_preprocess.html",
+    xeno = "./Reports/xeno/01_preprocess/xeno.qs2"),
+  params = list(xeno_counts_dir= xeno_counts_dir)
 )
 
 pipeline[["patients_preprocess"]] = list(
   input = list(
-    script = "./Notebooks/patients/00_preprocess.Rmd",
+    script = "./Notebooks/patients/01_preprocess.Rmd",
     count_matrix = patients_count_matrix
   ),
   output = list(
-    report ="./Reports/patients/00_preprocess/00_preprocess.html",
-    patients = "./Reports/patients/00_preprocess/patients.qs")
+    report ="./Reports/patients/01_preprocess/01_preprocess.html",
+    patients = "./Reports/patients/01_preprocess/patients.qs2")
 )
 
 ####################################### Clustering ####################################################
 pipeline[["xeno_clustering"]] = list(
   input = list(
-    script = "./Notebooks/xeno/001_clustering.Rmd",
+    script = "./Notebooks/xeno/02_clustering.Rmd",
     xeno =  pipeline$xeno_preprocess$output$xeno
   ),
   output = list(
-    report ="./Reports/xeno/001_clustering/001_clustering.html"
+    report ="./Reports/xeno/02_clustering/02_clustering.html"
     )
 )
 
@@ -94,13 +98,13 @@ pipeline[["patients_sipsic_analysis"]] = list(
 ####################################### Xenogratfs DEG & SIPSIC ####################################################
 pipeline[["xenografts_deg"]] = list(
   input = list(
-    script = "./Notebooks/xeno/01_DEG.Rmd",
+    script = "./Notebooks/xeno/03_DEG.Rmd",
     xeno =  pipeline$xeno_preprocess$output$xeno,
     hif_targets= hif_targets,
     genesets = msigDB_hallmarks
   ),
   output = list(
-    report ="./Reports/xeno/01_DEG/01_DEG.html"
+    report ="./Reports/xeno/03_DEG/03_DEG.html"
   )
 )
 
@@ -134,7 +138,7 @@ pipeline[["xeno_sipsic_analysis"]] = list(
 # pipeline[["xeno_sipsic_known_pathways"]] = list(
 #   input = list(
 #     script = "./Notebooks/xeno/06_known_pathways.Rmd",
-#     xeno = "./Reports/xeno/00_preprocess/xeno.qs",
+#     xeno = "./Reports/xeno/01_preprocess/xeno.qs",
 #     hallmarks_logFC_df = pipeline$xeno_sipsic_analysis$output$logFC_df,
 #     hallmarks_fdr_df = pipeline$xeno_sipsic_analysis$output$fdr_df,
 #     kurppa = "./input_data/pathways_from_papers/Kurppa_PMC7146079_table_s1_YAP signature.xlsx",
@@ -296,55 +300,112 @@ pipeline[["bulk_cell_lines_OSI"]] = list(
 ####################################### Bulk cell lines - OSI+ROXA March 25 ####################################################
 
 
-pipeline[["bulk_mar25_HCC"]] = list(
+pipeline[["Bulk_preprocess"]] = list(
   input = list(
-    script = "./Notebooks/Bulk/03_bulk_cell_lines_march25/HCC_mar25_analysis.Rmd",
+    script = "./Notebooks/Bulk/03_bulk_cell_lines_march25/01_preprocess.Rmd",
     rna_counts =  "./input_data/cell_lines/OSI_roxa_march25/Mar25_noMTGLKI_tpm.txt",
-    hif_targets= hif_targets,
-    sample_description = "./input_data/cell_lines/OSI_roxa_march25/RK_BIFSAMPLE.xlsx",
-    genesets =msigDB_hallmarks,
-    SENESCENCE = "./input_data/pathways_from_papers/FRIDMAN_SENESCENCE_UP.v2024.1.Hs.gmt"
+    sample_description = "./input_data/cell_lines/OSI_roxa_march25/RK_BIFSAMPLE.xlsx"
   ),
   output = list(
-    report ="./Reports/Bulk/03_bulk_cell_lines_march25/mar25_analysis_HCC/mar25_analysis_HCC.html",
-    up_in_persistors= "./Reports/Bulk/03_bulk_cell_lines_march25/mar25_analysis_HCC/HCC_comboVSosi_not_roxaVSctrl.txt"
+    report = "./Reports/Bulk/03_bulk_cell_lines_march25/01_preprocess/01_preprocess.html",
+    bulk_Mar25_TPM_list = "./Reports/Bulk/03_bulk_cell_lines_march25/01_preprocess/bulk_Mar25_TPM_list.RDS",
+    metadata_list = "./Reports/Bulk/03_bulk_cell_lines_march25/01_preprocess/metadata_list.RDS"
   )
 )
 
 
-pipeline[["bulk_mar25_H1975"]] = list(
+pipeline[["Bulk_PCA"]] = list(
   input = list(
-    script = "./Notebooks/Bulk/03_bulk_cell_lines_march25/H1975_mar25_analysis.Rmd",
-    rna_counts =  "./input_data/cell_lines/OSI_roxa_march25/Mar25_noMTGLKI_tpm.txt",
-    hif_targets= hif_targets,
-    sample_description = "./input_data/cell_lines/OSI_roxa_march25/RK_BIFSAMPLE.xlsx",
-    genesets =msigDB_hallmarks,
-    SENESCENCE = "./input_data/pathways_from_papers/FRIDMAN_SENESCENCE_UP.v2024.1.Hs.gmt"
+    script = "./Notebooks/Bulk/03_bulk_cell_lines_march25/02_PCA.Rmd",
+    bulk_Mar25_TPM_list = pipeline$Bulk_preprocess$output$bulk_Mar25_TPM_list,
+    metadata_list = pipeline$Bulk_preprocess$output$metadata_list
   ),
   output = list(
-    report ="./Reports/Bulk/03_bulk_cell_lines_march25/mar25_analysis_H1975/mar25_analysis_H1975.html",
-    up_in_persistors= "./Reports/Bulk/03_bulk_cell_lines_march25/mar25_analysis_H1975/H1975_comboVSosi_not_roxaVSctrl.txt"
-    
+    report = "./Reports/Bulk/03_bulk_cell_lines_march25/02_PCA/02_PCA.html"
   )
 )
 
-pipeline[["march25_all_analysis"]] = list(
+pipeline[["Bulk_TPM_heatmap"]] = list(
   input = list(
-    script = "./Notebooks/Bulk/03_bulk_cell_lines_march25/all_cell_lines_analysis.Rmd",
-    rna_counts =  "./input_data/cell_lines/OSI_roxa_march25/Mar25_noMTGLKI_tpm.txt",
-    hif_targets= hif_targets,
-    sample_description = "./input_data/cell_lines/OSI_roxa_march25/RK_BIFSAMPLE.xlsx",
-    genesets =msigDB_hallmarks,
-    up_in_persistors_HCC = pipeline$bulk_mar25_HCC$output$up_in_persistors,
-    up_in_persistors_H1975 = pipeline$bulk_mar25_H1975$output$up_in_persistors,
-    SENESCENCE = "./input_data/pathways_from_papers/FRIDMAN_SENESCENCE_UP.v2024.1.Hs.gmt"
-    
+    script = "./Notebooks/Bulk/03_bulk_cell_lines_march25/03_TPM_heatmap.Rmd",
+    bulk_Mar25_TPM_list = pipeline$Bulk_preprocess$output$bulk_Mar25_TPM_list,
+    metadata_list = pipeline$Bulk_preprocess$output$metadata_list,
+    msigdb = msigdb,
+    msigDB_hallmarks = msigDB_hallmarks,
+    hif_targets = hif_targets,
+    SASP_genes = "./input_data/Pathways/SASP_genes.txt"
   ),
   output = list(
-    report ="./Reports/Bulk/03_bulk_cell_lines_march25/all_cell_lines_analysis/all_cell_lines_analysis.html"
+    report = "./Reports/Bulk/03_bulk_cell_lines_march25/03_TPM_heatmap/03_TPM_heatmap.html"
   )
 )
 
+pipeline[["Bulk_GSVA"]] = list(
+  input = list(
+    script = "./Notebooks/Bulk/03_bulk_cell_lines_march25/04_GSVA.Rmd",
+    bulk_Mar25_TPM_list = pipeline$Bulk_preprocess$output$bulk_Mar25_TPM_list,
+    metadata_list = pipeline$Bulk_preprocess$output$metadata_list,
+    msigdb = msigdb,
+    msigDB_hallmarks = msigDB_hallmarks,
+    hif_targets = hif_targets,
+    SASP_genes = "./input_data/Pathways/SASP_genes.txt"
+  ),
+  output = list(
+    report = "./Reports/Bulk/03_bulk_cell_lines_march25/04_GSVA/04_GSVA.html"
+  )
+)
+
+
+# 
+# pipeline[["bulk_mar25_HCC"]] = list(
+#   input = list(
+#     script = "./Notebooks/Bulk/03_bulk_cell_lines_march25/HCC_mar25_analysis.Rmd",
+#     rna_counts =  "./input_data/cell_lines/OSI_roxa_march25/Mar25_noMTGLKI_tpm.txt",
+#     hif_targets= hif_targets,
+#     sample_description = "./input_data/cell_lines/OSI_roxa_march25/RK_BIFSAMPLE.xlsx",
+#     genesets =msigDB_hallmarks,
+#     SENESCENCE = "./input_data/pathways_from_papers/FRIDMAN_SENESCENCE_UP.v2024.1.Hs.gmt"
+#   ),
+#   output = list(
+#     report ="./Reports/Bulk/03_bulk_cell_lines_march25/mar25_analysis_HCC/mar25_analysis_HCC.html",
+#     up_in_persistors= "./Reports/Bulk/03_bulk_cell_lines_march25/mar25_analysis_HCC/HCC_comboVSosi_not_roxaVSctrl.txt"
+#   )
+# )
+# 
+# 
+# pipeline[["bulk_mar25_H1975"]] = list(
+#   input = list(
+#     script = "./Notebooks/Bulk/03_bulk_cell_lines_march25/H1975_mar25_analysis.Rmd",
+#     rna_counts =  "./input_data/cell_lines/OSI_roxa_march25/Mar25_noMTGLKI_tpm.txt",
+#     hif_targets= hif_targets,
+#     sample_description = "./input_data/cell_lines/OSI_roxa_march25/RK_BIFSAMPLE.xlsx",
+#     genesets =msigDB_hallmarks,
+#     SENESCENCE = "./input_data/pathways_from_papers/FRIDMAN_SENESCENCE_UP.v2024.1.Hs.gmt"
+#   ),
+#   output = list(
+#     report ="./Reports/Bulk/03_bulk_cell_lines_march25/mar25_analysis_H1975/mar25_analysis_H1975.html",
+#     up_in_persistors= "./Reports/Bulk/03_bulk_cell_lines_march25/mar25_analysis_H1975/H1975_comboVSosi_not_roxaVSctrl.txt"
+#     
+#   )
+# )
+# 
+# pipeline[["march25_all_analysis"]] = list(
+#   input = list(
+#     script = "./Notebooks/Bulk/03_bulk_cell_lines_march25/all_cell_lines_analysis.Rmd",
+#     rna_counts =  "./input_data/cell_lines/OSI_roxa_march25/Mar25_noMTGLKI_tpm.txt",
+#     hif_targets= hif_targets,
+#     sample_description = "./input_data/cell_lines/OSI_roxa_march25/RK_BIFSAMPLE.xlsx",
+#     genesets =msigDB_hallmarks,
+#     up_in_persistors_HCC = pipeline$bulk_mar25_HCC$output$up_in_persistors,
+#     up_in_persistors_H1975 = pipeline$bulk_mar25_H1975$output$up_in_persistors,
+#     SENESCENCE = "./input_data/pathways_from_papers/FRIDMAN_SENESCENCE_UP.v2024.1.Hs.gmt"
+#     
+#   ),
+#   output = list(
+#     report ="./Reports/Bulk/03_bulk_cell_lines_march25/all_cell_lines_analysis/all_cell_lines_analysis.html"
+#   )
+# )
+# 
 
 
 
