@@ -37,6 +37,10 @@ output = pipeline$xeno_sipsic_analysis$output
 # Functions
 
 ```{r}
+library(qs2)
+library(Seurat)
+library(ggplot2)
+library(dplyr)
 library(stringi)
 library(reticulate)
 library(ggplotify)
@@ -52,7 +56,7 @@ source_from_github(repositoy = "sc_general_functions",version = "0.1.35",script_
 
 
 ```{r}
-xeno <- qs::qread(input$xeno)
+xeno <- qs_read(input$xeno)
 ```
 
 
@@ -394,115 +398,6 @@ for (patient_name in c("1109","1071")) {
   print(p2)
 }
 
-```
-
-# Ternary plot
-
-## OSI cells
-```{r}
-# Description
-library(ggtern)
-p_list = list()
-
-for (patient_name in unique(xeno$orig.ident)) {
-  patient_data = subset(xeno,subset = orig.ident == patient_name)
-  pathways_names = c(
-    "HALLMARK-INTERFERON-ALPHA-RESPONSE",
-    "HALLMARK-TNFA-SIGNALING-VIA-NFKB",
-    "HALLMARK-HYPOXIA"
-  )
-  
-  DefaultAssay(patient_data) = "sipsic"
-  data = FetchData(object = patient_data, vars = c(pathways_names))
-  data[] <- data %>%
-    mutate(across(everything(), ~ as.numeric(min_max_normalize(.))))  # scale per pathway
-  data = data[colnames(patient_data)[patient_data$treatment == "OSI"],]
-  # data = apply(data, MARGIN = 2, min_max_normalize) %>% as.data.frame()
-  
-  colnames(data) = c("IFNa","TNFa_NFKb","HIF")
-  
-
-  p = ggtern(data,ggtern::aes(IFNa,TNFa_NFKb,HIF)) +geom_point()+
-  ggtitle(paste("Model",patient_name))+
-  theme_tropical(base_size=14)
-  
-
-  p_list[[patient_name]] = p
-
-}
-p_list
-```
-
-## NT vs OSI
-```{r}
-# Description
-library(ggtern)
-p_list = list()
-
-for (patient_name in unique(xeno$orig.ident)) {
-  # patient_name = "119"
-  patient_data = subset(xeno,subset = orig.ident == patient_name)
-  pathways_names = c(
-    "HALLMARK-INTERFERON-ALPHA-RESPONSE",
-    "HALLMARK-TNFA-SIGNALING-VIA-NFKB",
-    "HALLMARK-HYPOXIA"
-  )
-  patient_data = patient_data[,colnames(patient_data)[! patient_data$treatment == "res"]]
-
-  DefaultAssay(patient_data) = "sipsic"
-  data = FetchData(object = patient_data, vars = c(pathways_names))
-
-  data[] <- data %>%
-    mutate(across(everything(), ~ as.numeric(min_max_normalize(.))))  # scale per pathway
-
-# Function to normalize a row
-normalize_row <- function(row) {
-  return(row / sum(row))  # Divide each element by the sum of the row
-}
-
-# Normalize each row in the DataFrame
-normalized_df <- as.data.frame(t(apply(data, 1, normalize_row)))
-
-
-
-data$treatment = patient_data$treatment
-colnames(data) = c("IFNa","TNFa_NFKb","HIF","treatment")
-  
-# 
-  p = ggtern(data,ggtern::aes(IFNa,TNFa_NFKb,HIF)) +
-# geom_point(ggtern::aes(fill=treatment,color=treatment),alpha = 0.5) +
-scale_shape_manual(values=c(21,22),breaks = c("OSI"))+
-    ggtitle(paste("Model",patient_name))+
-  theme_tropical(base_size=14) +
- stat_density_tern(geom='DensityTern',ggtern::aes(color=treatment,alpha = 0.6))
-
-#      p = ggtern(data,ggtern::aes(IFNa,TNFa_NFKb,HIF)) +
-# # geom_point(ggtern::aes(fill=treatment,color=treatment),alpha = 0.5) +
-# scale_shape_manual(values=c(21,22),breaks = c("OSI"))+
-#     ggtitle(paste("Model",patient_name))+
-#   theme_tropical(base_size=14) +
-#  stat_density_tern(geom='polygon',ggtern::aes(fill=treatment,alpha=..level..))
-# 
-
-#      p = ggtern(data,ggtern::aes(IFNa,TNFa_NFKb,HIF)) +
-# scale_shape_manual(values=c(21,22),breaks = c("OSI"))+
-#     ggtitle(paste("Model",patient_name))+
-#   theme_tropical(base_size=14) +
-#  stat_density_tern(geom='polygon',ggtern::aes(fill=treatment,alpha = 0.5))
-
-
-  p_list[[patient_name]] = p
-
-}
-p_list
-```
-
-
-
-## plot grid
-```{r fig.height=12, fig.width=16}
-# plot
-do.call(ggtern::grid.arrange,args = c( p_list,ncol=3))
 ```
 
 

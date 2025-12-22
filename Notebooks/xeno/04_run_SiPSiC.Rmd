@@ -39,12 +39,16 @@ output = pipeline$xenografts_run_sipsic$output
 # Functions
 
 ```{r}
+library(qs2)
+library(Seurat)
+library(ggplot2)
+library(dplyr)
 library(stringi)
 library(reticulate)
 library(ggplotify)
 suppressPackageStartupMessages(library(GSEABase))
 library(SiPSiC)
-source_from_github(repositoy = "DEG_functions",version = "0.2.47")
+source_from_github(repositoy = "DEG_functions",version = "0.2.59")
 source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_name = "functions.R")
 
 
@@ -54,7 +58,7 @@ source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_
 
 
 ```{r}
-xeno <- qs::qread(input$xeno)
+xeno <- qs_read(input$xeno)
 hallmark_genesets = getGmt(paste0(input$genesets))
 hif_targets = scan(input$hif_targets, character(), quote = "")
 # add hif targets to genesets

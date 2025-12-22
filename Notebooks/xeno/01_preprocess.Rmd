@@ -19,6 +19,7 @@ params:
 source("./pipe.R")
 input = pipeline$xeno_preprocess$input
 output = pipeline$xeno_preprocess$output
+script_params = pipeline$xeno_preprocess$params
 ```
 
 
@@ -26,35 +27,37 @@ output = pipeline$xeno_preprocess$output
 library(Seurat)
 library("dplyr")
 library("ggplot2")
+library(qs2)
+
 ```
 
 ```{r}
-xeno_119.data <- Read10X(data.dir = "./input_data/xeno_raw/119-1_filtered_feature_bc_matrix")
+xeno_119.data <- Read10X(data.dir = script_params $xeno_counts_dir %s+% "119-1_filtered_feature_bc_matrix/")
 xeno_119 <- CreateSeuratObject(counts = xeno_119.data, project = "119")
 percent.mt <- PercentageFeatureSet(xeno_119, pattern = "^MT-")
 xeno_119[["percent.mt"]] <- percent.mt
 
-xeno_PC9.data <- Read10X(data.dir = "./input_data/xeno_raw/PC9_filtered_feature_bc_matrix")
+xeno_PC9.data <- Read10X(data.dir = script_params $xeno_counts_dir %s+% "PC9_filtered_feature_bc_matrix")
 xeno_PC9 <- CreateSeuratObject(counts = xeno_PC9.data, project = "PC9")
 percent.mt <- PercentageFeatureSet(xeno_PC9, pattern = "^MT-")
 xeno_PC9[["percent.mt"]] <- percent.mt
 
-xeno_1109.data <- Read10X(data.dir = "./input_data/xeno_raw/1109-1_filtered_feature_bc_matrix")
+xeno_1109.data <- Read10X(data.dir = script_params$xeno_counts_dir %s+% "1109-1_filtered_feature_bc_matrix")
 xeno_1109 <- CreateSeuratObject(counts = xeno_1109.data, project = "1109")
 percent.mt <- PercentageFeatureSet(xeno_1109, pattern = "^MT-")
 xeno_1109[["percent.mt"]] <- percent.mt
 
-xeno_1071.data <- Read10X(data.dir = "./input_data/xeno_raw/1071-1_filtered_feature_bc_matrix")
+xeno_1071.data <- Read10X(data.dir = script_params$xeno_counts_dir %s+% "1071-1_filtered_feature_bc_matrix")
 xeno_1071 <- CreateSeuratObject(counts = xeno_1071.data, project = "1071")
 percent.mt <- PercentageFeatureSet(xeno_1071, pattern = "^MT-")
 xeno_1071[["percent.mt"]] <- percent.mt
 
-xeno_1157.data <- Read10X(data.dir = "./input_data/xeno_raw/1157-1_filtered_feature_bc_matrix")
+xeno_1157.data <- Read10X(data.dir = script_params$xeno_counts_dir %s+% "1157-1_filtered_feature_bc_matrix")
 xeno_1157 <- CreateSeuratObject(counts = xeno_1157.data, project = "1157")
 percent.mt <- PercentageFeatureSet(xeno_1157, pattern = "^MT-")
 xeno_1157[["percent.mt"]] <- percent.mt
 
-xeno_1068.data <- Read10X(data.dir = "./input_data/xeno_raw/1068-2_filtered_feature_bc_matrix")
+xeno_1068.data <- Read10X(data.dir = script_params$xeno_counts_dir %s+% "1068-2_filtered_feature_bc_matrix")
 xeno_1068 <- CreateSeuratObject(counts = xeno_1068.data, project = "1068")
 percent.mt <- PercentageFeatureSet(xeno_1068, pattern = "^MT-")
 xeno_1068[["percent.mt"]] <- percent.mt
@@ -90,7 +93,7 @@ elbowplot
 ```{r}
 xeno.big <- FindNeighbors(xeno.big, dims = 1:25)
 xeno.big <- FindClusters(xeno.big, resolution = .5)
-xeno.big <- RunUMAP(xeno.big, dims = 1:25)
+xeno.big <- RunUMAP(xeno.big, dims = 1:25,set.op.mix.ratio = 0.5, local.connectivity = 1.5)
 lung_umap <- DimPlot(object = xeno.big, reduction = "umap", pt.size = 0.1, label = F)
 lung_umap
 ```
@@ -129,7 +132,6 @@ xeno.big <- AddMetaData(object = xeno.big, metadata = xeno.big$orig.ident, col.n
 ```
 
 ```{r}
-library(qs)
-qsave(xeno.big, params$data_out_dir %s+% basename(output$xeno))
+qs_save(xeno.big, params$data_out_dir %s+% basename(output$xeno))
 ```
 

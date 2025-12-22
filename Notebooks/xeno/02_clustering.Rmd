@@ -1,5 +1,8 @@
 ---
 title: "R Notebook"
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+
 output:
   html_document: 
     code_folding: hide
@@ -22,7 +25,13 @@ output = pipeline$xeno_clustering$output
 ```
 
 ```{r}
-xeno <- qs::qread(input$xeno)
+library(Seurat)
+library(qs2)
+library(ggplot2)
+```
+
+```{r}
+xeno <- qs_read(input$xeno)
 
 ```
 
