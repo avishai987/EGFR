@@ -1,0 +1,137 @@
+─ Session info ───────────────────────────────────────────────────────────────────────────────────────────────────
+ setting  value
+ version  R version 4.3.3 (2024-02-29)
+ os       CS HUJI Debian GNU/Linux 12 (bookworm) 5786
+ system   x86_64, linux-gnu
+ ui       X11
+ language en_US:en_GB:en
+ collate  en_IL.UTF-8
+ ctype    en_IL.UTF-8
+ tz       Asia/Jerusalem
+ date     2025-12-22
+ pandoc   2.19.2 @ /sci/labs/yotamd/lab_share/avishai.wizel/python_envs/miniconda/envs/EGFR/bin/ (via rmarkdown)
+ quarto   NA
+
+─ Packages ───────────────────────────────────────────────────────────────────────────────────────────────────────
+ package              * version   date (UTC) lib source
+ abind                  1.4-5     2016-07-21 [1] CRAN (R 4.3.3)
+ annotate             * 1.80.0    2023-10-24 [1] Bioconductor
+ AnnotationDbi        * 1.64.1    2023-11-03 [1] Bioconductor
+ beachmat               2.18.0    2023-10-24 [1] Bioconductor
+ Biobase              * 2.62.0    2023-10-24 [1] Bioconductor
+ BiocGenerics         * 0.48.1    2023-11-01 [1] Bioconductor
+ BiocParallel           1.36.0    2023-10-24 [1] Bioconductor
+ BiocSingular           1.18.0    2023-10-24 [1] Bioconductor
+ Biostrings             2.70.1    2023-10-25 [1] Bioconductor
+ bit                    4.6.0     2025-03-06 [1] CRAN (R 4.3.3)
+ bit64                  4.6.0-1   2025-01-16 [1] CRAN (R 4.3.3)
+ bitops                 1.0-9     2024-10-03 [1] CRAN (R 4.3.3)
+ blob                   1.2.4     2023-03-17 [1] CRAN (R 4.3.3)
+ bslib                  0.9.0     2025-01-30 [1] CRAN (R 4.3.3)
+ cachem                 1.1.0     2024-05-16 [1] CRAN (R 4.3.3)
+ Cairo                  1.6-5     2025-08-20 [1] CRAN (R 4.3.3)
+ circlize             * 0.4.16    2024-02-20 [1] CRAN (R 4.3.3)
+ cli                    3.6.5     2025-04-23 [1] CRAN (R 4.3.3)
+ clue                   0.3-66    2024-11-13 [1] CRAN (R 4.3.3)
+ cluster                2.1.8.1   2025-03-12 [1] CRAN (R 4.3.3)
+ codetools              0.2-20    2024-03-31 [1] CRAN (R 4.3.3)
+ colorspace             2.1-1     2024-07-26 [1] CRAN (R 4.3.3)
+ ComplexHeatmap       * 2.18.0    2023-10-24 [1] Bioconductor
+ crayon                 1.5.3     2024-06-20 [1] CRAN (R 4.3.3)
+ DBI                    1.2.3     2024-06-02 [1] CRAN (R 4.3.3)
+ DelayedArray           0.28.0    2023-10-24 [1] Bioconductor
+ DelayedMatrixStats     1.24.0    2023-10-24 [1] Bioconductor
+ devtools             * 2.4.5     2022-10-11 [1] CRAN (R 4.3.3)
+ digest                 0.6.37    2024-08-19 [1] CRAN (R 4.3.3)
+ doParallel             1.0.17    2022-02-07 [1] CRAN (R 4.3.3)
+ dplyr                * 1.1.4     2023-11-17 [1] CRAN (R 4.3.3)
+ ellipsis               0.3.2     2021-04-29 [1] CRAN (R 4.3.3)
+ evaluate               1.0.5     2025-08-27 [1] CRAN (R 4.3.3)
+ fastmap                1.2.0     2024-05-15 [1] CRAN (R 4.3.3)
+ foreach                1.5.2     2022-02-02 [1] CRAN (R 4.3.3)
+ fs                     1.6.6     2025-04-12 [1] CRAN (R 4.3.3)
+ generics               0.1.4     2025-05-09 [1] CRAN (R 4.3.3)
+ GenomeInfoDb           1.38.1    2023-11-08 [1] Bioconductor
+ GenomeInfoDbData       1.2.11    2025-12-15 [1] Bioconductor
+ GenomicRanges          1.54.1    2023-10-29 [1] Bioconductor
+ GetoptLong             1.0.5     2020-12-15 [1] CRAN (R 4.3.3)
+ GlobalOptions          0.1.2     2020-06-10 [1] CRAN (R 4.3.3)
+ glue                   1.8.0     2024-09-30 [1] CRAN (R 4.3.3)
+ graph                * 1.80.0    2023-10-24 [1] Bioconductor
+ GSEABase             * 1.64.0    2023-10-24 [1] Bioconductor
+ GSVA                 * 1.50.0    2023-10-24 [1] Bioconductor
+ HDF5Array              1.30.0    2023-10-24 [1] Bioconductor
+ htmltools              0.5.8.1   2024-04-04 [1] CRAN (R 4.3.3)
+ htmlwidgets            1.6.4     2023-12-06 [1] CRAN (R 4.3.3)
+ httpuv                 1.6.16    2025-04-16 [1] CRAN (R 4.3.3)
+ httr                   1.4.7     2023-08-15 [1] CRAN (R 4.3.3)
+ IRanges              * 2.36.0    2023-10-24 [1] Bioconductor
+ irlba                  2.3.5.1   2022-10-03 [1] CRAN (R 4.3.0)
+ iterators              1.0.14    2022-02-05 [1] CRAN (R 4.3.3)
+ jquerylib              0.1.4     2021-04-26 [1] CRAN (R 4.3.3)
+ jsonlite               2.0.0     2025-03-27 [1] CRAN (R 4.3.3)
+ KEGGREST               1.42.0    2023-10-24 [1] Bioconductor
+ knitr                  1.50      2025-03-16 [1] CRAN (R 4.3.3)
+ later                  1.4.4     2025-08-27 [1] CRAN (R 4.3.3)
+ lattice                0.22-7    2025-04-02 [1] CRAN (R 4.3.3)
+ lifecycle              1.0.4     2023-11-07 [1] CRAN (R 4.3.3)
+ magrittr             * 2.0.3     2022-03-30 [1] CRAN (R 4.3.3)
+ MakefileR            * 1.1.0     2025-10-21 [1] CRAN (R 4.3.3)
+ Matrix                 1.6-1.1   2023-09-18 [1] CRAN (R 4.3.1)
+ MatrixGenerics         1.14.0    2023-10-24 [1] Bioconductor
+ matrixStats            1.5.0     2025-01-07 [1] CRAN (R 4.3.3)
+ memoise                2.0.1     2021-11-26 [1] CRAN (R 4.3.3)
+ mime                   0.13      2025-03-17 [1] CRAN (R 4.3.3)
+ miniUI                 0.1.2     2025-04-17 [1] CRAN (R 4.3.3)
+ pillar                 1.11.0    2025-07-04 [1] CRAN (R 4.3.3)
+ pkgbuild               1.4.8     2025-05-26 [1] CRAN (R 4.3.3)
+ pkgconfig              2.0.3     2019-09-22 [1] CRAN (R 4.3.3)
+ pkgload                1.4.0     2024-06-28 [1] CRAN (R 4.3.3)
+ png                    0.1-8     2022-11-29 [1] CRAN (R 4.3.3)
+ profvis                0.4.0     2024-09-20 [1] CRAN (R 4.3.3)
+ promises               1.3.3     2025-05-29 [1] CRAN (R 4.3.3)
+ purrr                  1.1.0     2025-07-10 [1] CRAN (R 4.3.3)
+ R6                     2.6.1     2025-02-15 [1] CRAN (R 4.3.3)
+ RColorBrewer           1.1-3     2022-04-03 [1] CRAN (R 4.3.3)
+ Rcpp                   1.1.0     2025-07-02 [1] CRAN (R 4.3.3)
+ RCurl                  1.98-1.17 2025-03-22 [1] CRAN (R 4.3.3)
+ remotes                2.5.0     2024-03-17 [1] CRAN (R 4.3.3)
+ rhdf5                  2.46.1    2023-11-29 [1] Bioconductor 3.18 (R 4.3.3)
+ rhdf5filters           1.14.1    2023-11-06 [1] Bioconductor
+ Rhdf5lib               1.24.0    2023-10-24 [1] Bioconductor
+ rjson                  0.2.23    2024-09-16 [1] CRAN (R 4.3.3)
+ rlang                  1.1.6     2025-04-11 [1] CRAN (R 4.3.3)
+ rmarkdown              2.29      2024-11-04 [1] CRAN (R 4.3.3)
+ RSQLite                2.4.3     2025-08-20 [1] CRAN (R 4.3.3)
+ rsvd                   1.0.5     2021-04-16 [1] CRAN (R 4.3.0)
+ S4Arrays               1.2.0     2023-10-24 [1] Bioconductor
+ S4Vectors            * 0.40.2    2023-11-23 [1] Bioconductor 3.18 (R 4.3.3)
+ sass                   0.4.10    2025-04-11 [1] CRAN (R 4.3.3)
+ ScaledMatrix           1.10.0    2023-10-24 [1] Bioconductor
+ sessioninfo            1.2.3     2025-02-05 [1] CRAN (R 4.3.3)
+ shape                  1.4.6.1   2024-02-23 [1] CRAN (R 4.3.3)
+ shiny                  1.11.1    2025-07-03 [1] CRAN (R 4.3.3)
+ SingleCellExperiment   1.24.0    2023-10-24 [1] Bioconductor
+ SparseArray            1.2.2     2023-11-07 [1] Bioconductor
+ sparseMatrixStats      1.14.0    2023-10-24 [1] Bioconductor
+ stringi              * 1.8.7     2025-03-27 [1] CRAN (R 4.3.3)
+ stringr              * 1.5.2     2025-09-08 [1] CRAN (R 4.3.3)
+ SummarizedExperiment   1.32.0    2023-10-24 [1] Bioconductor
+ tibble               * 3.3.0     2025-06-08 [1] CRAN (R 4.3.3)
+ tidyselect             1.2.1     2024-03-11 [1] CRAN (R 4.3.3)
+ urlchecker             1.0.1     2021-11-30 [1] CRAN (R 4.3.3)
+ usethis              * 3.2.1     2025-09-06 [1] CRAN (R 4.3.3)
+ vctrs                  0.6.5     2023-12-01 [1] CRAN (R 4.3.3)
+ withr                  3.0.2     2024-10-28 [1] CRAN (R 4.3.3)
+ writexl              * 1.5.4     2025-04-15 [1] CRAN (R 4.3.3)
+ xfun                   0.53      2025-08-19 [1] CRAN (R 4.3.3)
+ XML                  * 3.99-0.17 2024-06-25 [1] CRAN (R 4.3.3)
+ xtable                 1.8-4     2019-04-21 [1] CRAN (R 4.3.3)
+ XVector                0.42.0    2023-10-24 [1] Bioconductor
+ yaml                   2.3.10    2024-07-26 [1] CRAN (R 4.3.3)
+ zlibbioc               1.48.0    2023-10-24 [1] Bioconductor
+
+ [1] /sci/labs/yotamd/lab_share/avishai.wizel/python_envs/miniconda/envs/EGFR/lib/R/library
+ * ── Packages attached to the search path.
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────
