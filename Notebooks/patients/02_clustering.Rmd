@@ -1,0 +1,56 @@
+---
+title: "R Notebook"
+output:
+  html_document: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: TRUE
+    number_sections: true
+    toc_depth: 2
+    df_print: paged
+params: 
+  data_out_dir: "./temp_data/" 
+---
+
+```{r}
+# Get input and output
+source("./pipe.R")
+input = pipeline$patients_clustering$input
+output = pipeline$patients_clustering$output
+```
+
+```{r}
+library(Seurat)
+library(qs2)
+library(ggplot2)
+```
+
+```{r}
+lung <- qs_read(input$lung)
+```
+
+
+
+```{r}
+p <- DimPlot(object = lung, reduction = "umap", pt.size = 0.1, label = F,group.by = "time.point")
+p
+```
+```{r}
+svg(filename = params$data_out_dir %s+% "patients_treatment_UMAP.svg")
+p
+dev.off()
+
+```
+
+```{r}
+p <- DimPlot(object = lung, reduction = "umap", pt.size = 0.1, label = F,group.by = "patient.ident")+ggtitle("")
+p
+```
+```{r}
+svg(filename = params$data_out_dir %s+% "patients_idents_UMAP.svg")
+p
+dev.off()
+
+```
