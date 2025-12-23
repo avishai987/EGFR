@@ -3,14 +3,6 @@ title: 'Xeno Run SiPSiC'
 author: "Avishai Wizel"
 date: '`r Sys.time()`'
 output:
-  # html_notebook: 
-  #   code_folding: hide
-  #   toc: true
-  #   toc_collapse: true
-  #   toc_float:
-  #     collapsed: false
-  #   number_sections: true
-  #   toc_depth: 1
   html_document: 
     code_folding: hide
     toc: yes
@@ -48,6 +40,7 @@ library(reticulate)
 library(ggplotify)
 suppressPackageStartupMessages(library(GSEABase))
 library(SiPSiC)
+library(SourceFromGithub)
 source_from_github(repositoy = "DEG_functions",version = "0.2.59")
 source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_name = "functions.R")
 
@@ -99,12 +92,3 @@ pathwayScoresMatrix <- as.data.frame(do.call("rbind", pathwayScoreLists))
 saveRDS(object = pathwayScoresMatrix,file = paste0(params$data_out_dir,basename(output$sipsic_matrix)))
 ```
 
-
-# session info
-<button class="btn btn-primary" data-toggle="collapse" data-target="#BlockName"> Show/Hide </button>  
-<div id="BlockName" class="collapse">  
-```{r}
-devtools::session_info()
-```
-
-</div>
