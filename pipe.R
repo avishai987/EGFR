@@ -48,11 +48,11 @@ pipeline[["xeno_clustering"]] = list(
 
 pipeline[["patients_clustering"]] = list(
   input = list(
-    script = "./Notebooks/patients/001_clustering.Rmd",
+    script = "./Notebooks/patients/02_clustering.Rmd",
     lung =  pipeline$patients_preprocess$output$patients
   ),
   output = list(
-    report ="./Reports/patients/001_clustering/001_clustering.html"
+    report ="./Reports/patients/02_clustering/02_clustering.html"
   )
 )
 
@@ -61,37 +61,37 @@ pipeline[["patients_clustering"]] = list(
 
 pipeline[["patients_deg"]] = list(
   input = list(
-    script = "./Notebooks/patients/01_DEG.Rmd",
+    script = "./Notebooks/patients/03_DEG.Rmd",
     lung =  pipeline$patients_preprocess$output$patients,
     hif_targets = hif_targets,
     genesets = msigDB_hallmarks
   ),
   output = list(
-    report ="./Reports/patients/01_DEG/01_DEG.html"
+    report ="./Reports/patients/03_DEG/03_DEG.html"
   )
 )
 
 pipeline[["patients_run_sipsic"]] = list(
   input = list(
-    script ="./Notebooks/patients/02_run_sipsic.Rmd",
+    script ="./Notebooks/patients/04_run_sipsic.Rmd",
     lung =  pipeline$patients_preprocess$output$patients,
     hif_targets= hif_targets,
     genesets= msigDB_hallmarks
   ),
   output = list(
-    report ="./Reports/patients/02_run_sipsic/02_run_sipsic.html",
-    sipsic_matrix ="./Reports/patients/02_run_sipsic/patients_pathwayScoresMatrix.RDS"
+    report ="./Reports/patients/04_run_sipsic/04_run_sipsic.html",
+    sipsic_matrix ="./Reports/patients/04_run_sipsic/patients_pathwayScoresMatrix.RDS"
   )
 )
 
 pipeline[["patients_sipsic_analysis"]] = list(
   input = list(
-    script ="./Notebooks/patients/03_sipsic_analysis.Rmd",
+    script ="./Notebooks/patients/05_sipsic_analysis.Rmd",
     lung =  pipeline$patients_preprocess$output$patients,
     sipsic_matrix = pipeline$patients_run_sipsic$output$sipsic_matrix
   ),
   output = list(
-    report ="./Reports/patients/03_sipsic_analysis/03_sipsic_analysis.html"
+    report ="./Reports/patients/05_sipsic_analysis/05_sipsic_analysis.html"
   )
 )
 
@@ -110,28 +110,28 @@ pipeline[["xenografts_deg"]] = list(
 
 pipeline[["xenografts_run_sipsic"]] = list(
   input = list(
-    script = "./Notebooks/xeno/02_run_SiPSiC.Rmd",
+    script = "./Notebooks/xeno/04_run_SiPSiC.Rmd",
     xeno =  pipeline$xeno_preprocess$output$xeno,
     hif_targets= hif_targets,
     genesets = msigDB_hallmarks
   ),
   output = list(
-    report ="./Reports/xeno/02_run_SiPSiC/02_run_SiPSiC.html",
-    sipsic_matrix ="./Reports/xeno/02_run_SiPSiC/xeno_pathwayScoresMatrix.RDS"
+    report ="./Reports/xeno/04_run_SiPSiC/04_run_SiPSiC.html",
+    sipsic_matrix ="./Reports/xeno/04_run_SiPSiC/xeno_pathwayScoresMatrix.RDS"
   )
 )
 
 
 pipeline[["xeno_sipsic_analysis"]] = list(
   input = list(
-    script = "./Notebooks/xeno/03_SiPSiC.Rmd",
+    script = "./Notebooks/xeno/05_SiPSiC.Rmd",
     xeno =  pipeline$xeno_preprocess$output$xeno,
     sipsic_matrix = pipeline$xenografts_run_sipsic$output$sipsic_matrix
   ),
   output = list(
-    report ="./Reports/xeno/03_SiPSiC/03_SiPSiC.html",
-    logFC_df = "./Reports/xeno/03_SiPSiC/xeno_sipsic_hallmarks_logFC.tsv",
-    fdr_df = "./Reports/xeno/03_SiPSiC/xeno_sipsic_hallmarks_fdr_df.tsv"
+    report ="./Reports/xeno/05_SiPSiC/05_SiPSiC.html",
+    logFC_df = "./Reports/xeno/05_SiPSiC/xeno_sipsic_hallmarks_logFC.tsv",
+    fdr_df = "./Reports/xeno/05_SiPSiC/xeno_sipsic_hallmarks_fdr_df.tsv"
   )
 )
 
@@ -158,12 +158,12 @@ pipeline[["xeno_sipsic_analysis"]] = list(
 
 pipeline[["xeno_cnmf_preprocess"]] = list(
   input = list(
-    script = "./Notebooks/xeno/04_cnmf/01_create_data_for_cnmf.Rmd",
+    script = "./Notebooks/xeno/06_cnmf/01_create_data_for_cnmf.Rmd",
     xeno =  pipeline$xeno_preprocess$output$xeno
     ),
   output = list(
-    report ="./Reports/xeno/04_cnmf/01_create_data_for_cnmf/01_create_data_for_cnmf.html",
-    xeno_counts_filtered = "./Reports/xeno/04_cnmf/01_create_data_for_cnmf/xeno_counts_filtered.h5ad"
+    report ="./Reports/xeno/06_cnmf/01_create_data_for_cnmf/01_create_data_for_cnmf.html",
+    xeno_counts_filtered = "./Reports/xeno/06_cnmf/01_create_data_for_cnmf/xeno_counts_filtered.h5ad"
   ),
   params = list(
     cnmf_env = cnmf_conda_env_path
@@ -173,25 +173,25 @@ pipeline[["xeno_cnmf_preprocess"]] = list(
 #Note: recommended to run in background ("sbatch")
 pipeline[["xeno_cnmf_run"]] = list(
   input = list(
-    script = "./Notebooks/xeno/04_cnmf/02_run_cnmf/sbatch_cnmf_script.sh"
+    script = "./Notebooks/xeno/06_cnmf/02_run_cnmf/sbatch_cnmf_script.sh"
   ),
   output = list(
-    cnmf_object = "Reports/xeno/04_cnmf/02_run_cnmf_1.7/models_2Kvargenes_corrected_noTPM_cnmf_obj.pckl"
+    cnmf_object = "Reports/xeno/06_cnmf/02_run_cnmf_1.7/models_2Kvargenes_corrected_noTPM_cnmf_obj.pckl"
   ),
   shell = substitute(paste(pipeline[[i]]$input$script))
 )
 
 pipeline[["calculate_programs"]] = list(
   input = list(
-    script = "Notebooks/xeno/04_cnmf/04_calculate_programs.Rmd",
+    script = "Notebooks/xeno/06_cnmf/04_calculate_programs.Rmd",
     xeno =  pipeline$xeno_preprocess$output$xeno,
-    cnmf_object = "Reports/xeno/04_cnmf/02_run_cnmf_1.7/models_2Kvargenes_corrected_noTPM_cnmf_obj.pckl",
+    cnmf_object = pipeline$xeno_cnmf_run$output$cnmf_object,
     genesets = msigDB_hallmarks
   ),
   output = list(
-    report = "./Reports/xeno/04_cnmf/04_calculate_programs/04_calculate_programs.html",
-    xeno_cell_usage = "./Reports/xeno/04_cnmf/04_calculate_programs/cell_usage_by_TPM.RDS",
-    gep_scores = "./Reports/xeno/04_cnmf/04_calculate_programs/gep_scores.RDS"
+    report = "./Reports/xeno/06_cnmf/04_calculate_programs/04_calculate_programs.html",
+    xeno_cell_usage = "./Reports/xeno/06_cnmf/04_calculate_programs/cell_usage_by_TPM.RDS",
+    gep_scores = "./Reports/xeno/06_cnmf/04_calculate_programs/gep_scores.RDS"
   ),
   params = list(
     cnmf_env = cnmf_conda_env_path
@@ -201,7 +201,7 @@ pipeline[["calculate_programs"]] = list(
 
 pipeline[["models_programs_analysis"]] = list(
   input = list(
-    script = "./Notebooks/xeno/04_cnmf/05_models_cnmf_analysis_k5.Rmd",
+    script = "./Notebooks/xeno/06_cnmf/05_models_cnmf_analysis_k5.Rmd",
     xeno =  pipeline$xeno_preprocess$output$xeno,
     xeno_cell_usage = pipeline$calculate_programs$output$xeno_cell_usage,
     gep_scores = pipeline$calculate_programs$output$gep_scores,
@@ -209,7 +209,7 @@ pipeline[["models_programs_analysis"]] = list(
     genesets = msigDB_hallmarks
   ),
   output = list(
-    report ="./Reports/xeno/04_cnmf/05_models_cnmf_analysis_k5/05_models_cnmf_analysis_k5.html"  
+    report ="./Reports/xeno/06_cnmf/05_models_cnmf_analysis_k5/05_models_cnmf_analysis_k5.html"  
     )
 )
 
@@ -222,22 +222,36 @@ pipeline[["bivona_preprocess"]] = list(
   ),
   output = list(
     report ="./Reports/Bivona/01_preprocess/01_preprocess.html",
-    bivona = "./Reports/Bivona/01_preprocess/bivona.qs")
+    bivona = "./Reports/Bivona/01_preprocess/bivona.qs2")
 )
 
 
-pipeline[["patients_bivona_programs_calc"]] = list(
+pipeline[["patients_programs_calc"]] = list(
   input = list(
-    script = "./Notebooks/patients/04_patients_cnmf_k5_from_xeno_calc.Rmd",
+    script = "./Notebooks/patients/06_patients_cnmf_k5_from_xeno_calc.Rmd",
     lung =  pipeline$patients_preprocess$output$patients,
-    bivona = pipeline$bivona_preprocess$output$bivona,
     gep_scores = pipeline$calculate_programs$output$gep_scores,
-    cnmf_object = "Reports/xeno/04_cnmf/02_run_cnmf_1.7/models_2Kvargenes_corrected_noTPM_cnmf_obj.pckl"
+    cnmf_object = pipeline$xeno_cnmf_run$output$cnmf_object
   ),
   output = list(
-    report ="./Reports/patients/04_patients_cnmf_k5_from_xeno_calc/04_patients_cnmf_k5_from_xeno_calc.html" ,
-    patients_cell_usage = "./Reports/patients/04_patients_cnmf_k5_from_xeno_calc/patients_cell_usage.RDS",
-    bivonas_cell_usage = "./Reports/patients/04_patients_cnmf_k5_from_xeno_calc/bivona_cell_usage.RDS"
+    report ="./Reports/patients/06_patients_cnmf_k5_from_xeno_calc/06_patients_cnmf_k5_from_xeno_calc.html" ,
+    patients_cell_usage = "./Reports/patients/06_patients_cnmf_k5_from_xeno_calc/patients_cell_usage.RDS"
+    ),
+  params = list(
+    cnmf_env = cnmf_conda_env_path
+  )
+)
+
+pipeline[["bivona_programs_calc"]] = list(
+  input = list(
+    script = "./Notebooks/Bivona/02_bivona_cnmf_k5_calc_from_xeno.Rmd",
+    bivona = pipeline$bivona_preprocess$output$bivona,
+    gep_scores = pipeline$calculate_programs$output$gep_scores,
+    cnmf_object = pipeline$xeno_cnmf_run$output$cnmf_object
+  ),
+  output = list(
+    report ="./Reports/Bivona/02_bivona_cnmf_k5_calc_from_xeno/02_bivona_cnmf_k5_calc_from_xeno.html" ,
+    bivonas_cell_usage = "./Reports/Bivona/02_bivona_cnmf_k5_calc_from_xeno/bivona_cell_usage.RDS"
   ),
   params = list(
     cnmf_env = cnmf_conda_env_path
@@ -246,27 +260,27 @@ pipeline[["patients_bivona_programs_calc"]] = list(
 
 pipeline[["patients_programs_analysis"]] = list(
   input = list(
-    script = "./Notebooks/patients/05_patients_cnmf_k5_from_xeno.Rmd",
+    script = "./Notebooks/patients/07_patients_cnmf_k5_from_xeno.Rmd",
     lung =  pipeline$patients_preprocess$output$patients,
-    patients_cell_usage = pipeline$patients_bivona_programs_calc$output$patients_cell_usage,
+    patients_cell_usage = pipeline$patients_programs_calc$output$patients_cell_usage,
     genesets = msigDB_hallmarks,
     hif_targets= hif_targets
   ),
   output = list(
-    report ="./Reports/patients/05_patients_cnmf_k5_from_xeno/05_patients_cnmf_k5_from_xeno.html"  
+    report ="./Reports/patients/07_patients_cnmf_k5_from_xeno/07_patients_cnmf_k5_from_xeno.html"  
   )
 )
 
 pipeline[["bivona_programs_analysis"]] = list(
   input = list(
-    script = "./Notebooks/Bivona/02_bivona_cnmf_analysis.Rmd",
+    script = "./Notebooks/Bivona/03_bivona_cnmf_analysis.Rmd",
     bivona = pipeline$bivona_preprocess$output$bivona,
-    bivonas_cell_usage = pipeline$patients_bivona_programs_calc$output$bivonas_cell_usage,
+    bivonas_cell_usage = pipeline$bivona_programs_calc$output$bivonas_cell_usage,
     genesets = msigDB_hallmarks,
     hif_targets= hif_targets
   ),
   output = list(
-    report ="./Reports/Bivona/02_bivona_cnmf_analysis/02_bivona_cnmf_analysis.html"  
+    report ="./Reports/Bivona/03_bivona_cnmf_analysis/03_bivona_cnmf_analysis.html"  
   )
 )
 
@@ -440,7 +454,7 @@ for (i in 1:length(pipeline)) {
   mkfile = mkfile +   make_comment(c("============", names(pipeline)[[i]], "============")) + # comment
     make_rule(names(pipeline)[[i]], unlist(pipeline[[i]]$output), paste("@echo  $@ is up to date") ) #define rule output
   if(is.null(pipeline[[i]]$shell)){
-    mkfile = mkfile + make_rule(targets = unlist(pipeline[[i]]$output), deps = unlist(pipeline[[i]]$input), #run rscript, add & for grouped tagets
+    mkfile = mkfile + make_rule(targets = c(unlist(pipeline[[i]]$output),"&"), deps = unlist(pipeline[[i]]$input), #run rscript, add & for grouped targets
               script =paste("Rscript render.R",
                             names(pipeline)[[i]]
                             ))
