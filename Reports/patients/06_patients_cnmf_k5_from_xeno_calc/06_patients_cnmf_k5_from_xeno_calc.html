@@ -2839,43 +2839,18 @@ border-radius: 0px;
 
 <h1 class="title toc-ignore">05_patients_cnmf_calculation_k5</h1>
 <h4 class="author">Avishai Wizel</h4>
-<h4 class="date">2025-07-02 12:39:09.444475</h4>
+<h4 class="date">2025-12-24 14:14:13.287519</h4>
 
 </div>
 
 
 <pre class="r"><code>#Get input and output
 source(&quot;./pipe.R&quot;)
-input = pipeline$patients_bivona_programs_calc$input
-output = pipeline$patients_bivona_programs_calc$output
-input_params = pipeline$patients_bivona_programs_calc$params</code></pre>
-<div id="functions" class="section level1" number="1">
-<h1><span class="header-section-number">1</span> Functions</h1>
-<pre class="r"><code>library(ggplotify)
-library(stringi)
-library(ggpubr)
-
-suppressPackageStartupMessages(library(GSEABase))
-source_from_github(repositoy = &quot;DEG_functions&quot;,version = &quot;0.2.53&quot;)</code></pre>
-<pre><code>## ℹ SHA-1 hash of file is 8ed4e9017cead897a7d352226a5413f1b5fc0cb7</code></pre>
-<pre><code>## [36mℹ[39m Targets are out of date. Updating...
-## Registered S3 method overwritten by &#39;ggtree&#39;:
-##   method      from 
-##   identify.gg ggfun
-## clusterProfiler v4.2.2  For help: https://yulab-smu.top/biomedical-knowledge-mining-book/
-## 
-## If you use clusterProfiler in published research, please cite:
-## T Wu, E Hu, S Xu, M Chen, P Guo, Z Dai, T Feng, L Zhou, W Tang, L Zhan, X Fu, S Liu, X Bo, and G Yu. clusterProfiler 4.0: A universal enrichment tool for interpreting omics data. The Innovation. 2021, 2(3):100141</code></pre>
-<pre class="r"><code>source_from_github(repositoy = &quot;cNMF_functions&quot;,version = &quot;0.4.32&quot;,script_name = &quot;cnmf_functions_V3.R&quot;)</code></pre>
-<pre><code>## ℹ SHA-1 hash of file is 668a919b8c6f3ccc1fe336b0f7c732b40aabda54
-## [36mℹ[39m Targets are out of date. Updating...Loading required package: reticulate
-## Loading required package: facefuns</code></pre>
-<pre class="r"><code>source_from_github(repositoy = &quot;sc_general_functions&quot;,version = &quot;0.1.34&quot;,script_name = &quot;functions.R&quot;)</code></pre>
-<pre><code>## ℹ SHA-1 hash of file is 55839fb7db3fdb3e61d8d423b0b3129bfa1d777b
-## [36mℹ[39m Targets are out of date. Updating...</code></pre>
-</div>
-<div id="functions-1" class="section level1" number="2">
-<h1><span class="header-section-number">2</span> Functions</h1>
+input = pipeline$patients_programs_calc$input
+output = pipeline$patients_programs_calc$output
+input_params = pipeline$patients_programs_calc$params</code></pre>
+<div id="load-conda-env" class="section level1" number="1">
+<h1><span class="header-section-number">1</span> load conda env</h1>
 <pre class="r"><code>reticulate::use_condaenv(input_params$cnmf_env,required = T)
 reticulate::py_config() # if you see that r-cnmf_dev has not been loaded, restart/terminate r and try again, DO NOT load reticulate before.</code></pre>
 <pre><code>## python:         /sci/labs/yotamd/lab_share/avishai.wizel/python_envs/miniconda/envs/cnmf_1.7/bin/python
@@ -2886,13 +2861,45 @@ reticulate::py_config() # if you see that r-cnmf_dev has not been loaded, restar
 ## numpy_version:  2.2.6
 ## 
 ## NOTE: Python version was forced by use_python() function</code></pre>
-<pre class="r"><code>add_python_funs()
-library(reticulate)</code></pre>
+</div>
+<div id="functions" class="section level1" number="2">
+<h1><span class="header-section-number">2</span> Functions</h1>
+<pre class="r"><code>library(ggplotify)
+library(stringi)
+library(qs2)</code></pre>
+<pre><code>## qs2 0.1.5</code></pre>
+<pre class="r"><code>library(Seurat)</code></pre>
+<pre><code>## Attaching SeuratObject</code></pre>
+<pre><code>## &#39;SeuratObject&#39; was built under R 4.3.1 but the current version is
+## 4.3.3; it is recomended that you reinstall &#39;SeuratObject&#39; as the ABI
+## for R may have changed</code></pre>
+<pre class="r"><code>library(ggplot2)
+library(dplyr)</code></pre>
+<pre><code>## 
+## Attaching package: &#39;dplyr&#39;</code></pre>
+<pre><code>## The following objects are masked from &#39;package:stats&#39;:
+## 
+##     filter, lag</code></pre>
+<pre><code>## The following objects are masked from &#39;package:base&#39;:
+## 
+##     intersect, setdiff, setequal, union</code></pre>
+<pre class="r"><code>library(reticulate)
+suppressPackageStartupMessages(library(GSEABase))
+library(SourceFromGithub)
+source_from_github(repositoy = &quot;DEG_functions&quot;,version = &quot;0.2.53&quot;)</code></pre>
+<pre><code>## ℹ SHA-1 hash of file is &quot;8ed4e9017cead897a7d352226a5413f1b5fc0cb7&quot;</code></pre>
+<pre class="r"><code>source_from_github(repositoy = &quot;cNMF_functions&quot;,version = &quot;0.4.3&quot;,script_name = &quot;cnmf_functions_V3.R&quot;)</code></pre>
+<pre><code>## ℹ SHA-1 hash of file is &quot;9ba93c5f4313e9a1908a62fb8134e6c415e95727&quot;</code></pre>
+<pre><code>## Loading required package: facefuns</code></pre>
+<pre class="r"><code>source_from_github(repositoy = &quot;sc_general_functions&quot;,version = &quot;0.1.34&quot;,script_name = &quot;functions.R&quot;)</code></pre>
+<pre><code>## ℹ SHA-1 hash of file is &quot;55839fb7db3fdb3e61d8d423b0b3129bfa1d777b&quot;</code></pre>
+<pre><code>## Loading required package: print.rmd.tabs</code></pre>
+<pre><code>## Loading required package: RColorBrewer</code></pre>
+<pre class="r"><code>add_python_funs()</code></pre>
 </div>
 <div id="data" class="section level1" number="3">
 <h1><span class="header-section-number">3</span> Data</h1>
-<pre class="r"><code>lung &lt;- qs::qread(input$lung)
-bivona_pri_egfr = qs::qread(input$bivona)
+<pre class="r"><code>lung &lt;- qs_read(input$lung)
 gep_scores = readRDS(input$gep_scores)</code></pre>
 <pre class="python"><code>from cnmf import cNMF
 import pickle
@@ -2916,8 +2923,8 @@ genes = genes[!genes %in% all_0_genes]
 lung_expression = lung_expression[,!colnames(lung_expression) %in% all_0_genes]
 gc(verbose = F)</code></pre>
 <pre><code>       used  (Mb) gc trigger   (Mb)  max used   (Mb)</code></pre>
-<p>Ncells 7247884 387.1 13650424 729.1 10162417 542.8 Vcells 64450233
-491.8 207896318 1586.2 253754657 1936.0</p>
+<p>Ncells 6525869 348.6 11925654 636.9 8623264 460.6 Vcells 51332649
+391.7 192731177 1470.5 240640847 1836.0</p>
 <pre class="python"><code>lung_expression = r.lung_expression
 genes = r.genes
 usage_by_calc = get_usage_from_score(counts=lung_expression,tpm=lung_expression,genes=genes,cnmf_obj=cnmf_obj,k=5,sumTo1=True)</code></pre>
@@ -2926,33 +2933,6 @@ usage_by_calc = get_usage_from_score(counts=lung_expression,tpm=lung_expression,
 colnames(all_metagenes) = paste0(&quot;Program.&quot;,1:5)</code></pre>
 <pre class="r"><code># save data
 saveRDS(object = all_metagenes,file = params$data_out_dir %s+%  basename(output$patients_cell_usage))</code></pre>
-</div>
-<div id="calculate-usage-by-bivona-counts" class="section level1" number="5">
-<h1><span class="header-section-number">5</span> Calculate usage by
-bivona counts</h1>
-<pre class="r"><code># get expression with genes in cnmf input
-genes = rownames(gep_scores)
-genes = genes [genes %in% rownames(bivona_pri_egfr)]
-bivona_expression = t(as.matrix(GetAssayData(bivona_pri_egfr,slot=&#39;data&#39;))) 
-bivona_expression = 2**bivona_expression #convert from log2(tpm+1) to tpm
-bivona_expression = bivona_expression-1
-bivona_expression = bivona_expression[,genes] %&gt;% as.data.frame()
-
-all_0_genes = colnames(bivona_expression)[colSums(bivona_expression==0, na.rm=TRUE)==nrow(bivona_expression)] #delete rows that have all 0
-genes = genes[!genes %in% all_0_genes]
-bivona_expression = bivona_expression[,!colnames(bivona_expression) %in% all_0_genes]
-gc(verbose = F)</code></pre>
-<pre><code>       used  (Mb) gc trigger   (Mb)  max used   (Mb)</code></pre>
-<p>Ncells 7286324 389.2 13650424 729.1 10162417 542.8 Vcells 65735873
-501.6 207896318 1586.2 253754657 1936.0</p>
-<pre class="python"><code>bivona_expression = r.bivona_expression
-genes = r.genes
-usage_by_calc = get_usage_from_score(counts=bivona_expression,tpm=bivona_expression,genes=genes,cnmf_obj=cnmf_obj,k=5,sumTo1=True)</code></pre>
-<pre class="r"><code>bivona_5_metagenes = py$usage_by_calc</code></pre>
-<pre class="r"><code>all_metagenes = bivona_5_metagenes
-colnames(all_metagenes) = paste0(&quot;Program.&quot;,1:5)</code></pre>
-<pre class="r"><code># save data
-saveRDS(object = all_metagenes,file = params$data_out_dir %s+%  basename(output$bivonas_cell_usage))</code></pre>
 </div>
 
 
