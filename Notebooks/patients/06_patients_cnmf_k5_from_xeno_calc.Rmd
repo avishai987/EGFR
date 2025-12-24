@@ -23,9 +23,15 @@ editor_options:
 ```{r}
 #Get input and output
 source("./pipe.R")
-input = pipeline$patients_bivona_programs_calc$input
-output = pipeline$patients_bivona_programs_calc$output
-input_params = pipeline$patients_bivona_programs_calc$params
+input = pipeline$patients_programs_calc$input
+output = pipeline$patients_programs_calc$output
+input_params = pipeline$patients_programs_calc$params
+```
+
+# load conda env
+```{r}
+reticulate::use_condaenv(input_params$cnmf_env,required = T)
+reticulate::py_config() # if you see that r-cnmf_dev has not been loaded, restart/terminate r and try again, DO NOT load reticulate before.
 ```
 
 
@@ -36,27 +42,25 @@ input_params = pipeline$patients_bivona_programs_calc$params
 ```{r warning=FALSE}
 library(ggplotify)
 library(stringi)
-library(ggpubr)
-
-suppressPackageStartupMessages(library(GSEABase))
-source_from_github(repositoy = "DEG_functions",version = "0.2.53")
-source_from_github(repositoy = "cNMF_functions",version = "0.4.32",script_name = "cnmf_functions_V3.R")
-source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_name = "functions.R")
-```
-
-# Functions
-```{r}
-reticulate::use_condaenv(input_params$cnmf_env,required = T)
-reticulate::py_config() # if you see that r-cnmf_dev has not been loaded, restart/terminate r and try again, DO NOT load reticulate before.
-add_python_funs()
+library(qs2)
+library(Seurat)
+library(ggplot2)
+library(dplyr)
 library(reticulate)
+suppressPackageStartupMessages(library(GSEABase))
+library(SourceFromGithub)
+source_from_github(repositoy = "DEG_functions",version = "0.2.53")
+source_from_github(repositoy = "cNMF_functions",version = "0.4.3",script_name = "cnmf_functions_V3.R")
+source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_name = "functions.R")
+add_python_funs()
 ```
+
+
 
 
 # Data
 ```{r}
-lung <- qs::qread(input$lung)
-bivona_pri_egfr = qs::qread(input$bivona)
+lung <- qs_read(input$lung)
 gep_scores = readRDS(input$gep_scores)
 ```
 
@@ -110,40 +114,3 @@ saveRDS(object = all_metagenes,file = params$data_out_dir %s+%  basename(output$
 ```
 
 
-# Calculate usage by bivona counts 
-```{r echo=TRUE, results='asis'}
-# get expression with genes in cnmf input
-genes = rownames(gep_scores)
-genes = genes [genes %in% rownames(bivona_pri_egfr)]
-bivona_expression = t(as.matrix(GetAssayData(bivona_pri_egfr,slot='data'))) 
-bivona_expression = 2**bivona_expression #convert from log2(tpm+1) to tpm
-bivona_expression = bivona_expression-1
-bivona_expression = bivona_expression[,genes] %>% as.data.frame()
-
-all_0_genes = colnames(bivona_expression)[colSums(bivona_expression==0, na.rm=TRUE)==nrow(bivona_expression)] #delete rows that have all 0
-genes = genes[!genes %in% all_0_genes]
-bivona_expression = bivona_expression[,!colnames(bivona_expression) %in% all_0_genes]
-gc(verbose = F)
-```
-
-
-```{python}
-bivona_expression = r.bivona_expression
-genes = r.genes
-usage_by_calc = get_usage_from_score(counts=bivona_expression,tpm=bivona_expression,genes=genes,cnmf_obj=cnmf_obj,k=5,sumTo1=True)
-
-```
-
-```{r}
-bivona_5_metagenes = py$usage_by_calc
-```
-
-```{r}
-all_metagenes = bivona_5_metagenes
-colnames(all_metagenes) = paste0("Program.",1:5)
-```
-
-```{r}
-# save data
-saveRDS(object = all_metagenes,file = params$data_out_dir %s+%  basename(output$bivonas_cell_usage))
-```
