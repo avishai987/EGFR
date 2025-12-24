@@ -27,6 +27,11 @@ input = pipeline$bivona_preprocess$input
 output = pipeline$bivona_preprocess$output
 ```
 
+```{r}
+library(Seurat)
+library(qs2)
+```
+
 # Data
 
 ```{r}
@@ -56,6 +61,6 @@ tiss_subset_tumor2_pri_egfr = RunUMAP(tiss_subset_tumor2_pri_egfr, dims = 1:5,ve
 ```
 
 ```{r}
-qs::qsave(tiss_subset_tumor2_pri_egfr,file = params$data_out_dir %s+% "bivona.qs")
+qs_save(tiss_subset_tumor2_pri_egfr,file = params$data_out_dir %s+% basename(output$bivona))
 ```
 

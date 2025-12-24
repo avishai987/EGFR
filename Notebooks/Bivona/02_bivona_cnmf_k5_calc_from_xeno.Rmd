@@ -1,0 +1,113 @@
+---
+title: '02_bivona_cnmf_k5_calc_from_xeno' 
+author: "Avishai Wizel"
+date: '`r Sys.time()`'
+output:
+  html_document: 
+    code_folding: hide
+    toc: yes
+    toc_collapse: yes
+    toc_float: 
+      collapsed: TRUE
+    number_sections: true
+    toc_depth: 2
+    df_print: paged
+params: 
+  data_out_dir: "./temp_data/" 
+
+editor_options: 
+  chunk_output_type: inline
+---
+
+
+```{r}
+#Get input and output
+source("./pipe.R")
+input = pipeline$bivona_programs_calc$input
+output = pipeline$bivona_programs_calc$output
+input_params = pipeline$bivona_programs_calc$params
+```
+
+
+# load conda env
+```{r}
+reticulate::use_condaenv(input_params$cnmf_env,required = T)
+reticulate::py_config() # if you see that r-cnmf_dev has not been loaded, restart/terminate r and try again, DO NOT load reticulate before.
+```
+
+# Functions
+
+```{r warning=FALSE}
+library(ggplotify)
+library(stringi)
+library(qs2)
+library(Seurat)
+library(ggplot2)
+library(dplyr)
+library(reticulate)
+suppressPackageStartupMessages(library(GSEABase))
+library(SourceFromGithub)
+source_from_github(repositoy = "DEG_functions",version = "0.2.53")
+source_from_github(repositoy = "cNMF_functions",version = "0.4.3",script_name = "cnmf_functions_V3.R")
+source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_name = "functions.R")
+add_python_funs()
+```
+
+
+
+
+# Data
+```{r}
+bivona_pri_egfr = qs_read(input$bivona)
+gep_scores = readRDS(input$gep_scores)
+```
+
+
+```{python}
+from cnmf import cNMF
+import pickle
+f = open(r.input["cnmf_object"], 'rb')
+cnmf_obj = pickle.load(f)
+f.close()
+```
+
+
+
+
+# Calculate usage by bivona counts 
+```{r echo=TRUE, results='asis'}
+# get expression with genes in cnmf input
+genes = rownames(gep_scores)
+genes = genes [genes %in% rownames(bivona_pri_egfr)]
+bivona_expression = t(as.matrix(GetAssayData(bivona_pri_egfr,slot='data'))) 
+bivona_expression = 2**bivona_expression #convert from log2(tpm+1) to tpm
+bivona_expression = bivona_expression-1
+bivona_expression = bivona_expression[,genes] %>% as.data.frame()
+
+all_0_genes = colnames(bivona_expression)[colSums(bivona_expression==0, na.rm=TRUE)==nrow(bivona_expression)] #delete rows that have all 0
+genes = genes[!genes %in% all_0_genes]
+bivona_expression = bivona_expression[,!colnames(bivona_expression) %in% all_0_genes]
+gc(verbose = F)
+```
+
+
+```{python}
+bivona_expression = r.bivona_expression
+genes = r.genes
+usage_by_calc = get_usage_from_score(counts=bivona_expression,tpm=bivona_expression,genes=genes,cnmf_obj=cnmf_obj,k=5,sumTo1=True)
+
+```
+
+```{r}
+bivona_5_metagenes = py$usage_by_calc
+```
+
+```{r}
+all_metagenes = bivona_5_metagenes
+colnames(all_metagenes) = paste0("Program.",1:5)
+```
+
+```{r}
+# save data
+saveRDS(object = all_metagenes,file = params$data_out_dir %s+%  basename(output$bivonas_cell_usage))
+```

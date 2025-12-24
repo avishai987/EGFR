@@ -31,21 +31,30 @@ output = pipeline$bivona_programs_analysis$output
 # Functions
 
 ```{r warning=FALSE}
+library(ggpubr)
+library(qs2)
+library(facefuns)
+library(Seurat)
+library(ggplot2)
+library(ggplotify)
 library(stringi)
 library(reticulate)
-library(ggpubr)
+library(SourceFromGithub)
+library(tidyr)
+library(tibble)
+library(rlang)
 library(rstatix)
 suppressPackageStartupMessages(library(GSEABase))
 source_from_github(repositoy = "DEG_functions",version = "0.2.53")
 source_from_github(repositoy = "cNMF_functions",version = "0.4.33",script_name = "cnmf_functions_V3.R")
 source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_name = "functions.R")
-
+library(dplyr)
 ```
 
 # Data
 
 ```{r}
-bivona = qs::qread(input$bivona)
+bivona = qs_read(input$bivona)
 bivonas_cell_usage = readRDS(input$bivonas_cell_usage)
 genesets = getGmt(input$genesets)  %>% geneIds()
 hif_targets =  scan(input$hif_targets, character(), quote = "")
