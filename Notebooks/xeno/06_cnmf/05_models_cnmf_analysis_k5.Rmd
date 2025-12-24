@@ -29,17 +29,22 @@ output = pipeline$models_programs_analysis$output
 
 
 # Functions
-```{r}
-library(ggpubr)
-```
-
-
 
 
 ```{r warning=FALSE}
+library(ggpubr)
+library(qs2)
+library(facefuns)
+library(Seurat)
+library(ggplot2)
 library(ggplotify)
 library(stringi)
 library(reticulate)
+library(SourceFromGithub)
+library(tidyr)
+library(tibble)
+library(rlang)
+library(dplyr)
 suppressPackageStartupMessages(library(GSEABase))
 source_from_github(repositoy = "DEG_functions",version = "0.2.53")
 source_from_github(repositoy = "cNMF_functions",version = "0.4.33",script_name = "cnmf_functions_V3.R")
@@ -51,7 +56,7 @@ source_from_github(repositoy = "sc_general_functions",version = "0.1.34",script_
 # Data
 
 ```{r}
-xeno <- qs::qread(input$xeno)
+xeno <- qs_read(input$xeno)
 genesets = getGmt(input$genesets)  %>% geneIds()
 hif_targets =  scan(input$hif_targets, character(), quote = "")
 genesets[["HIF_targets"]] = hif_targets

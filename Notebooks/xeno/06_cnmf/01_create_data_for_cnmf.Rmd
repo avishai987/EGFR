@@ -1,5 +1,5 @@
 ---
-title: '`r rstudioapi::getSourceEditorContext()$path %>% basename() %>% gsub(pattern = "\\.Rmd",replacement = "")`' 
+title: 'Create data for CNMF' 
 author: "Avishai Wizel"
 date: '`r Sys.time()`'
 output:
@@ -35,11 +35,14 @@ reticulate::py_config() # if you see that r-cnmf_dev has not been loaded, restar
 # Functions
 
 ```{r warning=FALSE}
+library(qs2)
+library(reticulate)
+library(Seurat)
 ```
 
 # Data
 ```{r}
-xeno <- qs::qread(input$xeno)
+xeno <- qs_read(input$xeno)
 xeno = DietSeurat(xeno)
 ```
 
@@ -47,7 +50,6 @@ xeno = DietSeurat(xeno)
 
 ## Convert seurat to scanpy
 ```{r}
-library(reticulate)
 sc <- import('scanpy', convert = FALSE)
 gene_expression = t(as.matrix(GetAssayData(xeno,slot='counts'))) 
 gene_expression = gene_expression[,colSums(gene_expression) != 0] #remove genes with 0 expression in all cells

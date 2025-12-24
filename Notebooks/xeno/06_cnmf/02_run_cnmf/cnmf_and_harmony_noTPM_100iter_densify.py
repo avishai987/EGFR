@@ -19,6 +19,8 @@ matplotlib.use('Agg')
 output_folder = sys.argv[1]
 batch_correction_folder= output_folder + '/xeno_batchCorrect/'
 xeno_filtered_path = sys.argv[2]
+num_of_cores = sys.argv[3]
+
 os.makedirs(output_folder, exist_ok=True)
 os.makedirs(batch_correction_folder, exist_ok=True)
 print(batch_correction_folder)
@@ -37,7 +39,11 @@ cnmf_obj_corrected = cNMF(output_dir=output_folder, name='BatchCorrected_cnmf')
 cnmf_obj_corrected.prepare(counts_fn= batch_correction_folder +'xeno.Corrected.HVG.Varnorm.h5ad', genes_file=batch_correction_folder + '/xeno.Corrected.HVGs.txt',components=np.arange(3,11), seed=14, num_highvar_genes=2000,densify=True)
 
 print ("factorizing...")
-cnmf_obj_corrected.factorize(worker_i=0, total_workers=1)
+if (num_of_cores == '1'):
+  cnmf_obj_corrected.factorize(worker_i=0, total_workers=1) # without multiprocessing
+else:
+  cnmf_obj_corrected.factorize_multi_process(total_workers=int(num_of_cores))
+  
 print ("combining...")
 cnmf_obj_corrected.combine()
 print ("done...")
