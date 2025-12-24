@@ -29,6 +29,9 @@ output = pipeline$bulk_cell_lines_OSI$output
 # Functions
 
 ```{r warning=FALSE}
+library(ggplot2)
+library(DESeq2)
+library(dplyr)
 ```
 
 # Data

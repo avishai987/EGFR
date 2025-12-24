@@ -3049,7 +3049,8 @@ for (cell_line in names(gsva_results_list)) {
   scores_df = gsva_results %&gt;% t() %&gt;% as.data.frame() %&gt;% merge(y = metadata, by = 0) %&gt;% column_to_rownames(&quot;Row.names&quot;)
   summary_df &lt;- scores_df %&gt;%
     group_by(condition) %&gt;%
-    dplyr::summarise(across(where(is.numeric), mean, .names = &quot;{.col}&quot;)) %&gt;% column_to_rownames(&quot;condition&quot;) %&gt;% scale()  %&gt;%  t() %&gt;% as.data.frame() %&gt;% na.omit()
+    dplyr::summarise(across(where(is.numeric), mean, .names = &quot;{.col}&quot;)) %&gt;% column_to_rownames(&quot;condition&quot;) %&gt;% scale()  %&gt;% 
+    t() %&gt;% as.data.frame() %&gt;% na.omit()
   summary_df_list[[cell_line]] = summary_df
 }
 
@@ -3126,38 +3127,6 @@ write_xlsx(rownames_to_column(clustered_mat,var = &quot;Pathway&quot;), path = p
     return(clustered_mat)
   }
 }</code></pre>
-<pre class="r"><code>clustered_mat = plot_genes_heatmap(&quot;SASP&quot;,return_df = T,plot = F)</code></pre>
-<pre><code>## Warning: There was 1 warning in `dplyr::summarise()`.
-## ℹ In argument: `across(pathway_genes, mean, .names = &quot;{.col}&quot;)`.
-## Caused by warning:
-## ! Using an external vector in selections was deprecated in tidyselect 1.1.0.
-## ℹ Please use `all_of()` or `any_of()` instead.
-##   # Was:
-##   data %&gt;% select(pathway_genes)
-## 
-##   # Now:
-##   data %&gt;% select(all_of(pathway_genes))
-## 
-## See &lt;https://tidyselect.r-lib.org/reference/faq-external-vector.html&gt;.</code></pre>
-<pre><code>## Warning: The input is a data frame-like object, convert it to a matrix.</code></pre>
-<pre><code>## Warning: The heatmap has not been initialized. You might have different results
-## if you repeatedly execute this function, e.g. when row_km/column_km was
-## set. It is more suggested to do as `ht = draw(ht); row_order(ht)`.</code></pre>
-<pre class="r"><code>write_xlsx(rownames_to_column(clustered_mat,var = &quot;Gene&quot;), path = paste0(params$data_out_dir,&quot;SASP_genes_TPM_heatmap.xlsx&quot;))
-
-clustered_mat = plot_genes_heatmap(&quot;HALLMARK_REACTIVE_OXYGEN_SPECIES_PATHWAY&quot;,return_df = T,plot = F)</code></pre>
-<pre><code>## Warning: The input is a data frame-like object, convert it to a matrix.
-## Warning: The heatmap has not been initialized. You might have different results
-## if you repeatedly execute this function, e.g. when row_km/column_km was
-## set. It is more suggested to do as `ht = draw(ht); row_order(ht)`.</code></pre>
-<pre class="r"><code>write_xlsx(rownames_to_column(clustered_mat,var = &quot;Gene&quot;), path = paste0(params$data_out_dir,&quot;ROS_genes_TPM_heatmap.xlsx&quot;))
-
-clustered_mat = plot_genes_heatmap(&quot;HIF_targets&quot;,return_df = T,plot = F)</code></pre>
-<pre><code>## Warning: The input is a data frame-like object, convert it to a matrix.
-## Warning: The heatmap has not been initialized. You might have different results
-## if you repeatedly execute this function, e.g. when row_km/column_km was
-## set. It is more suggested to do as `ht = draw(ht); row_order(ht)`.</code></pre>
-<pre class="r"><code>write_xlsx(rownames_to_column(clustered_mat,var = &quot;Gene&quot;), path = paste0(params$data_out_dir,&quot;HIF_genes_TPM_heatmap.xlsx&quot;))</code></pre>
 
 
 
