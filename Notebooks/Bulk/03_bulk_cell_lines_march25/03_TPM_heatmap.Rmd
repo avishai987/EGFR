@@ -228,3 +228,112 @@ write_xlsx(rownames_to_column(clustered_mat,var = "Gene"), path = paste0(params$
 
 
 ```
+# Scatter plot
+
+```{r}
+
+x_signature = "FRIDMAN_SENESCENCE_UP"
+y_signature = "HIF_targets"
+
+all_cell_lines_TPM = list()
+
+for (cell_line in names(bulk_Mar25_TPM_list)) {
+  cell_line_data = bulk_Mar25_TPM_list[[cell_line]]
+  metadata = metadata_list[[cell_line]]
+  all_genesets_tpm = list()
+
+  for (pathway in c(x_signature,y_signature)) {
+    pathway_genes = genesets[[pathway]]
+    pathway_genes = pathway_genes[pathway_genes %in% rownames(cell_line_data)]
+    scores_df = cell_line_data[pathway_genes,] %>% colMeans() %>% data.frame(row.names = names(.), score =.)
+    scores_df = merge(x = scores_df,y = metadata,by = 0) %>% column_to_rownames("Row.names")
+    scores_df$condition = factor(scores_df$condition,levels = 
+                                   c("Veh","Rox","osi_short","osi_short_roxa","osi_persistor","osi_persist_roxa"))
+    summary_df <- scores_df %>%
+    group_by(condition) %>%
+    dplyr::summarise(
+      Mean_Score = mean(score),
+      SD_Score = sd(score),
+      N = n(),
+      SE_Score = SD_Score / sqrt(N)
+    )
+    means = summary_df$Mean_Score  %>% scale() %>% as.vector() %>% setNames(summary_df$condition)
+    all_genesets_tpm[[pathway]] = means
+  }
+  
+  all_genesets_tpm_df = all_genesets_tpm %>% as.data.frame() %>% t() %>% as.data.frame()
+  all_cell_lines_TPM[[cell_line]] = all_genesets_tpm_df
+}
+
+
+```
+
+
+```{r}
+data = all_cell_lines_TPM$H1975 %>% t() 
+#scatter plot
+library(ggplot2)
+library(ggrepel)
+
+
+p1 = ggplot(data, aes(x = .data[[x_signature]], y =  .data[[y_signature]], label = rownames(data))) +
+  geom_point() +
+  geom_text_repel() +
+  xlab(paste(x_signature,"mean TPM (scaled)")) +
+  ylab(paste(y_signature,"mean TPM (scaled)")) +
+  ggtitle(paste("H1975:",x_signature,"vs",y_signature)) +
+  theme_minimal()
+
+p1
+data = all_cell_lines_TPM$HCC827 %>% t()
+#scatter plot
+
+
+p2 = ggplot(data, aes(x = .data[[x_signature]], y =  .data[[y_signature]], label = rownames(data))) +
+  geom_point() +
+  geom_text_repel() +
+  xlab(paste(x_signature,"mean TPM (scaled)")) +
+  ylab(paste(y_signature,"mean TPM (scaled)")) +
+  ggtitle(paste("H1975:",x_signature,"vs",y_signature)) +
+  theme_minimal()
+
+p2
+```
+```{r}
+pdf(file = paste0(params$data_out_dir,paste0(x_signature,"-",y_signature,"_scatterplot_H1975.pdf")))
+print(p1)
+dev.off()
+pdf(file = paste0(params$data_out_dir,paste0(x_signature,"-",y_signature,"_scatterplot_HCC827.pdf")))
+print(p2)
+dev.off()
+```
+
+```{r fig.width=10}
+library(ggVennDiagram)
+
+#senescence venn
+venn_data = list(
+  SASP = genesets[["SASP"]],
+  Fridman_senescence = genesets[["FRIDMAN_SENESCENCE_UP"]],
+  GO_SENESCENCE = genesets[["GOBP_POSITIVE_REGULATION_OF_CELLULAR_SENESCENCE"]]
+)
+p = ggVennDiagram(venn_data, label_alpha = 0, label = "count") +
+  scale_fill_gradient(low = "lightblue", high = "blue") +
+  theme(legend.position = "none")+ 
+  scale_x_continuous(expand = expansion(mult = 0.6))
+p
+
+
+#ros venn
+venn_data = list(
+  GOBP_RESPONSE_TO_ROS =  genesets[["GOBP_RESPONSE_TO_REACTIVE_OXYGEN_SPECIES"]],
+  GOBP_PROGRAMMED_CELL_DEATH_WHEN_ROS = genesets[["GOBP_PROGRAMMED_CELL_DEATH_IN_RESPONSE_TO_REACTIVE_OXYGEN_SPECIES"]],
+  Hallmark_ROS = genesets[["HALLMARK_REACTIVE_OXYGEN_SPECIES_PATHWAY"]]
+)
+p = ggVennDiagram(venn_data, label_alpha = 0, label = "count") +
+  scale_fill_gradient(low = "lightblue", high = "blue") +
+  theme(legend.position = "none")+ 
+  scale_x_continuous(expand = expansion(mult = 0.8))
+p
+```
+
