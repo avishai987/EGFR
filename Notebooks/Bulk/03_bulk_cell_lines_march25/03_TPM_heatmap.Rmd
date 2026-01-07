@@ -164,8 +164,7 @@ popViewport()
 ```{r fig.height=8, fig.width=7}
 
 
-plot_genes_heatmap <- function(pathway, return_df = F, plot = T) {
-  pathway_genes = genesets[[pathway]]
+plot_genes_heatmap <- function(pathway_genes, return_df = F, plot = T) {
   pathway_genes = pathway_genes[pathway_genes %in% rownames(bulk_Mar25_TPM_list[[1]]) & pathway_genes %in% rownames(bulk_Mar25_TPM_list[[2]])]
   # expressed in at least one sample
   pathway_genes = pathway_genes[rowSums(bulk_Mar25_TPM_list[[1]][pathway_genes,]) >0 & rowSums( bulk_Mar25_TPM_list[[2]][pathway_genes,])>0]
@@ -217,13 +216,13 @@ plot_genes_heatmap <- function(pathway, return_df = F, plot = T) {
 
 ```{r fig.height=10, fig.width=7}
 
-clustered_mat = plot_genes_heatmap("SASP",return_df = T,plot = T)
+clustered_mat = plot_genes_heatmap(genesets[["SASP"]],return_df = T,plot = T)
 write_xlsx(rownames_to_column(clustered_mat,var = "Gene"), path = paste0(params$data_out_dir,"SASP_genes_TPM_heatmap.xlsx"))
 
-clustered_mat = plot_genes_heatmap("HALLMARK_REACTIVE_OXYGEN_SPECIES_PATHWAY",return_df = T,plot = T)
+clustered_mat = plot_genes_heatmap(genesets[["HALLMARK_REACTIVE_OXYGEN_SPECIES_PATHWAY"]],return_df = T,plot = T)
 write_xlsx(rownames_to_column(clustered_mat,var = "Gene"), path = paste0(params$data_out_dir,"ROS_genes_TPM_heatmap.xlsx"))
 
-clustered_mat = plot_genes_heatmap("HIF_targets",return_df = T,plot = T)
+clustered_mat = plot_genes_heatmap(genesets[["HIF_targets"]],return_df = T,plot = T)
 write_xlsx(rownames_to_column(clustered_mat,var = "Gene"), path = paste0(params$data_out_dir,"HIF_genes_TPM_heatmap.xlsx"))
 
 
@@ -294,7 +293,7 @@ p2 = ggplot(data, aes(x = .data[[x_signature]], y =  .data[[y_signature]], label
   geom_text_repel() +
   xlab(paste(x_signature,"mean TPM (scaled)")) +
   ylab(paste(y_signature,"mean TPM (scaled)")) +
-  ggtitle(paste("H1975:",x_signature,"vs",y_signature)) +
+  ggtitle(paste("HCC827:",x_signature,"vs",y_signature)) +
   theme_minimal()
 
 p2
@@ -335,5 +334,58 @@ p = ggVennDiagram(venn_data, label_alpha = 0, label = "count") +
   theme(legend.position = "none")+ 
   scale_x_continuous(expand = expansion(mult = 0.8))
 p
+```
+#FN1 and PI3
+
+```{r}
+summary_df_list = list()
+pathway_genes = c("FN1","PI3")
+for (cell_line in names(bulk_Mar25_TPM_list)) {
+  cell_line_data = bulk_Mar25_TPM_list[[cell_line]]
+  metadata = metadata_list[[cell_line]]
+  scores_df = cell_line_data[pathway_genes,] %>% t() %>% as.data.frame() %>% merge(y = metadata,by = 0) %>% column_to_rownames("Row.names")
+  
+  
+  summary_df <- scores_df %>%
+  group_by(condition) %>%
+  dplyr::summarise(
+    across(all_of(pathway_genes), mean, .names = "{.col}")
+  ) %>% column_to_rownames("condition") %>% scale()  %>%  t() %>% as.data.frame()%>% na.omit()
+  summary_df_list[[cell_line]] = summary_df
+}
+```
+
+```{r}
+data = summary_df_list$H1975 %>% t() 
+#scatter plot
+library(ggplot2)
+library(ggrepel)
+
+x_signature = "FN1"
+y_signature = "PI3"
+p1 = ggplot(data, aes(x = .data[[x_signature]], y =  .data[[y_signature]], label = rownames(data))) +
+  geom_point() +
+  geom_text_repel() +
+  xlab(paste(x_signature,"mean TPM (scaled)")) +
+  ylab(paste(y_signature,"mean TPM (scaled)")) +
+  ggtitle(paste("H1975:",x_signature,"vs",y_signature)) +
+  theme_minimal()
+
+p1
+data = summary_df_list$HCC827 %>% t()
+#scatter plot
+
+
+p2 = ggplot(data, aes(x = .data[[x_signature]], y =  .data[[y_signature]], label = rownames(data))) +
+  geom_point() +
+  geom_text_repel() +
+  xlab(paste(x_signature,"mean TPM (scaled)")) +
+  ylab(paste(y_signature,"mean TPM (scaled)")) +
+  ggtitle(paste("HCC827:",x_signature,"vs",y_signature)) +
+  theme_minimal()
+
+p2
+
+plot_genes_heatmap(pathway_genes,return_df = F,plot = T)
 ```
 
