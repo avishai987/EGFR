@@ -52,6 +52,7 @@
  GetoptLong         1.0.5     2020-12-15 [1] CRAN (R 4.3.3)
  ggplot2          * 3.5.2     2025-04-09 [1] CRAN (R 4.3.3)
  ggrepel          * 0.9.6     2024-09-07 [1] CRAN (R 4.3.3)
+ ggVennDiagram    * 1.5.4     2025-06-21 [1] CRAN (R 4.3.3)
  GlobalOptions      0.1.2     2020-06-10 [1] CRAN (R 4.3.3)
  glue               1.8.0     2024-09-30 [1] CRAN (R 4.3.3)
  graph            * 1.80.0    2023-10-24 [1] Bioconductor
