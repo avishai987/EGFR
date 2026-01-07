@@ -89,7 +89,7 @@ genesets_annot = rbind(genesets_annot,
 
 
 sasp =  scan(input$SASP_genes, character(), quote = "")
-genesets[["SASP"]] = hif_targets
+genesets[["SASP"]] = sasp
 
 genesets_annot = rbind(genesets_annot,
                         data.frame(
