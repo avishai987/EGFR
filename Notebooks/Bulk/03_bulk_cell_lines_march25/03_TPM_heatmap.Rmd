@@ -96,9 +96,16 @@ genesets_annot = rbind(genesets_annot,
                           name = "Senescence"
                         ))
 
+sabrina_senescence = readxl::read_xlsx("input_data/Pathways/pathways_from_papers/Sabrina_PMC12780064_sup_data_3.xlsx", sheet = "EIS gene list",skip = 0) %>% pull(2)
+
+sabrina_sasp = readxl::read_xlsx("input_data/Pathways/pathways_from_papers/Sabrina_PMC12780064_sup_data_3.xlsx", sheet = "Shared SASP genes",skip = 0) %>% pull(2)
 ```
 
 
+```{r}
+genesets[["Sabrina_Senescence"]] = sabrina_senescence
+genesets[["Sabrina_SASP"]] = sabrina_sasp
+```
 
 
 
@@ -164,10 +171,14 @@ popViewport()
 ```{r fig.height=8, fig.width=7}
 
 
-plot_genes_heatmap <- function(pathway_genes, return_df = F, plot = T) {
+plot_genes_heatmap <- function(pathway_genes, return_df = F, plot = T, pathway = "", scale= T,filter = T) {
   pathway_genes = pathway_genes[pathway_genes %in% rownames(bulk_Mar25_TPM_list[[1]]) & pathway_genes %in% rownames(bulk_Mar25_TPM_list[[2]])]
-  # expressed in at least one sample
-  pathway_genes = pathway_genes[rowSums(bulk_Mar25_TPM_list[[1]][pathway_genes,]) >0 & rowSums( bulk_Mar25_TPM_list[[2]][pathway_genes,])>0]
+  if (filter) {
+    # expressed in at least one sample
+    pathway_genes = pathway_genes[rowSums(bulk_Mar25_TPM_list[[1]][pathway_genes, ]) >
+                                    0 & rowSums(bulk_Mar25_TPM_list[[2]][pathway_genes, ]) > 0]
+  }
+
   summary_df_list = list()
   
   for (cell_line in names(bulk_Mar25_TPM_list)) {
@@ -180,7 +191,12 @@ plot_genes_heatmap <- function(pathway_genes, return_df = F, plot = T) {
     group_by(condition) %>%
     dplyr::summarise(
       across(all_of(pathway_genes), mean, .names = "{.col}")
-    ) %>% column_to_rownames("condition") %>% scale()  %>%  t() %>% as.data.frame()%>% na.omit()
+    ) %>% column_to_rownames("condition")
+    if (scale){
+      summary_df = summary_df  %>% scale()
+    }
+
+    summary_df = summary_df  %>%  t() %>% as.data.frame()%>% na.omit()
     summary_df_list[[cell_line]] = summary_df
   }
   
@@ -191,7 +207,7 @@ plot_genes_heatmap <- function(pathway_genes, return_df = F, plot = T) {
   ht <- Heatmap(summary_df, show_heatmap_legend = FALSE, column_title= pathway,
                 column_order  = colnames(summary_df),
                 column_split = str_extract(colnames(summary_df),"H1975|HCC"))
-  col_fun = colorRamp2(c(min(summary_df), max(summary_df)), c("blue", "red"))
+  col_fun = colorRamp2(c(min(summary_df),0, max(summary_df)), c("blue","white", "red"))
   
   lgd <- Legend(
     title = "TPM mean \nZ score",col_fun = col_fun)
@@ -214,9 +230,9 @@ plot_genes_heatmap <- function(pathway_genes, return_df = F, plot = T) {
 ```
 
 
-```{r fig.height=10, fig.width=7}
+```{r fig.height=6, fig.width=7}
 
-clustered_mat = plot_genes_heatmap(genesets[["SASP"]],return_df = T,plot = T)
+clustered_mat = plot_genes_heatmap(genesets[["SASP"]],return_df = T,plot = T,pathway = "SASP")
 write_xlsx(rownames_to_column(clustered_mat,var = "Gene"), path = paste0(params$data_out_dir,"SASP_genes_TPM_heatmap.xlsx"))
 
 clustered_mat = plot_genes_heatmap(genesets[["HALLMARK_REACTIVE_OXYGEN_SPECIES_PATHWAY"]],return_df = T,plot = T)
@@ -231,7 +247,7 @@ write_xlsx(rownames_to_column(clustered_mat,var = "Gene"), path = paste0(params$
 
 ```{r}
 
-x_signature = "FRIDMAN_SENESCENCE_UP"
+x_signature = "Sabrina_SASP"
 y_signature = "HIF_targets"
 
 all_cell_lines_TPM = list()
@@ -298,6 +314,8 @@ p2 = ggplot(data, aes(x = .data[[x_signature]], y =  .data[[y_signature]], label
 
 p2
 ```
+
+
 ```{r}
 pdf(file = paste0(params$data_out_dir,paste0(x_signature,"-",y_signature,"_scatterplot_H1975.pdf")))
 print(p1)
@@ -306,6 +324,36 @@ pdf(file = paste0(params$data_out_dir,paste0(x_signature,"-",y_signature,"_scatt
 print(p2)
 dev.off()
 ```
+
+```{r}
+#write data- hif
+clustered_mat = plot_genes_heatmap(genesets[["HIF_targets"]],return_df = T,plot = F)
+clustered_mat = clustered_mat[,c("HCC827.Veh", 
+                                 "HCC827.osi_persistor", "HCC827.osi_persist_roxa",
+                                 "H1975.Veh", "H1975.osi_persistor",
+                                 "H1975.osi_persist_roxa")]
+
+write_xlsx(rownames_to_column(clustered_mat,var = "Gene"), path = paste0(params$data_out_dir,"HIF_genes_zscores.xlsx"))
+
+#write data- fridman senescence
+clustered_mat = plot_genes_heatmap(genesets[["FRIDMAN_SENESCENCE_UP"]],return_df = T,plot = F)
+clustered_mat = clustered_mat[,c("HCC827.Veh", 
+                                 "HCC827.osi_persistor", "HCC827.osi_persist_roxa",
+                                 "H1975.Veh", "H1975.osi_persistor",
+                                 "H1975.osi_persist_roxa")]
+write_xlsx(rownames_to_column(clustered_mat,var = "Gene"), path = paste0(params$data_out_dir,"fridman_genes_zscore.xlsx"))
+
+#write rk senescence
+RK_senescence = c("ALDH1A3","AOPEP","CCN2","CDKN1A","CDKN1C","CDKN2A","CDKN2B","CDKN2D","CITED2","CLTB","COL1A2","CREG1","CRYAB","CXCL14","CYP1B1","EIF2S2","ESM1","F3","FILIP1L","FN1","GSN","GUK1","HBS1L","HPS5","HSPA2","HTATIP2","IFI16","IFNG","IGFBP1","IGFBP2","IGFBP3","IGFBP4","IGFBP5","IGFBP6","IGFBP7","IGSF3","ING1","IRF5","IRF7","ISG15","MAP1LC3B","MAP2K3","MMP1","NDN","NME2","NRG1","OPTN","PEA15","RAB13","RAB31","RAB5B","RABGGTA","TNFA","RBL2","YPEL3","SERPINB2","SERPINE1","SMPD1","SMURF2","SOD1","SPARC","TES","TFAP2A","TGFB1I1","THBS1","TNFAIP2","TNFAIP3","TP53","TSPYL5","ABI3","ARG2","B2M","EEF1E1","HLA-G","KIR2DL4","PAWR","SIRT1")
+clustered_mat = plot_genes_heatmap(RK_senescence,return_df = T,plot = F)
+clustered_mat = clustered_mat[,c("HCC827.Veh", 
+                                 "HCC827.osi_persistor", "HCC827.osi_persist_roxa",
+                                 "H1975.Veh", "H1975.osi_persistor",
+                                 "H1975.osi_persist_roxa")]
+write_xlsx(rownames_to_column(clustered_mat,var = "Gene"), path = paste0(params$data_out_dir,"RK_senescence_genes_zscore.xlsx"))
+
+```
+
 
 ```{r fig.width=10}
 library(ggVennDiagram)
@@ -387,5 +435,181 @@ p2 = ggplot(data, aes(x = .data[[x_signature]], y =  .data[[y_signature]], label
 p2
 
 plot_genes_heatmap(pathway_genes,return_df = F,plot = T)
+```
+# Signatures correlations
+
+```{r}
+groups_list = list()
+for (cell_line in c("HCC827","H1975")){
+  data = plot_genes_heatmap(genesets[["SASP"]],return_df = T,plot = F,pathway = "SASP",scale=F) %>%  
+    dplyr::select(starts_with(cell_line)) %>% t() %>% cor()
+  dist_matrix <- dist(data) 
+  hc <- hclust(dist_matrix,method = "complete")
+  groups <- cutree(hc, k = 2)
+  groups_list[[cell_line]] = groups
+  col_annotations = data.frame(group = factor(groups))
+  connectivity <- rowMeans(data)
+  top_5_genes <- names(sort(connectivity, decreasing = TRUE)[1:8])
+  print(top_5_genes)
+  
+  # heatmap of correlation
+  ht <- Heatmap(data, show_heatmap_legend = F, column_title= paste(cell_line,"SASP genes correlation"),
+                cluster_rows = T, cluster_columns = T,top_annotation = HeatmapAnnotation(group = col_annotations$group))
+  col_fun = colorRamp2(c(-1,0, 1), c("blue","white", "red"))
+  title = "Pearson"
+  lgd <- Legend(
+    title = title,col_fun = col_fun)
+  draw(ht, padding = unit(c(2, 2, 2, 75), "mm"))
+  pushViewport(viewport(x=0.65, y=0.7, width=unit(4, "cm"), height=unit(6, "cm"), just=c("left","center")))
+  draw(lgd,x = unit(0.2, "cm"), y = unit(1, "cm"))
+  popViewport()
+    
+}
+
+```
+```{r}
+group_1 = names(groups_list[[1]])[groups_list[[1]] == 1]
+group_2 = names(groups_list[[2]])[groups_list[[2]] == 1]
+
+intersect(group_1, group_2)
+```
+
+```{r}
+genesets[["sasp_cor"]] = intersect(group_1, group_2)
+```
+
+
+# scatter 2 cell lines together, filtered list
+
+```{r}
+
+x_signature = "SASP" #oprions: "sasp_cor", "SASP"
+y_signature = "HIF_targets"
+
+all_cell_lines_TPM = list()
+
+for (cell_line in names(bulk_Mar25_TPM_list)) {
+  cell_line_data = bulk_Mar25_TPM_list[[cell_line]]
+  metadata = metadata_list[[cell_line]]
+  all_genesets_tpm = list()
+
+  for (pathway in c(x_signature,y_signature)) {
+    pathway_genes = genesets[[pathway]]
+    pathway_genes = pathway_genes[pathway_genes %in% rownames(cell_line_data)]
+    scores_df = cell_line_data[pathway_genes,] %>% colMeans() %>% data.frame(row.names = names(.), score =.)
+    scores_df = merge(x = scores_df,y = metadata,by = 0) %>% column_to_rownames("Row.names")
+    scores_df$condition = factor(scores_df$condition,levels = 
+                                   c("Veh","Rox","osi_short","osi_short_roxa","osi_persistor","osi_persist_roxa"))
+    summary_df <- scores_df %>%
+    group_by(condition) %>%
+    dplyr::summarise(
+      Mean_Score = mean(score),
+      SD_Score = sd(score),
+      N = n(),
+      SE_Score = SD_Score / sqrt(N)
+    )
+    means = summary_df$Mean_Score  %>% scale() %>% as.vector() %>% setNames(summary_df$condition)
+    all_genesets_tpm[[pathway]] = means
+  }
+  
+  all_genesets_tpm_df = all_genesets_tpm %>% as.data.frame() %>% t() %>% as.data.frame()
+  all_cell_lines_TPM[[cell_line]] = all_genesets_tpm_df
+}
+
+
+```
+
+
+```{r}
+
+data_1975 = all_cell_lines_TPM$H1975 %>% t() 
+data_827 = all_cell_lines_TPM$HCC827 %>% t()
+all_data = rbind(data_1975,data_827) %>% as.data.frame()
+
+all_data$cell_line = c(rep("H1975",nrow(data_1975)),rep("HCC827",nrow(data_827)))
+#drop rows with "osi_short"
+all_data = all_data  %>% filter(!grepl("osi_short", rownames(all_data)))
+#scatter plot
+library(ggplot2)
+library(ggrepel)
+
+
+p1 = ggplot(all_data, aes(x = .data[[x_signature]], y =  .data[[y_signature]], label = rownames(all_data), color= cell_line)) +
+  geom_point() +
+  geom_text_repel() +
+  # set colors
+  scale_colour_manual(values = c("H1975" = "red", "HCC827" = "blue")) +
+  xlab(paste(x_signature,"mean TPM (scaled)")) +
+  ylab(paste(y_signature,"mean TPM (scaled)")) +
+  ggtitle(paste("H1975:",x_signature,"vs",y_signature)) +
+  theme_minimal()
+
+p1
+
+```
+
+
+# Kurpa genes
+
+```{r fig.height=7, fig.width=6}
+kurpa_sasp <- c(
+  "IL-1b"     = "IL1B",
+  "IP-10"     = "CXCL10",
+  "MCP-1"     = "CCL2",
+  "IL-12p40"  = "IL12B",
+  "IL-12P70"  = "IL12A",
+  "IL-6"      = "IL6",
+  "IL-13"     = "IL13",
+  "IFNg"      = "IFNG",
+  "G-CSF"     = "CSF3",
+  "IL-4"      = "IL4",
+  "EGF"       = "EGF",
+  "IL-10"     = "IL10",
+  "IL-7"      = "IL7",
+  "IL-1RA"    = "IL1RN",
+  "IFNa2"     = "IFNA2",
+  "RANTES"    = "CCL5",
+  "Eotaxin"   = "CCL11",
+  "IL-15"     = "IL15",
+  "IL-8"      = "CXCL8",
+  "TNFa"      = "TNF",
+  "TNFb"      = "LTA",
+  "IL-2"      = "IL2",
+  "IL-1a"     = "IL1A",
+  "IL-17A"    = "IL17A",
+  "IL-3"      = "IL3",
+  "IL-5"      = "IL5",
+  "MIP-1a"    = "CCL3",
+  "MIP-1b"    = "CCL4",
+  "VEGF"      = "VEGFA",
+  "GM-CSF"    = "CSF2"
+)
+
+sasp_genes_flat <- unname(kurpa_sasp)
+
+data = plot_genes_heatmap(sasp_genes_flat ,return_df = T,plot = F,pathway = "SASP",scale=F,filter=F)
+
+data = data+1 #psudocount
+log2_fc = data.frame(row.names  = rownames(data), 
+                     HCC827_fc = log2(data$HCC827.osi_persistor/data$HCC827.Veh),
+                     H1975_fc = log2(data$H1975.osi_persistor/data$H1975.Veh))
+#rename rownames to kurpa names
+match_indices <- match(rownames(log2_fc), kurpa_sasp) 
+rownames(log2_fc) = names(kurpa_sasp)[match_indices]
+#order log2_fc by kurpa_sasp names
+log2_fc = log2_fc[names(kurpa_sasp), ] %>% na.omit()
+
+#heatmap of log2_fc
+ht <- Heatmap(as.matrix(log2_fc[,c("HCC827_fc","H1975_fc")]), show_heatmap_legend = F, 
+              column_title= paste("SASP genes log2 FC osi_persistor vs Veh"),
+              cluster_rows = F, cluster_columns = F, show_row_names = T)
+col_fun = colorRamp2(c(min(log2_fc[,c("HCC827_fc","H1975_fc")]),0, max(log2_fc[,c("HCC827_fc","H1975_fc")])), c("blue","white", "red"))
+title = "log2 FC"
+lgd <- Legend(
+  title = title,col_fun = col_fun)
+draw(ht, padding = unit(c(4, 10, 10, 75), "mm"))
+pushViewport(viewport(x=0.8, y=0.7, width=unit(4, "cm"), height=unit(6, "cm"), just=c("left","center")))
+draw(lgd,x = unit(0.2, "cm"), y = unit(1, "cm"))
+popViewport()
 ```
 
