@@ -194,24 +194,54 @@ dev.off()
 ```
 
 
+```{r}
+  library(tidyr)
+  library(tibble)
+  library(ggplot2)
+dotplot_no_exponent <- function(seurat_obj, markers, group.by="seurat_clusters") {
+  dotplot = DotPlot(object = seurat_obj,features = markers,cluster.idents = F,scale = F) 
+  avg_exp = AverageExpression(object = seurat_obj,features = markers,group.by = group.by,slot = "counts") %>%  #calculate average from log2(TPM)
+    as.data.frame() %>% 
+    rownames_to_column(var = "gene") %>%
+    pivot_longer(cols = -gene,names_to = "id",values_to = "avg_exp") %>%
+    mutate(id = gsub("^RNA.","",id)) 
+  
+  avg_exp_and_pct = right_join(dotplot$data[,c("pct.exp","features.plot","id")],avg_exp,by=c("features.plot"="gene","id"="id"))  #add average expression to dotplot data
+  
+  #create factor in ascending order of clusters
+  avg_exp_and_pct$id = factor(avg_exp_and_pct$id,levels = sort(as.numeric(unique(avg_exp_and_pct$id))))
+   p = ggplot(data = avg_exp_and_pct, mapping = aes_string(x = "features.plot", 
+      y = "id")) + geom_point(mapping = aes_string(size = "pct.exp", 
+      color = "avg_exp")) + theme(axis.title.x = element_blank(), 
+      axis.title.y = element_blank()) + guides(size = guide_legend(title = "Percent\nExpressed")) + 
+      labs(x = "Genes", y = "Clusters",color = "Average\nexpression")+ scale_color_gradient(low = "lightgrey", high = "blue")+
+     theme_cowplot()
+   return (p)
+  
+}
+```
 
 ```{r fig.height=5, fig.width=10}
+library(tidyr)
+library(tibble)
+library(cowplot)
 wbc_markers = c("CD68", "PTPRC", "CD163", "CD14", "CD53", "CD52", "C3AR1", "LAPTM5", "IGSF6",  "SRGN" )
-wbc_dotplot = DotPlot(object = lung,features = wbc_markers,cluster.idents = F,scale = F) +ggtitle("WBC markers")
+wbc_dotplot = dotplot_no_exponent(seurat_obj = lung,markers = wbc_markers,group.by="seurat_clusters") + ggtitle("WBC markers") 
+
 endo_markers= c("VWF", "ERG", "PTPRB",  "TIE1" )
-endo_dotplot = DotPlot(object = lung,features = endo_markers,cluster.idents = F,scale = F) + ggtitle("Endothelial markers") 
+endo_dotplot = dotplot_no_exponent(seurat_obj = lung,markers = endo_markers,group.by="seurat_clusters") + ggtitle("Endothelial markers")
 meso_markers = c("CALB2", "UPK3B", "UPK1B", "HAS1", "WT1", "SAA2",  "SAA1")
-meso_dotplot = DotPlot(object = lung,features = meso_markers,cluster.idents = F,scale = F)+ ggtitle("Mesothelial markers") 
+meso_dotplot = dotplot_no_exponent(seurat_obj = lung,markers = meso_markers,group.by="seurat_clusters") + ggtitle("Mesothelial markers")
 cancer_markers = c("EGFR", "MET", "EPCAM", "NKX2-1", "NAPSA")
-cancer_dotplot = DotPlot(object = lung,features = cancer_markers,cluster.idents = F,scale = F)+ ggtitle("Cancer markers") 
+cancer_dotplot = dotplot_no_exponent(seurat_obj = lung,markers = cancer_markers,group.by="seurat_clusters") + ggtitle("Cancer markers")
 wbc_dotplot
 endo_dotplot
 meso_dotplot
 cancer_dotplot
 ```
 
-```{r fig.height=9, fig.width=12}
-p = ggpubr::ggarrange(wbc_dotplot,endo_dotplot,meso_dotplot,cancer_dotplot, common.legend = T,ncol = 2,nrow = 2,widths = c(1.5,1))
+```{r fig.height=9, fig.width=14}
+p = ggpubr::ggarrange(wbc_dotplot,endo_dotplot,meso_dotplot,cancer_dotplot, common.legend = F,ncol = 2,nrow = 2,widths = c(1.4,1),legend = "right")+ theme(plot.margin = margin(t = 5, r = 50, b = 5, l = 5))
 p
 
 svg(filename = params$data_out_dir %s+% "clusters_cell_types.svg",height = 9,width = 12)
@@ -221,6 +251,11 @@ dev.off()
 
 # identify cell types
 ```{r}
+library(RColorBrewer)
+#shades_red <- brewer.pal(8, "Reds")
+shades_red = colorRampPalette(c("indianred1", "firebrick4"))(8)
+shades_orange <- brewer.pal(3, "Oranges")
+
 
 # assigning the type of the cell of the clusters
 new.cluster.ids <- c(" 0- cancer",
@@ -240,8 +275,12 @@ new.cluster.ids <- c(" 0- cancer",
 names(new.cluster.ids) <- levels(lung)
 lung <- RenameIdents(lung, new.cluster.ids)
 umap_labled <- DimPlot(lung, reduction = "umap", label = TRUE, pt.size = 0.1) + NoLegend()
-umap_labled2 <- DimPlot(lung, reduction = "umap", label = F, pt.size = 0.1) 
-
+umap_labled
+umap_labled2 <- DimPlot(lung, reduction = "umap", label = F, pt.size = 0.1) + scale_color_manual(
+    values = c(shades_red[1:2], "blue", shades_red[3:6], "green", shades_red[7],"blue", shades_red[8],shades_orange[1:3]),
+    labels = new.cluster.ids
+  )
+umap_labled2
 
 new.cluster.ids2 <- c("cancer",
                       "cancer",
@@ -375,10 +414,10 @@ CancerOnlyTPM <- FindNeighbors(CancerOnlyTPM, reduction = "pca", dims = 1:10)
 CancerOnlyTPM <- FindClusters(CancerOnlyTPM, resolution = .5)
 ```
 
-```{r}
-print(DimPlot(CancerOnlyTPM, reduction = "umap", pt.size = 0.1))
-print(DimPlot(CancerOnlyTPM, reduction = "umap", group.by="patient.ident", pt.size = 0.1))
-print(DimPlot(CancerOnlyTPM, reduction = "umap", group.by="time.point", pt.size = 0.1))
+```{r fig.height=6, fig.width=7}
+DimPlot(CancerOnlyTPM, reduction = "umap", pt.size = 0.5)+ ggtitle(NULL)
+DimPlot(CancerOnlyTPM, reduction = "umap", group.by="patient.ident", pt.size = 0.5)+ ggtitle(NULL)
+DimPlot(CancerOnlyTPM, reduction = "umap", group.by="time.point", pt.size = 0.5)+ ggtitle(NULL)
 ```
 
 ```{r}
