@@ -25,6 +25,7 @@ output = pipeline$patients_clustering$output
 library(Seurat)
 library(qs2)
 library(ggplot2)
+library(dplyr)
 ```
 
 ```{r}
@@ -53,4 +54,63 @@ svg(filename = params$data_out_dir %s+% "patients_idents_UMAP.svg")
 p
 dev.off()
 
+```
+
+
+#KRT 5- KRT17+
+```{r}
+
+data = lung %>% FetchData(vars = c("KRT5","KRT17"))  %>% mutate(KRT5_state = ifelse(KRT5>0,"high","low"),
+                                                KRT17_state = ifelse(KRT17>0,"high","low")) 
+
+lung = AddMetaData(object = lung,metadata = data[,c("KRT5_state","KRT17_state"),drop=F])
+lung$KRT_quadrant <- paste0("KRT5_", lung$KRT5_state, "/KRT17_", lung$KRT17_state)
+table(lung$KRT_quadrant)
+DimPlot(lung, group.by = "KRT_quadrant", cols = c(
+  "KRT5_low/KRT17_low"   = "lightgrey", 
+  "KRT5_high/KRT17_low"  = "#ff0000", # אדום
+  "KRT5_low/KRT17_high"  = "#00ff00", # ירוק (מה שחיפשת)
+  "KRT5_high/KRT17_high" = "#ffcc00"  # צהוב/כתום
+)) + ggtitle("KRT5/KRT17 Co-expression States")
+```
+
+```{r fig.height=5, fig.width=9}
+plot_data <- lung@meta.data %>%
+  group_by(time.point, KRT_quadrant) %>% 
+  summarise(count = n()) %>%
+  mutate(percentage = count / sum(count) * 100)
+
+
+ggplot(plot_data, aes(x = time.point, y = percentage, fill = KRT_quadrant)) +
+  geom_bar(stat = "identity", position = "stack") +
+  scale_fill_manual(values = c(
+    "KRT5_low/KRT17_low"   = "lightgrey", 
+    "KRT5_high/KRT17_low"  = "#ff0000", # אדום
+    "KRT5_low/KRT17_high"  = "#00ff00", # ירוק
+    "KRT5_high/KRT17_high" = "#ffcc00"  # צהוב
+  )) +
+  theme_minimal() +
+  labs(y = "Percentage of Cells (%)", x = "Time Point", fill = "KRT Status") +
+  ggtitle("Distribution of KRT5/KRT17 Subsets over Time")
+```
+```{r fig.height=8, fig.width=6}
+#per model
+plot_data <- lung@meta.data %>%
+  group_by(time.point, patient.ident, KRT_quadrant) %>% 
+  summarise(count = n()) %>%
+  mutate(percentage = count / sum(count) * 100)
+
+
+ggplot(plot_data, aes(x = time.point, y = percentage, fill = KRT_quadrant)) +
+  geom_bar(stat = "identity", position = "stack") +
+  scale_fill_manual(values = c(
+    "KRT5_low/KRT17_low"   = "lightgrey", 
+    "KRT5_high/KRT17_low"  = "#ff0000", # אדום
+    "KRT5_low/KRT17_high"  = "#00ff00", # ירוק
+    "KRT5_high/KRT17_high" = "#ffcc00"  # צהוב
+  )) +
+  facet_grid(patient.ident ~ .) +
+  theme_minimal() +
+  labs(y = "Percentage of Cells (%)", x = "Time Point", fill = "KRT Status") +
+  ggtitle("Distribution of KRT5/KRT17 Subsets over Time")
 ```
