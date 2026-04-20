@@ -32,6 +32,9 @@ output = pipeline$xeno_sipsic_known_pathways$output
 library(stringi)
 library(reticulate)
 library(readxl)
+library(Seurat)
+library(readr)
+library(rstatix)
 suppressPackageStartupMessages(library(GSEABase))
 library(SiPSiC)
 library(ggpubr)
@@ -54,8 +57,8 @@ calculatePathwayScores <- function(pathwayToScore, countsMatrix) {
 
 ```{r}
 # Load data
-xeno <- qs::qread(input$xeno)
-
+xeno <- qs2::qs_read(input$xeno)
+msigdb = readRDS(input$msigdb)
 #read Kurppa_PMC7146079_table_s1_YAP signature.xlsx tab "Zhang et al. Cancer Res 2008"
 kurppa <- readxl::read_excel(input$kurppa,sheet = "Zhang et al. Cancer Res 2008")
 kurppa_genes <- kurppa[-1,1,drop=T] # remove first row
@@ -64,16 +67,13 @@ kurppa_genes <- kurppa[-1,1,drop=T] # remove first row
 hadrek <- readxl::read_excel(input$hadrek,sheet = "Supp. Data 3",skip = 3)
 hadrek_genes <- hadrek[,1,drop = T]
 
-#read FRIDMAN_SENESCENCE_UP.v2024.1.Hs.gmt
-FRIDMAN_SENESCENCE_UP  = getGmt(input$SENESCENCE) %>% geneIds() %>%  unlist() %>% base::unname()
+
 
 # read Avelolar Signature from Maynard_PMC7484178_Table_S2.csv
 maynard <- read_csv(input$maynard)
 maynard_genes <- maynard$`Avelolar Signature` %>% unlist() %>% base::unname()
 
 
-#read ferroptosis
-ferroptosis = getGmt(input$ferroptosis) %>% geneIds() %>%  unlist() %>% base::unname()
 
 # read esrra, remove first row and NA
 esrra_up = readxl::read_excel(input$esrra,sheet = "Sheet1")[["Up genes"]] %>% .[-1] %>% .[!is.na(.)]
@@ -82,15 +82,15 @@ esrra_down = readxl::read_excel(input$esrra,sheet = "Sheet1")[["Down genes"]] %>
 # read HIF targets
 hif_targets = scan(input$hif_targets, character(), quote = "")
 
-#SASP
-sasp = c(c("CCL2", "CCL5", "CCL7", "IL1A", "IL1B", "IL32"),c("SCG2", "INHBA", "INHA", "WNT7A", "CSF2", "TNFRSF11B", "GREM1", "CMTM3"))
+sasp =  scan( "./input_data/Pathways/SASP_genes.txt", character(), quote = "")
+
 # list of all genesets
 genesets <- GeneSetCollection(
   GeneSet(kurppa_genes, setName = "Kurppa_YAP"),
    GeneSet(hadrek_genes, setName = "Hadrek_YAP5SA_UP"),
-  GeneSet(FRIDMAN_SENESCENCE_UP, setName = "FRIDMAN_SENESCENCE_UP"),
+  msigdb[["FRIDMAN_SENESCENCE_UP"]],
   GeneSet(maynard_genes, setName = "Maynard_Avelolar_Signature"),
-  GeneSet(ferroptosis, setName = "Ferroptosis"),
+  msigdb[["GOBP_FERROPTOSIS"]],
   GeneSet(esrra_up, setName = "ESRRA_UP"),
   GeneSet(esrra_down, setName = "ESRRA_DOWN"),
   GeneSet(sasp, setName = "SASP")
@@ -98,6 +98,7 @@ genesets <- GeneSetCollection(
 
 ) 
 
+  
 ```
 
 ```{r}
@@ -194,14 +195,14 @@ p
 # hypoxia and ROS correlation
 ```{r fig.height=6, fig.width=15}
 # read the pathways
-hallmark_sipsic = readRDS("./Reports/xeno/02_run_SiPSiC/pathwayScoresMatrix.rds") 
+hallmark_sipsic = readRDS("./Reports/xeno/04_run_SiPSiC/xeno_pathwayScoresMatrix.RDS") 
 xeno[["hallmark_sipsic"]] = CreateAssayObject(counts = hallmark_sipsic)
 
 xeno_osi = subset(xeno, subset = treatment == "OSI")
-
+DefaultAssay(xeno_osi) = "hallmark_sipsic"
 # get ROS and hypoxia scores
-ros_expression = FetchData(xeno_osi@assays$hallmark_sipsic, vars = "HALLMARK-REACTIVE-OXYGEN-SPECIES-PATHWAY")
-HALLMARK_HYPOXIA = FetchData(xeno_osi@assays$hallmark_sipsic, vars = "hif-targets")
+ros_expression = FetchData(xeno_osi, vars = "HALLMARK-REACTIVE-OXYGEN-SPECIES-PATHWAY")
+HALLMARK_HYPOXIA = FetchData(xeno_osi,vars = "hif-targets")
 patient = FetchData(xeno_osi, vars = "orig.ident")
 
 #combine data
@@ -221,14 +222,14 @@ p1 = ggplot(data = data, aes(x = HALLMARK_REACTIVE_OXYGEN_SPECIES_PATHWAY, y = h
   
 # NT cells
 # read the pathways
-hallmark_sipsic = readRDS("./Reports/xeno/02_run_SiPSiC/pathwayScoresMatrix.rds") 
+
 xeno[["hallmark_sipsic"]] = CreateAssayObject(counts = hallmark_sipsic)
 
 xeno_nt = subset(xeno, subset = treatment == "NT")
 
 # get ROS and hypoxia scores
-ros_expression = FetchData(xeno_nt@assays$hallmark_sipsic, vars = "HALLMARK-REACTIVE-OXYGEN-SPECIES-PATHWAY")
-HALLMARK_HYPOXIA = FetchData(xeno_nt@assays$hallmark_sipsic, vars = "hif-targets")
+ros_expression = FetchData(xeno_nt, vars = "HALLMARK-REACTIVE-OXYGEN-SPECIES-PATHWAY")
+HALLMARK_HYPOXIA = FetchData(xeno_nt, vars = "hif-targets")
 patient = FetchData(xeno_nt, vars = "orig.ident")
 
 #combine data
@@ -290,7 +291,7 @@ xeno = SetIdent(xeno, value = "treatment")
 # add xeno@assays$known_pathways to metadata
 xeno = AddMetaData(xeno, metadata = as.data.frame(t(pathwayScoresMatrix)))
 
-hallmark_sipsic = readRDS("./Reports/xeno/02_run_SiPSiC/pathwayScoresMatrix.rds") 
+
 xeno = AddMetaData(xeno, metadata = as.data.frame(t(hallmark_sipsic)))
 
 data = FetchData(xeno, vars = c(rownames(pathwayScoresMatrix), "treatment","orig.ident","HALLMARK_TNFA_SIGNALING_VIA_NFKB","HALLMARK_WNT_BETA_CATENIN_SIGNALING", "HALLMARK_REACTIVE_OXYGEN_SPECIES_PATHWAY", "HALLMARK_FATTY_ACID_METABOLISM","HALLMARK_G2M_CHECKPOINT"))
@@ -308,15 +309,13 @@ p
 
 
 ```{r fig.height=6, fig.width=15}
-# read the pathways
-hallmark_sipsic = readRDS("./Reports/xeno/02_run_SiPSiC/pathwayScoresMatrix.rds") 
 xeno[["hallmark_sipsic"]] = CreateAssayObject(counts = hallmark_sipsic)
 
 xeno_osi = subset(xeno, subset = treatment == "OSI")
 
 # get ROS and hypoxia scores
-ros_expression = FetchData(xeno_osi@assays$hallmark_sipsic, vars = "HALLMARK-FATTY-ACID-METABOLISM")
-HALLMARK_HYPOXIA = FetchData(xeno_osi@assays$hallmark_sipsic, vars = "HALLMARK-G2M-CHECKPOINT")
+ros_expression = FetchData(xeno_osi, vars = "HALLMARK-FATTY-ACID-METABOLISM")
+HALLMARK_HYPOXIA = FetchData(xeno_osi, vars = "HALLMARK-G2M-CHECKPOINT")
 patient = FetchData(xeno_osi, vars = "orig.ident")
 
 #combine data
@@ -335,15 +334,14 @@ p1 = ggplot(data = data, aes(x = HALLMARK_FATTY_ACID_METABOLISM, y = HALLMARK_G2
 
   
 # NT cells
-# read the pathways
-hallmark_sipsic = readRDS("./Reports/xeno/02_run_SiPSiC/pathwayScoresMatrix.rds") 
+
 xeno[["hallmark_sipsic"]] = CreateAssayObject(counts = hallmark_sipsic)
 
 xeno_nt = subset(xeno, subset = treatment == "NT")
 
 # get ROS and hypoxia scores
-ros_expression = FetchData(xeno_nt@assays$hallmark_sipsic, vars = "HALLMARK-FATTY-ACID-METABOLISM")
-HALLMARK_HYPOXIA = FetchData(xeno_nt@assays$hallmark_sipsic, vars = "HALLMARK-G2M-CHECKPOINT")
+ros_expression = FetchData(xeno_nt, vars = "HALLMARK-FATTY-ACID-METABOLISM")
+HALLMARK_HYPOXIA = FetchData(xeno_nt, vars = "HALLMARK-G2M-CHECKPOINT")
 patient = FetchData(xeno_nt, vars = "orig.ident")
 
 #combine data
@@ -483,3 +481,49 @@ pdf(paste0(params$data_out_dir,"ESRRA_DOWN_violin_models.pdf"),width = 8,height 
 all_plots[["ESRRA_DOWN"]]
 dev.off()
 ```
+
+
+```{r}
+DefaultAssay(object = xeno) = "known_pathways"
+#esrra up
+library(rstatix)
+genes_by_tp = FetchData(object = xeno,vars = c("treatment", "SASP","orig.ident"),slot = "counts") %>% filter(treatment != "res")
+pathway = "SASP"
+# all cells by patient boxplot
+formula <- as.formula(paste0(pathway," ~ treatment"))
+
+#plot and split by patient:
+stat.test <- genes_by_tp %>%
+  group_by(orig.ident) %>%
+  wilcox_test(formula) %>%
+  adjust_pvalue(method = "fdr") %>%
+  add_significance() %>%
+  add_xy_position(x = "treatment") %>%
+  mutate(p.adj = signif(p.adj, digits = 2))
+stat.test
+
+
+plt = ggplot(genes_by_tp, aes(x = treatment, y = .data[[pathway]])) +
+  geom_violin(scale = "width",aes(fill = treatment),trim = T) +
+  stat_pvalue_manual(stat.test, label = "{p.adj}")  + #add p value
+  geom_boxplot(width = 0.2, outlier.shape = NA) +
+  labs(title = paste(pathway, "per cell"), y = pathway, fill = "treatment")+
+  theme(plot.title = element_text(hjust = 0.5),axis.title.x = element_blank()) + theme_minimal()+
+scale_y_continuous(expand = expansion(mult = c(0.05, 0.2))) + # Add 10% spaces between the p-value labels and the plot border
+  facet_wrap(~orig.ident,scales = "free")
+
+# add median label to each violin
+
+
+plt+
+  stat_summary(
+    aes(label = after_stat(round(y, 2))),
+    fun = "mean",                        
+    geom = "text", 
+    size = 3, 
+    vjust = -7                          
+  )
+
+
+```
+
