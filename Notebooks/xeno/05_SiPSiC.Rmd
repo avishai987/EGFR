@@ -133,7 +133,7 @@ for (row_num in 1:nrow(logFC_df)) {
 ```
 
 ```{r fig.height=8, fig.width=8}
-col_fun = circlize::colorRamp2(c(-1.5, 0, 1.5), c("royalblue4", "white", "red"))
+col_fun = circlize::colorRamp2(c(-1.5, 0, 1.5), c("blue", "white", "red"))
 p = ComplexHeatmap::Heatmap(logFC_df,  row_names_gp = gpar(fontsize = 8,col =colors), clustering_method_rows = "average",show_heatmap_legend = F,col = col_fun, clustering_distance_rows = "euclidean", cell_fun = function(j, i, x, y, width, height, fill) {
         grid.text(fdr_df[i, j], x, y, gp = gpar(fontsize = 8))
 }
@@ -159,6 +159,13 @@ draw(lgd,x = unit(0.85, "npc"), y = unit(0.78, "npc"))
 dev.off()
 
 
+```
+
+```{r}
+compare_and_save_svg("./paper_figures/my_plot.svg",width = 8, height = 7, {
+  draw(p, padding = unit(c(2, 2, 2, 50), "mm"))
+  draw(lgd, x = unit(0.85, "npc"), y = unit(0.78, "npc"))
+})
 ```
 
 ```{r}
